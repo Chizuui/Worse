@@ -12,6 +12,7 @@ mod term;
 mod view;
 mod worker;
 
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 
@@ -102,6 +103,8 @@ pub(crate) enum Cmd {
     TermClose,
     /// A turn finished (from the hub recorder); refreshes a shown turn diff.
     TurnFinished,
+    /// The chat now shows a session of another folder: reopen the workspace there.
+    SetRoot(PathBuf),
     Shutdown,
 }
 
@@ -121,6 +124,8 @@ struct State {
     tx: Option<mpsc::UnboundedSender<Cmd>>,
     thread: Option<JoinHandle<()>>,
     shut_down: bool,
+    /// Workspace the worker opens (the active session's folder); None = env / current dir.
+    root: Option<PathBuf>,
 }
 
 static STATE: Mutex<State> = Mutex::new(State {
@@ -128,6 +133,7 @@ static STATE: Mutex<State> = Mutex::new(State {
     tx: None,
     thread: None,
     shut_down: false,
+    root: None,
 });
 
 static HUB: Mutex<Option<HubLink>> = Mutex::new(None);
@@ -153,9 +159,10 @@ fn send(cmd: Cmd) {
             return;
         };
         let (tx, rx) = mpsc::unbounded_channel();
+        let root = state.root.clone();
         match std::thread::Builder::new()
             .name("harness-panels".into())
-            .spawn(move || worker::run(window, rx))
+            .spawn(move || worker::run(window, root, rx))
         {
             Ok(handle) => {
                 state.thread = Some(handle);
@@ -276,6 +283,19 @@ pub fn attach_core(core: Arc<dyn HarnessCore>) {
 #[allow(dead_code)] // Wired by agent B (ui-requests.md).
 pub fn session_opened(session: SessionId) {
     with_hub(|hub| hub.active_session = Some(session));
+}
+
+/// The active session's workspace changed (UI thread). A running worker switches at once; a worker that starts
+/// later opens this folder.
+pub fn set_workspace(root: PathBuf) {
+    let mut state = lock(&STATE);
+    if state.root.as_ref() == Some(&root) {
+        return;
+    }
+    state.root = Some(root.clone());
+    if let Some(tx) = &state.tx {
+        let _ = tx.send(Cmd::SetRoot(root));
+    }
 }
 
 /// Stops the worker (kills terminals, stops the watcher, cancels searches) and joins it. Call after the event

@@ -5,6 +5,9 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-15
@@ -52,9 +55,16 @@ jobs:
           </plist>
           PLIST
           codesign --force --deep --sign - "$app"
-          cd dist && ditto -c -k --keepParent Harness.app Harness-macos-universal.zip
+          cd dist && ditto -c -k --keepParent Harness.app Worse-Harness-macos-universal.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: Harness-macos-universal
-          path: dist/Harness-macos-universal.zip
+          path: dist/Worse-Harness-macos-universal.zip
+
+      # Tag builds attach the app to the GitHub release of that tag (created if missing).
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Worse-Harness-macos-universal.zip

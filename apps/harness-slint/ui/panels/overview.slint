@@ -189,11 +189,11 @@ export component OverviewPanel inherits Rectangle {
                     icon: Icons.monitor;
                     text: "Local";
                 }
-                InfoRow {
+                if root.workspace != "": InfoRow {
                     icon: Icons.folder;
                     text: root.workspace;
                 }
-                if PanelGit.is-repo && PanelGit.branch != "": InfoRow {
+                if root.workspace != "" && PanelGit.is-repo && PanelGit.branch != "": InfoRow {
                     icon: Icons.git-branch;
                     text: PanelGit.branch + (PanelGit.sync != "" ? "  " + PanelGit.sync : "");
                 }

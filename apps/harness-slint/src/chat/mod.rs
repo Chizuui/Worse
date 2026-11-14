@@ -1142,6 +1142,17 @@ pub fn sessions_changed(list: Vec<(String, String)>, active: Option<&str>) {
     });
 }
 
+/// 修复：@ 文件提及、打开路径、拖放仍用启动时的工作区；随打开的会话切换，并丢弃旧工作区的文件列表。
+pub fn set_workspace(path: &Path) {
+    with_state(|s| {
+        if s.workspace != path {
+            s.workspace = path.to_path_buf();
+            s.files = None;
+            s.walk_sent = false;
+        }
+    });
+}
+
 /// Message about to be sent: pasted text folded in, the other chips as context items, prompt history recorded.
 pub fn prepare_send(text: &str) -> (String, Vec<ContextItem>) {
     with_state(|s| s.prepare_send(text)).unwrap_or_else(|| (text.to_string(), Vec::new()))

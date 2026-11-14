@@ -79,7 +79,8 @@ struct Terminal {
 
 struct Worker {
     window: Weak<AppWindow>,
-    root: PathBuf,
+    /// `None` = no session or folder open yet: the panels open nothing.
+    root: Option<PathBuf>,
     ws: Option<Workspace>,
     events: Option<WorkspaceEventStream>,
     done_tx: mpsc::UnboundedSender<Done>,
@@ -105,7 +106,11 @@ struct Worker {
 }
 
 /// Thread body: builds the runtime and runs the worker until `Cmd::Shutdown` / the channel closes.
-pub(crate) fn run(window: Weak<AppWindow>, mut rx: mpsc::UnboundedReceiver<Cmd>) {
+pub(crate) fn run(
+    window: Weak<AppWindow>,
+    root: Option<PathBuf>,
+    mut rx: mpsc::UnboundedReceiver<Cmd>,
+) {
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -118,11 +123,12 @@ pub(crate) fn run(window: Weak<AppWindow>, mut rx: mpsc::UnboundedReceiver<Cmd>)
     };
     runtime.block_on(async move {
         let (done_tx, mut done_rx) = mpsc::unbounded_channel();
-        let root = std::env::var_os("HARNESS_WORKSPACE")
-            .filter(|v| !v.is_empty())
-            .map(PathBuf::from)
-            .or_else(|| std::env::current_dir().ok())
-            .unwrap_or_else(|| PathBuf::from("."));
+        // 修复：没有打开会话/文件夹时不再回退到当前目录（否则面板显示无关文件夹的 Git 状态）。
+        let root = root.or_else(|| {
+            std::env::var_os("HARNESS_WORKSPACE")
+                .filter(|v| !v.is_empty())
+                .map(PathBuf::from)
+        });
         let mut worker = Worker {
             window,
             root,
@@ -233,7 +239,19 @@ impl Worker {
         if let Some(ws) = &self.ws {
             return Some(ws.clone());
         }
-        match Workspace::open(self.root.clone(), WorkspaceConfig::default()).await {
+        let Some(root) = self.root.clone() else {
+            let text = "Open a folder or a session first".to_owned();
+            view::git_result(&self.window, text.clone(), true, false);
+            view::term_status(
+                &self.window,
+                TermStatus {
+                    error: text,
+                    ..TermStatus::default()
+                },
+            );
+            return None;
+        };
+        match Workspace::open(root, WorkspaceConfig::default()).await {
             Ok(ws) => {
                 self.events = Some(ws.subscribe());
                 self.ws = Some(ws.clone());
@@ -255,7 +273,51 @@ impl Worker {
         }
     }
 
+    /// 修复：面板（Git/终端/搜索/Diff）一直停在启动时的工作区；打开另一个文件夹的会话后切换到该会话的工作区。
+    async fn set_root(&mut self, root: PathBuf) {
+        if self.root.as_ref() == Some(&root) {
+            return;
+        }
+        // 之前没有工作区时，已打开的面板显示过“先打开文件夹”，现在也要刷新。
+        let was_open = self.ws.is_some() || self.root.is_none();
+        let had_terminal = self.terminal.is_some() || (self.root.is_none() && self.size.is_some());
+        // 关闭旧工作区（终端、监视器、搜索），再清空依赖它的面板状态。
+        self.shutdown().await;
+        self.root = Some(root);
+        self.events = None;
+        self.watch = None;
+        self.git = None;
+        self.git_due = None;
+        self.diff_source = None;
+        self.diff_files.clear();
+        self.diff_current = 0;
+        self.search_id = None;
+        self.hits.clear();
+        self.terminal = None;
+        self.frame_due = None;
+        view::diff(&self.window, DiffView::default());
+        view::search(&self.window, Vec::new(), false, String::new(), String::new());
+        if !was_open {
+            return;
+        }
+        let Some(ws) = self.workspace().await else {
+            return;
+        };
+        match ws.watch_start().await {
+            Ok(id) => self.watch = Some(id),
+            Err(error) => eprintln!("harness-slint: watcher unavailable: {error}"),
+        }
+        self.git_refresh(true);
+        if had_terminal {
+            self.term_start(&ws).await;
+        }
+    }
+
     async fn command(&mut self, cmd: Cmd) {
+        if let Cmd::SetRoot(root) = cmd {
+            self.set_root(root).await;
+            return;
+        }
         let Some(ws) = self.workspace().await else {
             return;
         };
@@ -339,7 +401,7 @@ impl Worker {
                     view::term_status(&self.window, terminal.status.clone());
                 }
             }
-            Cmd::Shutdown => {}
+            Cmd::Shutdown | Cmd::SetRoot(_) => {}
         }
     }
 

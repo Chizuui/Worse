@@ -323,6 +323,7 @@ impl UiState {
         }
         self.active = Some(summary.id.clone());
         self.opened_title.clone_from(&summary.title);
+        self.set_workspace(&summary.workspace_path);
         if let Some(existing) = self.summaries.iter_mut().find(|s| s.id == summary.id) {
             *existing = summary.clone();
         }
@@ -345,6 +346,26 @@ impl UiState {
         if let Some((text, context)) = self.pending_send.take() {
             self.send_message(summary.id.clone(), text, context);
         }
+    }
+
+    /// 修复：工作区只在启动时设置一次，打开其它文件夹的会话后右侧路径、左下角项目名、文件树和 Git/终端面板
+    /// 仍停在旧文件夹；现在跟随打开的会话（空路径 = 保持当前工作区）。
+    fn set_workspace(&mut self, path: &str) {
+        let path = PathBuf::from(path);
+        // 与界面上显示的工作区比较：启动时界面为空，第一次打开会话时必须显示。
+        if path.as_os_str().is_empty()
+            || self.window.get_workspace().as_str() == path.to_string_lossy()
+        {
+            return;
+        }
+        self.workspace.clone_from(&path);
+        show_workspace(&self.window, &path);
+        let _ = self.files_tx.send(FileReq::List(ListDir {
+            dir: path.clone(),
+            depth: 0,
+        }));
+        crate::chat::set_workspace(&path);
+        crate::panels::set_workspace(path);
     }
 
     /// New session on the composer's current agent: passing it in `CreateSession` keeps a choice made before any
@@ -931,6 +952,21 @@ pub(crate) fn ui_font_family(zh: bool) -> &'static str {
     }
 }
 
+/// Workspace path, name and initial shown in the side pane, the project chip and the title bar.
+fn show_workspace(window: &AppWindow, workspace: &Path) {
+    window.set_workspace(SharedString::from(workspace.to_string_lossy().as_ref()));
+    let name = workspace
+        .file_name()
+        .map_or_else(|| workspace.to_string_lossy(), |n| n.to_string_lossy());
+    window.set_workspace_name(SharedString::from(name.as_ref()));
+    window.set_workspace_initial(SharedString::from(
+        name.chars()
+            .next()
+            .map(|c| c.to_uppercase().collect::<String>())
+            .unwrap_or_else(|| "H".to_owned()),
+    ));
+}
+
 pub fn install(
     window: &AppWindow,
     cmd: mpsc::UnboundedSender<Command>,
@@ -950,17 +986,8 @@ pub fn install(
     window.set_chat(ModelRc::from(chat.clone()));
     window.set_files(ModelRc::from(files.clone()));
     window.set_queue(ModelRc::from(queue.clone()));
-    window.set_workspace(SharedString::from(workspace.to_string_lossy().as_ref()));
-    let name = workspace
-        .file_name()
-        .map_or_else(|| workspace.to_string_lossy(), |n| n.to_string_lossy());
-    window.set_workspace_name(SharedString::from(name.as_ref()));
-    window.set_workspace_initial(SharedString::from(
-        name.chars()
-            .next()
-            .map(|c| c.to_uppercase().collect::<String>())
-            .unwrap_or_else(|| "H".to_owned()),
-    ));
+    // 修复：启动时不显示上次的工作区（名称/路径），直到打开会话或文件夹为止。
+    show_workspace(window, Path::new(""));
     let mono = if cfg!(target_os = "windows") {
         "Consolas"
     } else if cfg!(target_os = "macos") {
@@ -976,11 +1003,6 @@ pub fn install(
             window.set_side_tab(id);
         }
     });
-    let _ = files_tx.send(FileReq::List(ListDir {
-        dir: workspace.to_path_buf(),
-        depth: 0,
-    }));
-
     let state = UiState {
         window: window.clone_strong(),
         cmd,

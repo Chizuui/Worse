@@ -1265,7 +1265,8 @@ component Sidebar inherits Rectangle {
                         HorizontalLayout {
                             spacing: 4px;
                             Text {
-                                text: root.workspace;
+                                // 没有打开文件夹时只显示产品名。
+                                text: root.workspace != "" ? root.workspace : "Worse Harness";
                                 font-size: Theme.ui-sm;
                                 font-weight: Theme.weight-medium;
                                 color: Theme.foreground;
@@ -1273,7 +1274,7 @@ component Sidebar inherits Rectangle {
                                 overflow: elide;
                             }
                             Text {
-                                text: "· Harness";
+                                text: root.workspace != "" ? "· Harness" : "";
                                 font-size: Theme.ui-sm;
                                 color: Theme.foreground-subtle;
                                 vertical-alignment: center;
@@ -1310,7 +1311,7 @@ component Sidebar inherits Rectangle {
                             height: 26px;
                             padding-left: 10px;
                             Text {
-                                text: root.workspace + " · " + @tr("Local");
+                                text: root.workspace != "" ? root.workspace + " · " + @tr("Local") : @tr("Local");
                                 font-size: Theme.ui-sm;
                                 font-weight: Theme.weight-medium;
                                 color: Theme.foreground-subtle;
