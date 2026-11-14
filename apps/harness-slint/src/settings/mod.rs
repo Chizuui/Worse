@@ -283,9 +283,27 @@ fn transport_id(t: McpTransport) -> &'static str {
     }
 }
 
-fn fields_of(body: &EntryBody) -> Vec<(String, String)> {
+/// Agent ids of the `agents` form field (comma or newline separated); empty = all agents.
+fn agent_ids(value: &str) -> Vec<String> {
+    value
+        .split(['\n', ','])
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
+/// Form fields of `body`. `overlay` = the Harness MCP overlay target, the only config whose entries know which
+/// agent ids receive a server (`McpServer::agents`).
+fn fields_of(body: &EntryBody, overlay: bool) -> Vec<(String, String)> {
     let f = |k: &str, v: String| (k.to_string(), v);
     match body {
+        // Harness overlay only: the CLI configs have no per-agent filter.
+        EntryBody::Mcp(s) if overlay => {
+            let mut fields = fields_of(body, false);
+            fields.push(f("agents", s.agents.join(", ")));
+            fields
+        }
         EntryBody::Mcp(s) => vec![
             f("name", s.name.clone()),
             f("transport", transport_id(s.transport).into()),
@@ -358,7 +376,7 @@ fn default_body(concept: Concept) -> EntryBody {
     }
 }
 
-fn body_from(base: EntryBody, fields: &[(String, String)]) -> EntryBody {
+fn body_from(base: EntryBody, fields: &[(String, String)], overlay: bool) -> EntryBody {
     let get = |k: &str| {
         fields
             .iter()
@@ -379,6 +397,10 @@ fn body_from(base: EntryBody, fields: &[(String, String)]) -> EntryBody {
             s.env = pairs(&get("env"), '=');
             s.url = non_empty(&get("url"));
             s.headers = pairs(&get("headers"), ':');
+            // Harness overlay only: keep `agents` untouched for the CLI configs, which never write it.
+            if overlay {
+                s.agents = agent_ids(&get("agents"));
+            }
             EntryBody::Mcp(s)
         }
         EntryBody::Skill(mut s) => {
@@ -990,9 +1012,11 @@ impl State {
     }
 
     fn open_editor(&mut self, name: Option<&str>) {
-        let (Some(concept), _) = self.target() else {
+        let (Some(concept), target) = self.target() else {
             return;
         };
+        // Only the Harness overlay carries the per-agent filter (`agents`).
+        let is_overlay = target.agent == AgentKind::Harness;
         let cfg = self.window.global::<ConfigUi>();
         let entry = name.and_then(|n| self.entries.iter().find(|e| e.name == n).cloned());
         let base = entry
@@ -1000,7 +1024,7 @@ impl State {
             .map_or_else(|| default_body(concept), |e| e.body.clone());
         self.edit = Some(Edit {
             previous: entry.as_ref().map(|e| e.name.clone()),
-            fields: fields_of(&base),
+            fields: fields_of(&base, is_overlay),
             base: Some(base),
         });
         cfg.set_editing(true);
@@ -1046,6 +1070,8 @@ impl State {
 
     fn save_editor(&mut self) {
         let (_, target) = self.target();
+        // Only the Harness overlay carries the per-agent filter (`agents`).
+        let is_overlay = target.agent == AgentKind::Harness;
         let cfg = self.window.global::<ConfigUi>();
         let Some(edit) = &self.edit else {
             return;
@@ -1061,7 +1087,7 @@ impl State {
             };
             PlanOp::Upsert {
                 target,
-                body: Box::new(body_from(base, &edit.fields)),
+                body: Box::new(body_from(base, &edit.fields, is_overlay)),
                 previous: edit.previous.clone(),
             }
         };
@@ -2194,4 +2220,45 @@ pub fn teardown() {
             guard.take();
         }
     });
+}
+
+#[cfg(test)]
+mod mcp_agents_tests {
+    use super::*;
+
+    fn server() -> EntryBody {
+        EntryBody::Mcp(McpServer {
+            name: "ssh".into(),
+            command: Some("node".into()),
+            agents: vec!["claude-code".into(), "codex".into()],
+            ..McpServer::default()
+        })
+    }
+
+    fn agents_of(body: &EntryBody) -> Vec<String> {
+        match body {
+            EntryBody::Mcp(s) => s.agents.clone(),
+            _ => Vec::new(),
+        }
+    }
+
+    #[test]
+    fn overlay_form_round_trips_agents() {
+        let mut fields = fields_of(&server(), true);
+        let agents = fields.iter_mut().find(|(k, _)| k == "agents");
+        assert_eq!(agents.as_ref().map(|(_, v)| v.as_str()), Some("claude-code, codex"));
+        if let Some((_, v)) = agents {
+            *v = " codex ,\napi-deepseek, ".into();
+        }
+        let body = body_from(server(), &fields, true);
+        assert_eq!(agents_of(&body), vec!["codex".to_string(), "api-deepseek".to_string()]);
+    }
+
+    #[test]
+    fn cli_targets_have_no_agents_field_and_keep_the_value() {
+        let fields = fields_of(&server(), false);
+        assert!(fields.iter().all(|(k, _)| k != "agents"));
+        let body = body_from(server(), &fields, false);
+        assert_eq!(agents_of(&body), vec!["claude-code".to_string(), "codex".to_string()]);
+    }
 }

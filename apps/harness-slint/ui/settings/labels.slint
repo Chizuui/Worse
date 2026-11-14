@@ -144,6 +144,7 @@ export global Labels {
         if key == "env" { return @tr("Environment variables"); }
         if key == "url" { return "URL"; }
         if key == "headers" { return @tr("Headers"); }
+        if key == "agents" { return @tr("Agents"); }
         if key == "timeout" { return @tr("Timeout (seconds)"); }
         if key == "description" { return @tr("Description"); }
         if key == "argumentHint" { return @tr("Argument hint"); }
@@ -165,6 +166,7 @@ export global Labels {
         if key == "args" { return @tr("One argument per line"); }
         if key == "env" { return @tr("KEY=value, one per line"); }
         if key == "headers" { return @tr("Header: value, one per line"); }
+        if key == "agents" { return @tr("Agent ids, comma separated (empty = all agents), e.g. claude-code, codex"); }
         if key == "tools" { return @tr("Comma separated; empty inherits all tools"); }
         if key == "matcher" { return @tr("Tool name pattern, e.g. Bash|Write"); }
         ""
