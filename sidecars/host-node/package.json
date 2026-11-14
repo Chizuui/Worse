@@ -1,0 +1,26 @@
+{
+  "name": "@harness/host-node",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "pnpm --dir ../rust-bridge build && tsc -p tsconfig.json && node scripts/build-webRemote-vendor.mjs && node scripts/build-mcpTempAttachment-vendor.mjs && node scripts/build-vendor.mjs && node scripts/build-browser-vendor.mjs && node scripts/build-pluginSandbox-vendor.mjs",
+    "build:pluginSandbox-vendor": "node scripts/build-pluginSandbox-vendor.mjs",
+    "build:browser-vendor": "node scripts/build-browser-vendor.mjs",
+    "build:remote-vendor": "node scripts/build-vendor.mjs",
+    "build:webRemote-vendor": "node scripts/build-webRemote-vendor.mjs",
+    "build:mcpTempAttachment-vendor": "node scripts/build-mcpTempAttachment-vendor.mjs",
+    "typecheck": "pnpm --dir ../rust-bridge build && tsc -p tsconfig.json --noEmit",
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "start": "node --no-warnings dist/main.js"
+  },
+  "dependencies": {
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^6.0.2"
+  }
+}

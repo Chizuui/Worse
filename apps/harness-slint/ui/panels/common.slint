@@ -1,0 +1,139 @@
+// Small building blocks shared by agent A's panels (tokens and shared controls come from agent B).
+import { Theme } from "../theme/tokens.slint";
+
+// Panel toolbar row (ZCode panel header: 36px, title left, actions right, bottom border).
+export component PanelBar inherits Rectangle {
+    height: 36px;
+    background: transparent;
+    @children
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.border;
+    }
+}
+
+// Redesign helpers (FigCraft frames 01/05/06): agent colours, status pills, 4px progress tracks, caps headers.
+export global AgentTint {
+    public pure function of(name: string) -> color {
+        if name.to-lowercase() == "claude code" || name.to-lowercase() == "claude" || name.to-lowercase() == "claude-code" { return Theme.agent-claude; }
+        if name.to-lowercase() == "codex" { return Theme.agent-codex; }
+        if name.to-lowercase() == "deepseek" || name.to-lowercase() == "deepseek (api)" { return Theme.agent-deepseek; }
+        if name.to-lowercase() == "antigravity" || name.to-lowercase() == "agy" { return Theme.agent-agy; }
+        if name.to-lowercase() == "gemini" { return Theme.agent-gemini; }
+        return Theme.accent-fg;
+    }
+}
+
+// Pill: text in colour on colour + 1F, radius full, 11 semibold.
+export component Pill inherits Rectangle {
+    in property <string> text;
+    in property <color> tint: Theme.foreground-subtle;
+    height: 18px;
+    width: pill-text.preferred-width + 14px;
+    border-radius: self.height / 2;
+    background: root.tint.with-alpha(0.12);
+    accessible-role: none;
+    pill-text := Text {
+        text: root.text;
+        font-size: 11px;
+        font-weight: Theme.weight-semibold;
+        color: root.tint;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+    }
+}
+
+// Thin progress track (4px). ratio < 0 = indeterminate (sliding segment).
+export component ProgressTrack inherits Rectangle {
+    in property <float> ratio: -1;
+    in property <color> tint: Theme.accent-fg;
+    height: 4px;
+    border-radius: 2px;
+    background: Theme.border-hover;
+    clip: true;
+    Rectangle {
+        property <float> phase: Theme.reduce-motion ? 0.3 : mod(animation-tick() / 1ms, 1600) / 1600;
+        x: root.ratio < 0 ? (parent.width * 1.4 * self.phase - parent.width * 0.4) : 0;
+        width: root.ratio < 0 ? parent.width * 0.4 : parent.width * clamp(root.ratio, 0, 1);
+        height: parent.height;
+        border-radius: 2px;
+        background: root.tint;
+    }
+}
+
+// Caps section label (10 semibold, caps-label colour) with an optional count.
+export component CapsHeader inherits HorizontalLayout {
+    in property <string> text;
+    in property <string> count;
+    in property <color> tint: Theme.caps-label;
+    spacing: 6px;
+    Text {
+        text: root.text.to-uppercase();
+        font-size: 10px;
+        font-weight: Theme.weight-semibold;
+        letter-spacing: 0.8px;
+        color: root.tint;
+        vertical-alignment: center;
+    }
+    if root.count != "": Text {
+        text: root.count;
+        font-size: 10px;
+        font-weight: Theme.weight-semibold;
+        color: Theme.caps-label;
+        vertical-alignment: center;
+    }
+    Rectangle { horizontal-stretch: 1; }
+}
+
+// Centered placeholder text (empty / error / not-a-repo states).
+export component PanelNotice inherits Rectangle {
+    in property <string> text;
+    in property <bool> error;
+    Text {
+        x: Theme.space-4;
+        width: parent.width - 2 * Theme.space-4;
+        text: root.text;
+        wrap: word-wrap;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        font-size: Theme.ui-sm;
+        color: root.error ? Theme.destructive : Theme.foreground-subtle;
+    }
+}
+
+// Two-state chip used for search options (".*" regex, "Aa" case).
+export component ToggleChip inherits Rectangle {
+    in property <string> text;
+    in property <string> label;
+    in-out property <bool> checked;
+    callback toggled();
+    width: 28px;
+    height: Theme.control-sm;
+    border-radius: Theme.radius-md;
+    background: root.checked ? Theme.selected : (ta.has-hover ? Theme.hover : transparent);
+    border-width: root.checked ? 1px : 0px;
+    border-color: Theme.border-hover;
+    accessible-role: checkbox;
+    accessible-label: root.label;
+    accessible-checked: root.checked;
+    accessible-action-default => {
+        root.checked = !root.checked;
+        root.toggled();
+    }
+    Text {
+        text: root.text;
+        font-family: Theme.mono-font;
+        font-size: Theme.ui-sm;
+        color: root.checked ? Theme.foreground : Theme.foreground-subtle;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.checked = !root.checked;
+            root.toggled();
+        }
+    }
+}

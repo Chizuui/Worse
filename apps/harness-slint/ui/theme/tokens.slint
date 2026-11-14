@@ -1,0 +1,229 @@
+import { Palette } from "std-widgets.slint";
+
+export global Theme {
+    in-out property <int> pref: 0;
+    out property <bool> dark: pref == 2 || (pref == 0 && Palette.color-scheme == ColorScheme.dark);
+    in-out property <bool> reduce-motion: false;
+
+    out property <color> canvas: dark ? #0b0c0e : #e9edf3;
+    out property <color> glass: dark ? #111215 : #f7f8fbd9;
+    out property <color> glass-strong: dark ? #16181c : #fffffff7;
+    out property <color> glass-deep: dark ? #0b0c0e : #fbfcfdf0;
+    out property <color> glass-border: dark ? #24272d : #0b10201a;
+    out property <color> glass-hairline: #00000000;
+    out property <color> glass-highlight: dark ? #00000000 : #ffffff;
+    out property <length> glass-shadow-blur: 20px;
+    out property <length> glass-shadow-y: 10px;
+    out property <color> glass-shadow: dark ? #00000080 : #0b102014;
+
+    // Accent picked in Settings › Appearance (S2 swatches); dark theme only, light keeps its contrast-safe blue.
+    in-out property <color> accent-pick: #7c8cff;
+    out property <color> accent-fg: dark ? accent-pick : #2f5bd3;
+    out property <color> accent-soft: dark ? accent-pick.with-alpha(0.12) : #2f5bd314;
+    out property <color> accent-line: dark ? accent-pick.with-alpha(0.35) : #2f5bd359;
+    out property <color> glow: #00000000;
+    out property <color> violet: dark ? #b07cff : #4b5470;
+    out property <color> violet-soft: dark ? #b07cff1f : #4b547014;
+    out property <color> ember: dark ? #e88a5c : #a45a1f;
+    out property <color> ember-soft: dark ? #e88a5c1f : #a45a1f14;
+    out property <color> sky: accent-fg;
+    out property <color> sky-soft: accent-soft;
+    out property <brush> primary-brush: primary;
+    out property <brush> primary-brush-hover: primary-hover;
+    out property <color> primary-shadow: dark ? #00000080 : #0b102033;
+
+    out property <color> background: glass-deep;
+    out property <color> background-win-alt: canvas;
+    out property <color> header: transparent;
+    out property <color> panel: glass;
+    out property <color> sidebar: glass;
+    out property <color> surface: dark ? #16181c : #ffffffcc;
+    out property <color> surface-hover: dark ? #1c1f24 : #ffffff;
+    out property <color> user-bubble: dark ? #16181c : #0b10200a;
+    out property <color> card: dark ? #111215 : #ffffffb3;
+    out property <color> card-selected: dark ? #1c1f24 : #ffffff;
+    out property <color> card-border: dark ? #24272d : #0b102012;
+    out property <color> popover: glass-strong;
+    out property <color> popover-header: dark ? #ffffff05 : #0b102005;
+    out property <color> popover-border: dark ? #2a2d33 : #0b102014;
+    out property <color> menu: glass-strong;
+    out property <color> menu-hover: dark ? #1c1f24 : #0b10200d;
+    out property <color> input: dark ? #16181c : #ffffffcc;
+    out property <color> input-focused: dark ? #16181c : #ffffff;
+    out property <color> input-border: dark ? #24272d : #0b10201a;
+    out property <color> input-border-hover: dark ? #2a2d33 : #0b10202e;
+    out property <color> input-border-focused: accent-line;
+    out property <color> tab: transparent;
+    out property <color> tab-active: dark ? #1c1f24 : #ffffff;
+    out property <color> tab-border: card-border;
+    out property <color> toast: glass-strong;
+    out property <color> tooltip: dark ? #1c1f24 : #0b1020f0;
+    out property <color> tooltip-foreground: dark ? #edeef0 : #f8fafc;
+    out property <color> tag: dark ? #1c1f24 : #0b10200d;
+    out property <color> scrim: dark ? #00000099 : #0b102040;
+
+    out property <color> border: dark ? #24272d : #0b102014;
+    out property <color> border-hover: dark ? #2a2d33 : #0b102026;
+    out property <color> hover: dark ? #ffffff0a : #0b10200a;
+    out property <color> selected: dark ? #ffffff12 : #0b10200f;
+    out property <color> text-selection: dark ? #7c8cff59 : #2f6bdc4d;
+    out property <color> accent: accent-soft;
+    out property <color> brand: accent-fg;
+    out property <color> resize-handle: accent-fg;
+    out property <color> find-highlight: dark ? #fbbf2433 : #fde68a;
+    out property <color> find-highlight-active: dark ? #fbbf24 : #f59e0b;
+
+    out property <color> foreground: dark ? #edeef0 : #0b1020;
+    out property <color> foreground-subtle: dark ? #c9ccd2 : #0b1020b3;
+    out property <color> foreground-subtlest: dark ? #8a909a : #0b102085;
+    out property <color> foreground-inverse: dark ? #0b0c0e : #ffffff;
+    out property <color> muted: dark ? #8a909a : #475569;
+    out property <color> icon: foreground;
+    out property <color> icon-subtle: dark ? #8a909a : #0b1020a6;
+    out property <color> icon-subtlest: dark ? #6b717c : #0b102066;
+    out property <color> link: sky;
+    out property <color> icon-purple: violet;
+
+    out property <color> primary: dark ? #edeef0 : #0b1020;
+    out property <color> primary-hover: dark ? #ffffff : #1c2338;
+    out property <color> primary-foreground: dark ? #0b0c0e : #ffffff;
+    out property <color> secondary: surface;
+
+    out property <color> success: dark ? #3dd68c : #16a34a;
+    out property <color> success-foreground: dark ? #04210f : #ffffff;
+    out property <color> success-surface: dark ? #3dd68c1f : #16a34a1f;
+    out property <color> success-surface-foreground: dark ? #3dd68c : #15803d;
+    out property <color> warning: dark ? #f5b14c : #d97706;
+    out property <color> warning-foreground: dark ? #2a1a00 : #ffffff;
+    out property <color> warning-surface: dark ? #f5b14c1f : #d977061f;
+    out property <color> warning-surface-foreground: dark ? #f5b14c : #b45309;
+    out property <color> destructive: dark ? #f2555a : #dc2626;
+    out property <color> destructive-foreground: #ffffff;
+    out property <color> destructive-surface: dark ? #f2555a1f : #dc26261a;
+    out property <color> destructive-surface-foreground: dark ? #f2555a : #b91c1c;
+    out property <color> progress-surface: sky-soft;
+    out property <color> progress-surface-foreground: sky;
+    out property <color> confirm-surface: dark ? #3dd68c1f : #16a34a1a;
+    out property <color> confirm-foreground: dark ? #3dd68c : #15803d;
+    out property <color> ask-surface: sky-soft;
+    out property <color> ask-foreground: sky;
+    out property <color> idle-task: violet;
+    out property <color> idle-task-surface: violet-soft;
+
+    out property <color> diff-added: success;
+    out property <color> diff-added-foreground: success-foreground;
+    out property <color> diff-removed: destructive;
+    out property <color> diff-removed-foreground: dark ? #2a0505 : #ffffff;
+    out property <color> diff-added-surface: dark ? #3dd68c1a : #16a34a17;
+    out property <color> diff-removed-surface: dark ? #f2555a1a : #dc262614;
+    out property <color> git-modified: warning;
+    out property <color> git-added: success;
+    out property <color> git-deleted: destructive;
+    out property <color> git-renamed: sky;
+    out property <color> git-untracked: success;
+    out property <color> git-ignored: foreground-subtlest;
+    out property <color> git-descendant: warning;
+
+    out property <color> terminal-bg: dark ? #0b0c0e : #ffffffcc;
+    out property <color> terminal-fg: foreground;
+    out property <color> terminal-cursor: accent-fg;
+    out property <color> terminal-selection: dark ? #7c8cff40 : #2f5bd333;
+    out property <[color]> terminal-ansi: dark ? [#2a2f3d, #f87171, #4ade80, #fbbf24, #60a5fa, #c084fc, #5eead4, #cbd5e1, #64748b, #fca5a5, #86efac, #fcd34d, #93c5fd, #d8b4fe, #99f6e4, #f8fafc] : [#334155, #dc2626, #16a34a, #d97706, #2563eb, #9333ea, #0d9488, #94a3b8, #64748b, #ef4444, #22c55e, #f59e0b, #3b82f6, #a855f7, #14b8a6, #0b1020];
+
+    out property <color> markdown-inline-code: dark ? #1c1f24 : #0b10200d;
+    out property <color> file-node: sky-soft;
+    out property <color> file-node-foreground: sky;
+    out property <color> command-node: violet-soft;
+    out property <color> command-node-foreground: violet;
+
+    out property <color> syntax-keyword: dark ? #c792ea : #be185d;
+    out property <color> syntax-string: dark ? #a7d7b4 : #2f7a4a;
+    out property <color> syntax-comment: dark ? #6b717c : #64748b;
+    out property <color> syntax-function: dark ? #9aa6ff : #6d28d9;
+    out property <color> syntax-type: dark ? #f5b14c : #c2410c;
+    out property <color> syntax-number: dark ? #5bc0ff : #0369a1;
+
+    in property <string> ui-font: "";
+    in property <string> mono-font: "Consolas";
+    in-out property <length> ui-font-size: 14px;
+    out property <length> ui-xl: ui-font-size + 4px;
+    out property <length> ui-lg: ui-font-size + 2px;
+    out property <length> ui-base: ui-font-size;
+    out property <length> ui-caption: ui-font-size - 1px;
+    out property <length> ui-sm: ui-font-size - 2px;
+    out property <length> ui-xs: ui-font-size - 4px;
+    out property <length> ui-settings-title: ui-font-size + 10px;
+    in-out property <length> code-size: 12px;
+    in-out property <length> terminal-size: 13px;
+    out property <int> weight-normal: 400;
+    out property <int> weight-medium: 500;
+    out property <int> weight-semibold: 600;
+    out property <length> line-base: ui-font-size * 1.5;
+    out property <length> line-sm: (ui-font-size - 2px) * 1.5;
+
+    out property <length> space-0-5: 2px;
+    out property <length> space-1: 4px;
+    out property <length> space-1-5: 6px;
+    out property <length> space-2: 8px;
+    out property <length> space-2-5: 10px;
+    out property <length> space-3: 12px;
+    out property <length> space-4: 16px;
+    out property <length> space-5: 20px;
+    out property <length> space-6: 24px;
+    out property <length> space-8: 32px;
+
+    out property <length> radius-full: 999px;
+    out property <length> radius-3xl: 24px;
+    out property <length> radius-2xl: 20px;
+    out property <length> radius-xl: 14px;
+    out property <length> radius-lg: 10px;
+    out property <length> radius-md: 8px;
+    out property <length> radius-sm: 6px;
+
+    out property <length> control-xs: 22px;
+    out property <length> control-sm: 26px;
+    out property <length> control: 30px;
+    out property <length> control-lg: 34px;
+    out property <length> input-height: 38px;
+    out property <length> icon-size: 18px;
+    out property <length> icon-sm: 16px;
+    out property <length> icon-xs: 14px;
+    out property <length> frame-gap: 8px;
+    out property <length> sidebar-width: 272px;
+    out property <length> side-pane-width: 316px;
+    out property <length> topbar-height: 52px;
+    out property <color> composer: dark ? #16181c : glass-strong;
+    out property <color> composer-border: dark ? #2a2d33 : glass-border;
+    out property <color> section-line: dark ? #24272d : #0b10200f;
+    out property <color> switch-on: accent-fg;
+    out property <length> chat-max-width: 768px;
+
+    out property <length> shadow-md-blur: 24px;
+    out property <length> shadow-md-y: 8px;
+    out property <color> shadow-md-color: dark ? #00000080 : #0b10201f;
+    out property <length> shadow-lg-blur: 48px;
+    out property <length> shadow-lg-y: 16px;
+    out property <color> shadow-lg-color: dark ? #00000099 : #0b10202e;
+    out property <length> shadow-composer-blur: 36px;
+    out property <color> shadow-composer-color: dark ? #00000080 : #0b10201f;
+
+    out property <duration> dur-press: reduce-motion ? 0ms : 120ms;
+    out property <duration> dur-hover: reduce-motion ? 0ms : 150ms;
+    out property <duration> dur-menu: reduce-motion ? 0ms : 180ms;
+    out property <duration> dur-enter: reduce-motion ? 0ms : 220ms;
+    out property <duration> dur-move: reduce-motion ? 0ms : 240ms;
+    out property <duration> dur-dialog: reduce-motion ? 0ms : 240ms;
+    out property <duration> dur-panel: reduce-motion ? 0ms : 280ms;
+
+    // Redesign 2026-11: brand + agent identity colours
+    out property <brush> brand-gradient: @linear-gradient(90deg, #7c8cff 0%, #b07cff 100%);
+    out property <color> info: dark ? #5bc0ff : #0369a1;
+    out property <color> info-surface: dark ? #5bc0ff1f : #0369a11a;
+    out property <color> caps-label: dark ? #5d636d : #64748b;
+    out property <color> raised: dark ? #1c1f24 : #ffffff;
+    out property <color> agent-claude: #e88a5c;
+    out property <color> agent-codex: #3dd68c;
+    out property <color> agent-deepseek: #4d6bfe;
+    out property <color> agent-agy: #b07cff;
+    out property <color> agent-gemini: #5bc0ff;
+}

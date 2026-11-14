@@ -1,0 +1,20 @@
+[package]
+name = "harness-git"
+version = "0.1.0"
+description = "Harness git service: read-only port of ZCode's GitCliRepo/GitService over the git CLI."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+harness-fs = { path = "../harness-fs" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

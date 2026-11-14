@@ -1,0 +1,25 @@
+[package]
+name = "harness-watch"
+version = "0.1.0"
+description = "Harness file watcher: notify-based port of ZCode's FileWatcherService (debounce, max-wait, identity check, bounded coalescing)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+harness-fs = { path = "../harness-fs" }
+ignore = { workspace = true }
+notify = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+winapi-util = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

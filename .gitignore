@@ -1,0 +1,11 @@
+target/
+.work/
+node_modules/
+dist/
+gen/
+.npm-cache/
+dist-linux/
+dist-macos/
+# local notes for coding agents (kept out of the public repo)
+AGENTS.md
+CLAUDE.md

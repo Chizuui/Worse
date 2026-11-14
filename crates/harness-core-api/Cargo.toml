@@ -1,0 +1,19 @@
+[package]
+name = "harness-core-api"
+version = "0.4.0"
+description = "UI-agnostic API of the Harness agent hub: types, the HarnessCore trait and the event stream (spec phase-8-core.md)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+# Only the sync primitives: the API stays runtime-light for the UI crate.
+tokio = { version = "1", default-features = false, features = ["sync"] }
+# Local-time labels for UIs (API request 2); clock reads the system time zone without unsafe code.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[lints]
+workspace = true

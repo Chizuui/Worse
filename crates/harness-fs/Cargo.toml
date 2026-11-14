@@ -1,0 +1,21 @@
+[package]
+name = "harness-fs"
+version = "0.1.0"
+description = "Workspace file-system primitives for the Harness Rust Host: stat, bounded reads, atomic writes, path identity and symlink policy."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+icu_collator = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

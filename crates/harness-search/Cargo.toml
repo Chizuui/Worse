@@ -1,0 +1,24 @@
+[package]
+name = "harness-search"
+version = "0.1.0"
+description = "Workspace file index, fuzzy file-name search and streaming text search for the Harness Rust Host."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+harness-fs = { path = "../harness-fs" }
+grep-matcher = { workspace = true }
+grep-regex = { workspace = true }
+grep-searcher = { workspace = true }
+ignore = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,15 @@
+Worse Harness
+Copyright 2026 The Worse Harness contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes material derived from ZCode
+(https://github.com/zai-org/ZCode), Copyright 2026 Z.AI Co., Ltd, licensed under
+the Apache License, Version 2.0. Harness was started as a Rust remake of ZCode:
+its behaviour was used as the parity reference and its file-type icons
+(apps/harness-slint/ui/icons/files, from Material Icon Theme by Philipp Kief,
+MIT License) are reused. Files derived from ZCode were modified for Harness.
+
+Third-party icon sets and their licenses are listed in
+apps/harness-slint/ui/icons/LICENSES.md. Rust dependencies are listed in
+Cargo.lock and keep their own licenses.

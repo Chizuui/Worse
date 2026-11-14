@@ -1,0 +1,170 @@
+// Whiteboard and image annotation (13A, ZCode composer "Draw" / image annotate): freehand strokes over a white
+// board or an attached PNG. Rust (src/chat/whiteboard.rs) owns the strokes and builds the path commands; "Attach"
+// rasterises them to a PNG chip.
+
+import { Theme } from "../theme/tokens.slint";
+import { Icons, Button, IconButton, Dialog } from "../components/controls.slint";
+import { ChatUi } from "globals.slint";
+
+// One finished stroke: SVG path commands in board coordinates (640 x 400) and its color id.
+export struct WbStroke {
+    commands: string,
+    color: string,
+}
+
+export global WhiteboardUi {
+    in-out property <bool> open;
+    // "" = new whiteboard; else the image chip being annotated (its file name).
+    in property <string> annotating;
+    in property <image> background;
+    in property <bool> has-background;
+    in property <[WbStroke]> strokes;
+    in property <string> live;
+    in-out property <string> color: "red";
+    callback begin(length, length);
+    callback move(length, length);
+    callback end();
+    callback undo();
+    callback clear();
+    callback attach();
+    pure public function ink(c: string) -> color {
+        if c == "black" { return #1c2024; }
+        if c == "blue" { return #0090ff; }
+        if c == "green" { return #30a46c; }
+        if c == "yellow" { return #e2a336; }
+        #e5484d
+    }
+}
+
+export component WhiteboardDialog inherits Dialog {
+    title: WhiteboardUi.annotating != "" ? @tr("Annotate {0}", WhiteboardUi.annotating) : @tr("Whiteboard");
+    close-label: @tr("Close");
+    dialog-width: 688px;
+    close => {
+        WhiteboardUi.open = false;
+    }
+    HorizontalLayout {
+        spacing: 6px;
+        for c in ["red", "black", "blue", "green", "yellow"]: Rectangle {
+            width: 24px;
+            height: 24px;
+            border-radius: 12px;
+            border-width: WhiteboardUi.color == c ? 2px : 1px;
+            border-color: WhiteboardUi.color == c ? Theme.foreground : Theme.border;
+            accessible-role: AccessibleRole.button;
+            accessible-label: "ink " + c;
+            accessible-item-selected: WhiteboardUi.color == c;
+            accessible-action-default => {
+                WhiteboardUi.color = c;
+            }
+            Rectangle {
+                width: 14px;
+                height: 14px;
+                border-radius: 7px;
+                background: WhiteboardUi.ink(c);
+            }
+            TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    WhiteboardUi.color = c;
+                }
+            }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+        IconButton {
+            icon: Icons.rotate-ccw;
+            label: @tr("Undo stroke");
+            enabled: WhiteboardUi.strokes.length > 0;
+            clicked => {
+                WhiteboardUi.undo();
+            }
+        }
+        IconButton {
+            icon: Icons.trash-2;
+            label: @tr("Clear drawing");
+            enabled: WhiteboardUi.strokes.length > 0;
+            clicked => {
+                WhiteboardUi.clear();
+            }
+        }
+    }
+    board := Rectangle {
+        width: 640px;
+        height: 400px;
+        background: #ffffff;
+        border-width: 1px;
+        border-color: Theme.border;
+        clip: true;
+        accessible-role: AccessibleRole.image;
+        accessible-label: "drawing " + WhiteboardUi.strokes.length;
+        if WhiteboardUi.has-background: Image {
+            width: parent.width;
+            height: parent.height;
+            source: WhiteboardUi.background;
+            image-fit: contain;
+            accessible-role: none;
+        }
+        for s in WhiteboardUi.strokes: Path {
+            width: parent.width;
+            height: parent.height;
+            viewbox-width: 640;
+            viewbox-height: 400;
+            commands: s.commands;
+            stroke: WhiteboardUi.ink(s.color);
+            stroke-width: 3px;
+            stroke-line-cap: round;
+            stroke-line-join: round;
+            accessible-role: none;
+        }
+        if WhiteboardUi.live != "": Path {
+            width: parent.width;
+            height: parent.height;
+            viewbox-width: 640;
+            viewbox-height: 400;
+            commands: WhiteboardUi.live;
+            stroke: WhiteboardUi.ink(WhiteboardUi.color);
+            stroke-width: 3px;
+            stroke-line-cap: round;
+            stroke-line-join: round;
+            accessible-role: none;
+        }
+        TouchArea {
+            mouse-cursor: crosshair;
+            pointer-event(event) => {
+                if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                    WhiteboardUi.begin(self.mouse-x, self.mouse-y);
+                }
+                if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
+                    WhiteboardUi.end();
+                }
+            }
+            moved => {
+                if self.pressed {
+                    WhiteboardUi.move(self.mouse-x, self.mouse-y);
+                }
+            }
+        }
+    }
+    HorizontalLayout {
+        alignment: end;
+        spacing: 8px;
+        Button {
+            text: @tr("Cancel");
+            size: "lg";
+            clicked => {
+                WhiteboardUi.open = false;
+            }
+        }
+        Button {
+            text: @tr("Attach");
+            variant: "primary";
+            size: "lg";
+            enabled: WhiteboardUi.strokes.length > 0 || WhiteboardUi.has-background;
+            clicked => {
+                WhiteboardUi.attach();
+            }
+        }
+    }
+}

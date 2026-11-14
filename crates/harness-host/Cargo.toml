@@ -1,0 +1,32 @@
+[package]
+name = "harness-host"
+version = "0.1.0"
+description = "Harness Rust Host: NDJSON JSON-RPC server over stdio exposing the Rust hot-path services (fs, search, git, watch, pty)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "harness-host"
+path = "src/main.rs"
+
+[dependencies]
+harness-fs = { path = "../harness-fs" }
+harness-git = { path = "../harness-git" }
+harness-pty = { path = "../harness-pty" }
+harness-search = { path = "../harness-search" }
+harness-store = { path = "../harness-store" }
+harness-watch = { path = "../harness-watch" }
+base64 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

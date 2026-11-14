@@ -1,0 +1,285 @@
+// Keyboard shortcuts page — design frame "S6 · Shortcuts" (FigCraft), 1:1:
+// toolbar (search fills the row + "Reset to defaults"), one card with caps group headings and 39px rows
+// (command 13 #C9CCD2, one keycap per key right-aligned). Click a row to record a new combination
+// (accent row + dashed "Press keys…" + Cancel). Hover shows a small clear button (not in the design).
+import { Theme } from "../theme/tokens.slint";
+import { Icon, Icons, IconButton } from "../components/controls.slint";
+import { ShortcutsUi } from "globals.slint";
+import { PageHeader, SearchField, SetButton } from "parts.slint";
+import { Labels } from "labels.slint";
+
+// Keycap (design "key/X": pad [3,7], #1C1F24, 1px #2A2D33, r6, 11 #EDEEF0).
+component Keycap inherits Rectangle {
+    in property <string> text;
+    height: 21px;
+    width: max(20px, kt.preferred-width + 14px);
+    border-radius: 6px;
+    background: Theme.raised;
+    border-width: 1px;
+    border-color: Theme.border-hover;
+    kt := Text {
+        text: root.text;
+        font-size: 11px;
+        font-weight: Theme.weight-medium;
+        color: Theme.foreground;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// Group heading (design "group/X": 30 tall, pad [12,16,6,16], caps 10 #5D636D).
+component GroupHead inherits HorizontalLayout {
+    in property <string> text;
+    height: 30px;
+    padding-left: 16px;
+    padding-top: 12px;
+    padding-bottom: 6px;
+    Text {
+        text: root.text;
+        font-size: 10px;
+        font-weight: Theme.weight-semibold;
+        letter-spacing: 0.8px;
+        color: Theme.caps-label;
+        vertical-alignment: center;
+    }
+}
+
+component BindingRow inherits VerticalLayout {
+    in property <string> id;
+    in property <[string]> bindings;
+    property <bool> rec: ShortcutsUi.recording == root.id;
+    Rectangle {
+        height: root.rec ? 41px : 39px;
+        background: root.rec ? Theme.accent-fg.with-alpha(0.12) : (ta.has-hover ? Theme.hover : transparent);
+        border-width: root.rec ? 1px : 0px;
+        border-color: Theme.accent-fg.with-alpha(0.5);
+        animate background { duration: Theme.dur-hover; }
+        accessible-role: button;
+        accessible-label: @tr("Rebind {0}", Labels.command-label(root.id));
+        accessible-action-default => {
+            ShortcutsUi.start-record(root.id);
+        }
+        ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                if !root.rec {
+                    ShortcutsUi.start-record(root.id);
+                }
+            }
+        }
+        HorizontalLayout {
+            padding-left: 16px;
+            padding-right: 16px;
+            spacing: 8px;
+            Text {
+                text: Labels.command-label(root.id);
+                font-size: 13px;
+                color: root.rec ? Theme.foreground : Theme.foreground-subtle;
+                vertical-alignment: center;
+                overflow: elide;
+                horizontal-stretch: 1;
+                accessible-role: none;
+            }
+            if !root.rec && ta.has-hover && root.bindings.length > 0: VerticalLayout {
+                alignment: center;
+                IconButton {
+                    icon: Icons.x;
+                    label: @tr("Clear {0}", Labels.command-label(root.id));
+                    size: 20px;
+                    icon-size: 11px;
+                    clicked => {
+                        ShortcutsUi.clear(root.id);
+                    }
+                }
+            }
+            if !root.rec && root.bindings.length == 0: Text {
+                text: @tr("Unassigned");
+                font-size: 11px;
+                color: Theme.icon-subtlest;
+                vertical-alignment: center;
+            }
+            // Several bindings: separated by a faint "/".
+            if !root.rec: HorizontalLayout {
+                spacing: 8px;
+                for b[bi] in root.bindings: HorizontalLayout {
+                    spacing: 4px;
+                    if bi > 0: Text {
+                        text: "/";
+                        font-size: 11px;
+                        color: Theme.icon-subtlest;
+                        vertical-alignment: center;
+                    }
+                    for k in ShortcutsUi.display-keys(b): VerticalLayout {
+                        alignment: center;
+                        Keycap {
+                            text: k;
+                        }
+                    }
+                }
+            }
+            if root.rec && ShortcutsUi.recorded != "": HorizontalLayout {
+                spacing: 4px;
+                for k in ShortcutsUi.display-keys(ShortcutsUi.recorded): VerticalLayout {
+                    alignment: center;
+                    Keycap {
+                        text: k;
+                    }
+                }
+            }
+            // "recording" chip: pad [3,9], accent 12% fill, dashed-look accent border, r6, 11 accent.
+            if root.rec && ShortcutsUi.recorded == "": VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    height: 21px;
+                    width: pk.preferred-width + 18px;
+                    border-radius: 6px;
+                    background: Theme.accent-fg.with-alpha(0.12);
+                    border-width: 1px;
+                    border-color: Theme.accent-fg;
+                    pk := Text {
+                        text: @tr("Press keys…");
+                        font-size: 11px;
+                        font-weight: Theme.weight-medium;
+                        color: Theme.accent-fg;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+            if root.rec: Text {
+                text: @tr("Cancel");
+                font-size: 11px;
+                color: cta.has-hover ? Theme.foreground : Theme.muted;
+                vertical-alignment: center;
+                cta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        ShortcutsUi.cancel-record();
+                    }
+                }
+            }
+        }
+    }
+    // Error / conflict line while recording.
+    if root.rec && ShortcutsUi.error != "": HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        padding-top: 6px;
+        padding-bottom: 8px;
+        spacing: 8px;
+        Text {
+            text: Labels.error-text(ShortcutsUi.error, ShortcutsUi.conflict);
+            font-size: 12px;
+            color: Theme.destructive;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            horizontal-stretch: 1;
+            accessible-role: AccessibleRole.text;
+            accessible-label: self.text;
+        }
+        if ShortcutsUi.conflict != "": SetButton {
+            text: @tr("Rebind anyway");
+            label: @tr("Rebind anyway (current command loses it)");
+            clicked => {
+                ShortcutsUi.steal();
+            }
+        }
+    }
+}
+
+export component ShortcutsPage inherits VerticalLayout {
+    in property <bool> stacked;
+    callback request-reset();
+    spacing: 20px;
+    PageHeader {
+        title: @tr("Shortcuts");
+        description: @tr("Keyboard shortcuts for every action.");
+    }
+    // Toolbar (design: search 36 tall fills the row, gap 10, secondary "Reset to defaults").
+    HorizontalLayout {
+        spacing: 10px;
+        height: 36px;
+        SearchField {
+            horizontal-stretch: 1;
+            placeholder: ShortcutsUi.key-search ? (ShortcutsUi.key-query != "" ? ShortcutsUi.display(ShortcutsUi.key-query) : @tr("Press a combination…")) : @tr("Search shortcuts");
+            text <=> ShortcutsUi.query;
+            edited(q) => {
+                ShortcutsUi.search(q);
+            }
+        }
+        // Not in the design: search by key combination, kept as a compact icon toggle.
+        VerticalLayout {
+            alignment: center;
+            IconButton {
+                icon: Icons.keyboard;
+                label: @tr("Search by key combination");
+                active: ShortcutsUi.key-search;
+                size: 33px;
+                icon-size: 15px;
+                clicked => {
+                    if ShortcutsUi.key-search {
+                        ShortcutsUi.clear-key-search();
+                    } else {
+                        ShortcutsUi.start-key-search();
+                    }
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            SetButton {
+                height: 33px;
+                text: @tr("Reset to defaults");
+                clicked => {
+                    root.request-reset();
+                }
+            }
+        }
+    }
+    Rectangle {
+        background: Theme.card;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Theme.card-border;
+        clip: true;
+        VerticalLayout {
+            padding: 1px;
+            padding-bottom: 7px;
+            // Rows arrive grouped (global first, composer last): a heading above each group's first row.
+            for r[i] in ShortcutsUi.rows: VerticalLayout {
+                if i == 0 || ShortcutsUi.rows[i - 1].scope != r.scope: GroupHead {
+                    text: r.scope == "composer" ? @tr("COMPOSER") : @tr("GLOBAL");
+                }
+                BindingRow {
+                    id: r.id;
+                    bindings: r.bindings;
+                }
+            }
+            if ShortcutsUi.rows.length == 0: VerticalLayout {
+                padding: 32px;
+                spacing: 4px;
+                alignment: center;
+                HorizontalLayout {
+                    alignment: center;
+                    Icon {
+                        source: Icons.keyboard;
+                        size: 20px;
+                        tint: Theme.icon-subtlest;
+                    }
+                }
+                Text {
+                    text: ShortcutsUi.key-search && ShortcutsUi.key-query != "" ? @tr("No command is bound to {0}", ShortcutsUi.display(ShortcutsUi.key-query)) : @tr("No matching commands");
+                    font-size: 13px;
+                    color: Theme.foreground-subtle;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: @tr("Try another search, or clear the search field.");
+                    font-size: 12px;
+                    color: Theme.icon-subtlest;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+    }
+}

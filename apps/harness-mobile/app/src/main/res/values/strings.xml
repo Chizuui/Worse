@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Harness</string>
+
+    <string name="pairing_title">Pair with Harness</string>
+    <string name="pairing_hint">Scan the QR code shown in Harness → Settings → Remote, or paste the pair link.</string>
+    <string name="pairing_scan">Scan QR</string>
+    <string name="pairing_paste_label">Pair link</string>
+    <string name="pairing_paste_hint">https://host/p#t=…</string>
+    <string name="pairing_connect">Connect</string>
+    <string name="pairing_camera_needed">Camera permission is needed to scan the QR code.</string>
+    <string name="pairing_bad_link">Not a Harness pair link. Expected https://host/p#t=…</string>
+
+    <string name="menu_repair">Re-pair</string>
+    <string name="menu_reload">Reload</string>
+    <string name="menu_cancel">Cancel</string>
+    <string name="repair_confirm">Forget this device link and all cookies?</string>
+    <string name="repair_confirm_yes">Re-pair</string>
+</resources>

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeBuildCommand": "pnpm build && node ../../scripts/build-host-sidecar.mjs && cargo build --release -p harness-host --manifest-path ../../Cargo.toml && node ../../scripts/package/fetch-node-runtime.mjs && node ../../scripts/stage-sidecar-resources.mjs && node ../../scripts/package/sign-staged-resources.mjs"
+  },
+  "bundle": {
+    "targets": ["appimage", "deb", "rpm"],
+    "resources": {
+      "resources/host/": "host/"
+    }
+  }
+}

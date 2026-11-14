@@ -1,0 +1,16 @@
+[package]
+name = "harness-platform"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+harness-core = { path = "../harness-core" }
+harness-protocol = { path = "../harness-protocol" }
+thiserror.workspace = true
+tracing.workspace = true
+url.workspace = true
+
+[lints]
+workspace = true

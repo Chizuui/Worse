@@ -1,0 +1,30 @@
+[package]
+name = "harness-api-agent"
+version = "0.1.0"
+description = "Harness's own ACP coding agent for OpenAI-compatible APIs (phase-9-parity.md §9.7)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "harness-api-agent"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["fs", "io-std", "io-util", "macros", "rt-multi-thread", "process", "sync", "time"] }
+uuid = { workspace = true }
+ignore = { workspace = true }
+grep-searcher = { workspace = true }
+grep-regex = { workspace = true }
+# 与 tauri-plugin-updater 相同的 reqwest 0.13 + rustls(ring)，不引入新的 TLS 后端。
+reqwest = { version = "0.13", default-features = false, features = ["json", "stream", "rustls-no-provider", "system-proxy"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+tokio-util = { version = "0.7", default-features = false }
+
+[lints]
+workspace = true

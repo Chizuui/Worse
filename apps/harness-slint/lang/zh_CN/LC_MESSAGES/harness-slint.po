@@ -1,0 +1,1677 @@
+# Harness native UI — Simplified Chinese (bundled at build time by slint-build).
+msgid ""
+msgstr ""
+"Project-Id-Version: harness-slint\n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Streaming…"
+msgstr "输出中…"
+
+msgid "Stopped"
+msgstr "已停止"
+
+msgid "Interrupted"
+msgstr "已中断"
+
+msgid "Failed"
+msgstr "失败"
+
+msgid "Running"
+msgstr "运行中"
+
+msgid "Awaiting permission"
+msgstr "等待授权"
+
+msgid "Done"
+msgstr "完成"
+
+msgid "Denied"
+msgstr "已拒绝"
+
+msgid "Switched from {0} to {1}: limit reached (resets {2})"
+msgstr "已从 {0} 切换到 {1}：额度已用完（{2} 重置）"
+
+msgid "Switched from {0} to {1}: limit reached"
+msgstr "已从 {0} 切换到 {1}：额度已用完"
+
+msgid "All agents reached their limits. Paused (resets {0})"
+msgstr "所有 Agent 额度均已用完，已暂停（{0} 重置）"
+
+msgid "All agents reached their limits. Paused"
+msgstr "所有 Agent 额度均已用完，已暂停"
+
+msgid "New session"
+msgstr "新建会话"
+
+msgid "Sessions"
+msgstr "会话"
+
+msgid "Untitled session"
+msgstr "未命名会话"
+
+msgid "Settings"
+msgstr "设置"
+
+msgid "Available"
+msgstr "可用"
+
+msgid "Not installed"
+msgstr "未安装"
+
+msgid "Limit reached · resets {0}"
+msgstr "额度已用完 · {0} 重置"
+
+msgid "Limit reached"
+msgstr "额度已用完"
+
+msgid "Message"
+msgstr "消息"
+
+msgid "Ask anything. Enter to send, Shift+Enter for a new line."
+msgstr "输入任何问题。Enter 发送，Shift+Enter 换行。"
+
+msgid "Agent: {0}"
+msgstr "Agent：{0}"
+
+msgid "{0} queued"
+msgstr "{0} 条排队中"
+
+msgid "Stop"
+msgstr "停止"
+
+msgid "Send"
+msgstr "发送"
+
+msgid "Files"
+msgstr "文件"
+
+msgid "Start a conversation: pick an agent below and send a message."
+msgstr "开始对话：在下方选择 Agent 并发送消息。"
+
+msgid "All agents reached their limits. New messages are queued until one is available."
+msgstr "所有 Agent 额度均已用完。新消息会排队，直到有 Agent 可用。"
+
+msgid "Permission required"
+msgstr "需要授权"
+
+msgid "Deny"
+msgstr "拒绝"
+
+msgid "Approve"
+msgstr "允许"
+
+msgid "Close settings"
+msgstr "关闭设置"
+
+msgid "Theme"
+msgstr "主题"
+
+msgid "System"
+msgstr "跟随系统"
+
+msgid "Light"
+msgstr "浅色"
+
+msgid "Dark"
+msgstr "深色"
+
+msgid "Language"
+msgstr "语言"
+
+msgid "Agent fallback order (used when an agent reaches its limit)"
+msgstr "Agent 备用顺序（某个 Agent 额度用完时使用）"
+
+msgid "Move {0} up"
+msgstr "上移 {0}"
+
+msgid "Move {0} down"
+msgstr "下移 {0}"
+
+msgid "About"
+msgstr "关于"
+
+msgid "Harness drives external agent CLIs (Claude Code, Codex, agy); it has no model of its own."
+msgstr "Harness 驱动外部 Agent CLI（Claude Code、Codex、agy），自身不包含模型。"
+
+# Round 8.2 (agent B restyle + agent A panels)
+msgid "(no branch)"
+msgstr "（无分支）"
+
+msgid "Agents"
+msgstr "Agent"
+
+msgid "Back to workspace"
+msgstr "返回工作区"
+
+msgid "Branch {}"
+msgstr "分支 {}"
+
+msgid "Cancel queued message: {0}"
+msgstr "取消排队消息：{0}"
+
+msgid "Changes"
+msgstr "更改"
+
+msgid "Close preview"
+msgstr "关闭预览"
+
+msgid "Commit"
+msgstr "提交"
+
+msgid "Commit {} file(s)"
+msgstr "提交 {} 个文件"
+
+msgid "Commit message"
+msgstr "提交说明"
+
+msgid "Content"
+msgstr "内容"
+
+msgid "Diff"
+msgstr "差异"
+
+msgid "Exited ({})"
+msgstr "已退出（{}）"
+
+msgid "Fallback order"
+msgstr "切换顺序"
+
+msgid "Follow the system or force light / dark."
+msgstr "跟随系统，或固定为浅色 / 深色。"
+
+msgid "General"
+msgstr "通用"
+
+msgid "Git"
+msgstr "Git"
+
+msgid "Kill terminal"
+msgstr "结束终端"
+
+msgid "Loading…"
+msgstr "加载中…"
+
+msgid "Match case"
+msgstr "区分大小写"
+
+msgid "No changes"
+msgstr "没有更改"
+
+msgid "No diff selected"
+msgstr "未选择差异"
+
+msgid "No repository"
+msgstr "没有仓库"
+
+msgid "No results"
+msgstr "没有结果"
+
+msgid "Queued: {0}"
+msgstr "排队中：{0}"
+
+msgid "Refresh diff"
+msgstr "刷新差异"
+
+msgid "Refresh git status"
+msgstr "刷新 Git 状态"
+
+msgid "Regular expression"
+msgstr "正则表达式"
+
+msgid "Restart terminal"
+msgstr "重启终端"
+
+msgid "Search"
+msgstr "搜索"
+
+msgid "Search files by name"
+msgstr "按名称搜索文件"
+
+msgid "Search in files (Enter)"
+msgstr "在文件中搜索（回车）"
+
+msgid "Search query"
+msgstr "搜索内容"
+
+msgid "Searching…"
+msgstr "搜索中…"
+
+msgid "Side by side"
+msgstr "并排"
+
+msgid "Stage {}"
+msgstr "暂存 {}"
+
+msgid "Stage all"
+msgstr "全部暂存"
+
+msgid "Staged changes"
+msgstr "已暂存的更改"
+
+msgid "Terminal"
+msgstr "终端"
+
+msgid "Terminal input"
+msgstr "终端输入"
+
+msgid "Terminal output"
+msgstr "终端输出"
+
+msgid "This workspace is not a git repository."
+msgstr "此工作区不是 Git 仓库。"
+
+msgid "Turn changes"
+msgstr "本轮更改"
+
+msgid "Type to search this workspace."
+msgstr "输入以搜索此工作区。"
+
+msgid "Unified"
+msgstr "合并视图"
+
+msgid "Unstage {}"
+msgstr "取消暂存 {}"
+
+msgid "Unstage all"
+msgstr "全部取消暂存"
+
+msgid "What should we build?"
+msgstr "今天要做什么？"
+
+
+# Phase 9.1 settings (agent B)
+
+msgid "Installed {0}"
+msgstr "已安装 {0}"
+
+msgid "Installed"
+msgstr "已安装"
+
+msgid "Signed in"
+msgstr "已登录"
+
+msgid "Not signed in"
+msgstr "未登录"
+
+msgid "Sign-in unknown"
+msgstr "登录状态未知"
+
+msgid "Sign in from a terminal with the agent's own login command. Harness never reads or stores agent credentials."
+msgstr "请在终端中使用该 agent 自己的登录命令登录。Harness 不会读取或保存 agent 凭据。"
+
+msgid "Enabled"
+msgstr "已启用"
+
+msgid "Disabled agents are hidden from the picker and skipped by fallback."
+msgstr "停用的 agent 不会出现在选择器中，也不参与回退。"
+
+msgid "Enable {0}"
+msgstr "启用 {0}"
+
+msgid "Default mode"
+msgstr "默认模式"
+
+msgid "{0} default mode"
+msgstr "{0} 默认模式"
+
+msgid "Agent default"
+msgstr "跟随 agent 默认"
+
+msgid "Default model"
+msgstr "默认模型"
+
+msgid "{0} default model"
+msgstr "{0} 默认模型"
+
+msgid "Default reasoning effort"
+msgstr "默认推理强度"
+
+msgid "{0} default effort"
+msgstr "{0} 默认推理强度"
+
+msgid "Launch command"
+msgstr "启动命令"
+
+msgid "No extra arguments"
+msgstr "无额外参数"
+
+msgid "Found on PATH"
+msgstr "在 PATH 中查找"
+
+msgid "Environment"
+msgstr "环境变量"
+
+msgid "User"
+msgstr "用户"
+
+msgid "Workspace"
+msgstr "工作区"
+
+msgid "Local"
+msgstr "本地"
+
+msgid "Edit {0}"
+msgstr "编辑 {0}"
+
+msgid "Delete {0}"
+msgstr "删除 {0}"
+
+msgid "Form"
+msgstr "表单"
+
+msgid "Raw"
+msgstr "原始"
+
+msgid "Close editor"
+msgstr "关闭编辑器"
+
+msgid "Raw configuration"
+msgstr "原始配置"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Review changes"
+msgstr "检查变更"
+
+msgid "{0} does not support {1}"
+msgstr "{0} 不支持{1}"
+
+msgid "{0} has no workspace {1}"
+msgstr "{0} 没有工作区级{1}"
+
+msgid "Refresh"
+msgstr "刷新"
+
+msgid "No matches"
+msgstr "无匹配项"
+
+msgid "Nothing configured yet"
+msgstr "尚未配置"
+
+msgid "Memory"
+msgstr "记忆"
+
+msgid "Instructions"
+msgstr "指令"
+
+msgid "Notes Harness keeps for its agents through the memory MCP server. Global memory applies everywhere; project memory only in this workspace."
+msgstr "Harness 通过记忆 MCP 服务为 agent 保存的笔记。全局记忆处处生效；项目记忆仅在当前工作区生效。"
+
+msgid "Instructions each agent CLI reads at the start of every session."
+msgstr "各 agent CLI 在每次会话开始时读取的指令。"
+
+msgid "Use memory"
+msgstr "使用记忆"
+
+msgid "Give agents the Harness memory MCP server in new sessions."
+msgstr "在新会话中为 agent 提供 Harness 记忆 MCP 服务。"
+
+msgid "Global"
+msgstr "全局"
+
+msgid "Project"
+msgstr "项目"
+
+msgid "Search memory"
+msgstr "搜索记忆"
+
+msgid "{0} has no instructions file for this scope"
+msgstr "{0} 在此范围没有指令文件"
+
+msgid "{0} matching lines"
+msgstr "{0} 行匹配"
+
+msgid "New file"
+msgstr "新文件"
+
+msgid "{0} / {1} KB"
+msgstr "{0} / {1} KB"
+
+msgid "Memory content"
+msgstr "记忆内容"
+
+msgid "Instructions content"
+msgstr "指令内容"
+
+msgid "Revert"
+msgstr "还原"
+
+msgid "Save"
+msgstr "保存"
+
+msgid "Save memory"
+msgstr "保存记忆"
+
+msgid "Save instructions"
+msgstr "保存指令"
+
+msgid "Projects"
+msgstr "项目"
+
+msgid "Removing a project takes it out of the sidebar and the project picker. Its sessions stay in Recent and search, and nothing on disk is touched."
+msgstr "移除项目会将其从侧边栏和项目选择器中移除。其会话仍保留在最近和搜索中，磁盘上的文件不受影响。"
+
+msgid "Project management needs the hub project API"
+msgstr "项目管理需要 hub 的项目接口"
+
+msgid "Harness lists the current workspace only until the hub exposes its project list."
+msgstr "在 hub 提供项目列表之前，Harness 只列出当前工作区。"
+
+msgid "Search projects"
+msgstr "搜索项目"
+
+msgid "All"
+msgstr "全部"
+
+msgid "Unused ({0})"
+msgstr "未使用（{0}）"
+
+msgid "{0} selected"
+msgstr "已选择 {0} 个"
+
+msgid "Remove"
+msgstr "移除"
+
+msgid "Remove and delete data"
+msgstr "移除并删除数据"
+
+msgid "Undo"
+msgstr "撤销"
+
+msgid "Select {0}"
+msgstr "选择 {0}"
+
+msgid "Unused"
+msgstr "未使用"
+
+msgid "{0} sessions"
+msgstr "{0} 个会话"
+
+msgid "No projects"
+msgstr "暂无项目"
+
+msgid "Archive management"
+msgstr "归档管理"
+
+msgid "Archived sessions are hidden from the sidebar. Unarchive to bring one back, or delete it permanently."
+msgstr "已归档的会话不会显示在侧边栏中。可以取消归档恢复，或永久删除。"
+
+msgid "Archiving needs the hub archive API"
+msgstr "归档需要 hub 的归档接口"
+
+msgid "Harness sessions cannot be archived yet; this page lists archived sessions once the hub supports it."
+msgstr "Harness 会话暂时无法归档；hub 支持后此页会列出已归档的会话。"
+
+msgid "Search archived sessions"
+msgstr "搜索已归档会话"
+
+msgid "Unarchive"
+msgstr "取消归档"
+
+msgid "No archived sessions"
+msgstr "暂无已归档会话"
+
+msgid "Show more"
+msgstr "显示更多"
+
+msgid "Save {0}"
+msgstr "保存{0}"
+
+msgid "Choose the display language used by the application UI."
+msgstr "选择应用界面使用的显示语言。"
+
+msgid "System default"
+msgstr "跟随系统"
+
+msgid "Use the system shell profile"
+msgstr "使用系统 Shell 配置"
+
+msgid "Load your login shell profile (PATH, aliases) in integrated terminals."
+msgstr "在集成终端中加载登录 Shell 配置（PATH、别名）。"
+
+msgid "Terminal font"
+msgstr "终端字体"
+
+msgid "Font family for integrated terminals. Empty uses the default monospace font."
+msgstr "集成终端使用的字体。留空则使用默认等宽字体。"
+
+msgid "Terminal font size"
+msgstr "终端字号"
+
+msgid "Integrated shell"
+msgstr "集成 Shell"
+
+msgid "Program used for new terminals. Empty uses the system default."
+msgstr "新终端使用的程序。留空则使用系统默认。"
+
+msgid "Network"
+msgstr "网络"
+
+msgid "Passed to agent CLIs started by Harness. Takes effect for newly started agents."
+msgstr "传递给 Harness 启动的 agent CLI，对新启动的 agent 生效。"
+
+msgid "HTTP proxy"
+msgstr "HTTP 代理"
+
+msgid "No proxy"
+msgstr "不使用代理的地址"
+
+msgid "CA certificate"
+msgstr "CA 证书"
+
+msgid "Path to an extra PEM certificate trusted by agent CLIs."
+msgstr "agent CLI 额外信任的 PEM 证书路径。"
+
+msgid "Path to a .pem file"
+msgstr ".pem 文件路径"
+
+msgid "Hardware acceleration"
+msgstr "硬件加速"
+
+msgid "Use the GPU renderer. Restart Harness to apply."
+msgstr "使用 GPU 渲染。重启 Harness 后生效。"
+
+msgid "Notify when a task finishes"
+msgstr "任务完成时通知"
+
+msgid "Show a system notification when an agent finishes while Harness is in the background."
+msgstr "Harness 在后台时，agent 完成后显示系统通知。"
+
+msgid "Notification sound"
+msgstr "通知声音"
+
+msgid "Keep running in the tray when closed"
+msgstr "关闭窗口后在托盘中继续运行"
+
+msgid "Keep the computer awake while agents run"
+msgstr "agent 运行时阻止电脑休眠"
+
+msgid "Conversation"
+msgstr "对话"
+
+msgid "Messages sent while running"
+msgstr "运行中发送的消息"
+
+msgid "Queue waits for the current turn; Steer sends the message to the running agent."
+msgstr "排队会等待当前回合结束；引导会把消息发送给正在运行的 agent。"
+
+msgid "Queue"
+msgstr "排队"
+
+msgid "Steer"
+msgstr "引导"
+
+msgid "Send message with"
+msgstr "发送消息快捷键"
+
+msgid "Show reasoning"
+msgstr "显示思考过程"
+
+msgid "Show the agent's thinking blocks in the conversation."
+msgstr "在对话中显示 agent 的思考内容。"
+
+msgid "Show to-do lists"
+msgstr "显示待办列表"
+
+msgid "Group exploration steps"
+msgstr "合并探索步骤"
+
+msgid "Collapse consecutive reads and searches into one row."
+msgstr "将连续的读取和搜索折叠为一行。"
+
+msgid "Group terminal commands"
+msgstr "合并终端命令"
+
+msgid "Group file changes"
+msgstr "合并文件变更"
+
+msgid "Archive"
+msgstr "归档"
+
+msgid "Archive inactive sessions automatically"
+msgstr "自动归档不活跃的会话"
+
+msgid "Archive after"
+msgstr "归档期限"
+
+msgid " days"
+msgstr " 天"
+
+msgid "Storage"
+msgstr "存储"
+
+msgid "Data directory"
+msgstr "数据目录"
+
+msgid "Moves to {0} on the next start."
+msgstr "下次启动时迁移到 {0}。"
+
+msgid "Cancel move"
+msgstr "取消迁移"
+
+msgid "Change…"
+msgstr "更改…"
+
+msgid "Change data directory"
+msgstr "更改数据目录"
+
+msgid "New data directory"
+msgstr "新数据目录"
+
+msgid "Absolute path of an empty or new folder"
+msgstr "空文件夹或新文件夹的绝对路径"
+
+msgid "Move"
+msgstr "迁移"
+
+msgid "Harness copies its data to the new folder on the next start, verifies it, then switches. The old folder is kept until the copy is verified."
+msgstr "Harness 会在下次启动时把数据复制到新文件夹，校验后再切换。校验通过前保留旧文件夹。"
+
+msgid "Move the data directory to {0}?"
+msgstr "将数据目录迁移到 {0}？"
+
+msgid "Move on restart"
+msgstr "重启时迁移"
+
+msgid "Appearance"
+msgstr "外观"
+
+msgid "Interface font size"
+msgstr "界面字号"
+
+msgid "Base size of the interface text."
+msgstr "界面文字的基础大小。"
+
+msgid "Zoom"
+msgstr "缩放"
+
+msgid "Ctrl+= / Ctrl+- / Ctrl+0 also change it."
+msgstr "也可以用 Ctrl+= / Ctrl+- / Ctrl+0 调整。"
+
+msgid "Code"
+msgstr "代码"
+
+msgid "Code font size"
+msgstr "代码字号"
+
+msgid "Wrap long lines"
+msgstr "长行自动换行"
+
+msgid "Wrap code in chat code blocks and the file viewer instead of scrolling."
+msgstr "对话代码块和文件查看器中的代码自动换行，而不是横向滚动。"
+
+msgid "Line numbers"
+msgstr "行号"
+
+msgid "Show line numbers in the file viewer and diffs."
+msgstr "在文件查看器和差异中显示行号。"
+
+msgid "Code preview"
+msgstr "代码预览"
+
+msgid "Keyboard Shortcuts"
+msgstr "快捷键"
+
+msgid "Basics"
+msgstr "基础"
+
+msgid "Agent capabilities"
+msgstr "Agent 能力"
+
+msgid "Data and statistics"
+msgstr "数据与统计"
+
+msgid "Open Command Center"
+msgstr "打开命令中心"
+
+msgid "Open Settings"
+msgstr "打开设置"
+
+msgid "Find in Task"
+msgstr "在任务中查找"
+
+msgid "Toggle Sidebar"
+msgstr "切换侧边栏"
+
+msgid "Toggle Light/Dark Theme"
+msgstr "切换浅色/深色主题"
+
+msgid "Toggle Terminal"
+msgstr "切换终端"
+
+msgid "Toggle Side Pane"
+msgstr "切换侧边面板"
+
+msgid "Enter or Exit Full View"
+msgstr "进入或退出全屏视图"
+
+msgid "Previous Task"
+msgstr "上一个任务"
+
+msgid "Next Task"
+msgstr "下一个任务"
+
+msgid "Navigate Back"
+msgstr "后退"
+
+msgid "Navigate Forward"
+msgstr "前进"
+
+msgid "Open Model Menu"
+msgstr "打开模型菜单"
+
+msgid "Cycle Session Mode"
+msgstr "切换会话模式"
+
+msgid "Cycle Thought Level"
+msgstr "切换思考强度"
+
+msgid "New Task"
+msgstr "新建任务"
+
+msgid "Open Workspace"
+msgstr "打开工作区"
+
+msgid "Close Current Context"
+msgstr "关闭当前上下文"
+
+msgid "Zoom In"
+msgstr "放大"
+
+msgid "Zoom Out"
+msgstr "缩小"
+
+msgid "Reset Zoom"
+msgstr "重置缩放"
+
+msgid "Send Message"
+msgstr "发送消息"
+
+msgid "Insert Newline in Composer"
+msgstr "在输入框中换行"
+
+msgid "Toggle onboarding"
+msgstr "切换新手引导"
+
+msgid "This combination is reserved by the system"
+msgstr "该组合键已被系统保留"
+
+msgid "At least one modifier key is required (Ctrl / Cmd / Alt)"
+msgstr "至少需要一个修饰键（Ctrl / Cmd / Alt）"
+
+msgid "Unsupported key"
+msgstr "不支持的按键"
+
+msgid "Already bound to this command"
+msgstr "已绑定到此命令"
+
+msgid "Already used by “{0}”"
+msgstr "已被“{0}”使用"
+
+msgid "Failed to save shortcuts. Try again."
+msgstr "快捷键保存失败，请重试。"
+
+msgid "MCP Servers"
+msgstr "MCP 服务"
+
+msgid "Skills"
+msgstr "技能"
+
+msgid "Commands"
+msgstr "命令"
+
+msgid "Hooks"
+msgstr "钩子"
+
+msgid "Subagents"
+msgstr "子 Agent"
+
+msgid "MCP servers give agents extra tools. Harness edits each CLI's own configuration; the Harness overlay is added to every session Harness starts."
+msgstr "MCP 服务为 agent 提供额外工具。Harness 直接编辑各 CLI 自己的配置；Harness 叠加配置会加入 Harness 启动的每个会话。"
+
+msgid "Skills are folders with a SKILL.md that agents load on demand."
+msgstr "技能是包含 SKILL.md 的文件夹，agent 按需加载。"
+
+msgid "Custom slash commands are prompt templates stored as markdown files."
+msgstr "自定义斜杠命令是以 Markdown 文件保存的提示词模板。"
+
+msgid "Hooks run shell commands on agent events. Workspace hooks run with your permissions; only add hooks you trust."
+msgstr "钩子会在 agent 事件发生时运行 Shell 命令。工作区钩子以你的权限运行，只添加你信任的钩子。"
+
+msgid "Subagents are specialised agents with their own prompt, tools and model."
+msgstr "子 Agent 是拥有独立提示词、工具和模型的专用 agent。"
+
+msgid "Add server"
+msgstr "添加服务"
+
+msgid "New skill"
+msgstr "新建技能"
+
+msgid "New command"
+msgstr "新建命令"
+
+msgid "New hook"
+msgstr "新建钩子"
+
+msgid "New subagent"
+msgstr "新建子 Agent"
+
+msgid "New"
+msgstr "新建"
+
+msgid "Harness overlay"
+msgstr "Harness 叠加配置"
+
+msgid "Name"
+msgstr "名称"
+
+msgid "Type"
+msgstr "类型"
+
+msgid "Command"
+msgstr "命令"
+
+msgid "Arguments"
+msgstr "参数"
+
+msgid "Environment variables"
+msgstr "环境变量"
+
+msgid "Headers"
+msgstr "请求头"
+
+msgid "Timeout (seconds)"
+msgstr "超时（秒）"
+
+msgid "Description"
+msgstr "描述"
+
+msgid "Argument hint"
+msgstr "参数提示"
+
+msgid "Prompt"
+msgstr "提示词"
+
+msgid "Event"
+msgstr "事件"
+
+msgid "Matcher"
+msgstr "匹配规则"
+
+msgid "Status message"
+msgstr "状态消息"
+
+msgid "Run in background"
+msgstr "后台运行"
+
+msgid "Model"
+msgstr "模型"
+
+msgid "Color"
+msgstr "颜色"
+
+msgid "Tools"
+msgstr "工具"
+
+msgid "System prompt"
+msgstr "系统提示词"
+
+msgid "One argument per line"
+msgstr "每行一个参数"
+
+msgid "KEY=value, one per line"
+msgstr "KEY=value，每行一个"
+
+msgid "Header: value, one per line"
+msgstr "Header: value，每行一个"
+
+msgid "Comma separated; empty inherits all tools"
+msgstr "以逗号分隔；留空则继承全部工具"
+
+msgid "Tool name pattern, e.g. Bash|Write"
+msgstr "工具名匹配模式，例如 Bash|Write"
+
+msgid "Review deletion"
+msgstr "确认删除"
+
+msgid "Review change"
+msgstr "确认变更"
+
+msgid "Review memory changes"
+msgstr "确认记忆变更"
+
+msgid "Review instructions changes"
+msgstr "确认指令变更"
+
+msgid "Decrease"
+msgstr "减小"
+
+msgid "Increase"
+msgstr "增大"
+
+msgid "Close"
+msgstr "关闭"
+
+msgid "No changes: the file already has this content."
+msgstr "没有变更：文件内容已经相同。"
+
+msgid "Write changes"
+msgstr "写入变更"
+
+msgid "All settings"
+msgstr "全部设置"
+
+msgid "Reset all shortcuts to defaults?"
+msgstr "将所有快捷键重置为默认值？"
+
+msgid "This clears all custom keybinding overrides and restores every command to its default binding."
+msgstr "这会清除所有自定义按键绑定，并将每个命令恢复为默认绑定。"
+
+msgid "Reset all to defaults"
+msgstr "全部重置为默认"
+
+msgid "Remove projects and delete their data?"
+msgstr "移除项目并删除其数据？"
+
+msgid "Remove projects?"
+msgstr "移除项目？"
+
+msgid "Sessions and Harness data of the selected projects are deleted. Files in the project folders are not touched."
+msgstr "所选项目的会话和 Harness 数据将被删除。项目文件夹中的文件不受影响。"
+
+msgid "The selected projects leave the sidebar. Their sessions stay in Recent and search."
+msgstr "所选项目将从侧边栏移除。其会话仍保留在最近和搜索中。"
+
+msgid "Unassigned"
+msgstr "未分配"
+
+msgid "Press new combination…"
+msgstr "请按下新的组合键…"
+
+msgid "Rebind {0}"
+msgstr "重新绑定 {0}"
+
+msgid "Composer"
+msgstr "输入框"
+
+msgid "Clear {0}"
+msgstr "清除 {0}"
+
+msgid "Esc to cancel · Backspace to reset · press a new combo after a conflict"
+msgstr "Esc 取消 · Backspace 重置 · 冲突时可按新的组合键"
+
+msgid "Rebind anyway (current command loses it)"
+msgstr "仍然绑定（原命令将失去该快捷键）"
+
+msgid "Cancel recording"
+msgstr "取消录制"
+
+msgid "Search shortcuts"
+msgstr "搜索快捷键"
+
+msgid "Press a key combination to search…"
+msgstr "按下组合键进行搜索…"
+
+msgid "Search by key combination"
+msgstr "按组合键搜索"
+
+msgid "Keybinding"
+msgstr "按键绑定"
+
+msgid "Scope"
+msgstr "范围"
+
+msgid "No command is bound to {0}"
+msgstr "没有命令绑定到 {0}"
+
+msgid "No matching commands"
+msgstr "没有匹配的命令"
+
+msgid "Archive {0}"
+msgstr "归档 {0}"
+
+msgid "Connection test"
+msgstr "连接测试"
+
+msgid "Testing…"
+msgstr "正在测试…"
+
+msgid "Connected in {0} ms"
+msgstr "已连接，耗时 {0} 毫秒"
+
+msgid "Starts the agent once in a separate process and checks that it answers."
+msgstr "在独立进程中启动一次该 Agent，并检查其能否响应。"
+
+msgid "Test connection"
+msgstr "测试连接"
+
+msgid "Test {0}"
+msgstr "测试 {0}"
+
+msgid "{0} project(s) removed"
+msgstr "已移除 {0} 个项目"
+
+msgid "Delete archived session?"
+msgstr "删除已归档的会话？"
+
+msgid "The session and its history are deleted permanently. Files in the project folder are not touched."
+msgstr "该会话及其历史记录将被永久删除，项目文件夹中的文件不受影响。"
+
+msgid "Delete"
+msgstr "删除"
+
+msgid "Disable wrap"
+msgstr "关闭自动换行"
+
+msgid "Enable wrap"
+msgstr "开启自动换行"
+
+msgid "Copy code"
+msgstr "复制代码"
+
+msgid "Copy message"
+msgstr "复制消息"
+
+msgid "Copy response"
+msgstr "复制回复"
+
+msgid "More actions for {0}"
+msgstr "{0} 的更多操作"
+
+msgid "Remove attachment {0}"
+msgstr "移除附件 {0}"
+
+msgid "Mention a file, session or agent"
+msgstr "提及文件、会话或 Agent"
+
+msgid "Press 1 to approve, 2 to deny"
+msgstr "按 1 批准，按 2 拒绝"
+
+msgid "Session actions"
+msgstr "会话操作"
+
+msgid "Scroll to bottom"
+msgstr "滚动到底部"
+
+msgid "Dismiss error"
+msgstr "关闭错误提示"
+
+msgid "No commands"
+msgstr "没有命令"
+
+msgid "Mentions"
+msgstr "提及"
+
+msgid "Session menu"
+msgstr "会话菜单"
+
+msgid "Open"
+msgstr "打开"
+
+msgid "Copy session ID"
+msgstr "复制会话 ID"
+
+msgid "Drop files to attach"
+msgstr "拖放文件以添加附件"
+
+msgid "Find in session"
+msgstr "在会话中查找"
+
+msgid "Find"
+msgstr "查找"
+
+msgid "{0} of {1}"
+msgstr "第 {0} 个，共 {1} 个"
+
+msgid "Previous match"
+msgstr "上一个匹配"
+
+msgid "Next match"
+msgstr "下一个匹配"
+
+msgid "Close find"
+msgstr "关闭查找"
+
+msgid "Export conversation as Markdown"
+msgstr "将对话导出为 Markdown"
+
+msgid "Export conversation as HTML"
+msgstr "将对话导出为 HTML"
+
+msgid "Reveal workspace in file manager"
+msgstr "在文件管理器中显示工作区"
+
+msgid "Archive current session"
+msgstr "归档当前会话"
+
+msgid "Pasted text"
+msgstr "粘贴的文本"
+
+msgid "Copied"
+msgstr "已复制"
+
+msgid "Exported to"
+msgstr "已导出到"
+
+msgid "Actions"
+msgstr "操作"
+
+msgid "Today"
+msgstr "今天"
+
+msgid "Yesterday"
+msgstr "昨天"
+
+msgid "Previous 7 days"
+msgstr "过去 7 天"
+
+msgid "Previous 30 days"
+msgstr "过去 30 天"
+
+msgid "Older"
+msgstr "更早"
+
+msgid "now"
+msgstr "刚刚"
+
+msgid "{0}m"
+msgstr "{0} 分钟"
+
+msgid "{0}h"
+msgstr "{0} 小时"
+
+msgid "{0}d"
+msgstr "{0} 天"
+
+msgid "{0}w"
+msgstr "{0} 周"
+
+msgid "Command center"
+msgstr "命令中心"
+
+msgid "Search commands, sessions and files"
+msgstr "搜索命令、会话和文件"
+
+msgid "Search commands, sessions and files…"
+msgstr "搜索命令、会话和文件…"
+
+msgid "Results"
+msgstr "结果"
+
+msgid "↑↓ to navigate · Enter to run · Tab to switch scope · Esc to close"
+msgstr "↑↓ 选择 · Enter 执行 · Tab 切换范围 · Esc 关闭"
+
+msgid "Press a number to choose, Esc to deny once"
+msgstr "按数字键选择，Esc 拒绝本次"
+
+# ---- Phase 9.2B round 2 (turns, groups, schedules, composer) ----
+
+msgid "Copy as Markdown"
+msgstr "复制为 Markdown"
+
+msgid "Copy as CSV"
+msgstr "复制为 CSV"
+
+msgid "Edit message"
+msgstr "编辑消息"
+
+msgid "Rewind to here"
+msgstr "回退到此处"
+
+msgid "Fork from here"
+msgstr "从此处分叉"
+
+msgid "Retry"
+msgstr "重试"
+
+msgid "Scheduled prompts"
+msgstr "定时提示词"
+
+msgid "Archived"
+msgstr "已归档"
+
+msgid "New group"
+msgstr "新建分组"
+
+msgid "Group actions for {0}"
+msgstr "{0} 的分组操作"
+
+msgid "Move to {0}"
+msgstr "移动到 {0}"
+
+msgid "Remove from group"
+msgstr "移出分组"
+
+msgid "Attach files"
+msgstr "添加附件"
+
+msgid "Deny with feedback…"
+msgstr "拒绝并反馈…"
+
+msgid "Loading options…"
+msgstr "正在加载选项…"
+
+msgid "Resize sidebar"
+msgstr "调整侧栏宽度"
+
+msgid "Group menu"
+msgstr "分组菜单"
+
+msgid "Rename group"
+msgstr "重命名分组"
+
+msgid "Move group up"
+msgstr "分组上移"
+
+msgid "Move group down"
+msgstr "分组下移"
+
+msgid "Delete group"
+msgstr "删除分组"
+
+msgid "Rename"
+msgstr "重命名"
+
+msgid "Unpin"
+msgstr "取消置顶"
+
+msgid "Pin"
+msgstr "置顶"
+
+msgid "Mark as unread"
+msgstr "标为未读"
+
+msgid "Fork"
+msgstr "分叉"
+
+msgid "Rename session"
+msgstr "重命名会话"
+
+msgid "Fork session"
+msgstr "分叉会话"
+
+msgid "Pin session"
+msgstr "置顶会话"
+
+msgid "Files restored"
+msgstr "文件已恢复"
+
+msgid "Some files were skipped"
+msgstr "部分文件已跳过"
+
+msgid "Scheduled prompt started"
+msgstr "定时提示词已开始运行"
+
+msgid "The message and every later turn are replaced by the edited message."
+msgstr "此消息及其后的所有轮次将被编辑后的消息替换。"
+
+msgid "Also restore files changed by those turns"
+msgstr "同时恢复这些轮次修改的文件"
+
+msgid "Removes this message and every later turn. Its text goes back into the composer."
+msgstr "删除此消息及其后的所有轮次，消息文本放回输入框。"
+
+msgid "Rewind"
+msgstr "回退"
+
+msgid "Deny with feedback"
+msgstr "拒绝并反馈"
+
+msgid "The tool call is denied and this message is sent to the agent."
+msgstr "拒绝此次工具调用，并把这条消息发送给 agent。"
+
+msgid "Deny and send"
+msgstr "拒绝并发送"
+
+msgid "Delete session"
+msgstr "删除会话"
+
+msgid "The session and its history are deleted. This cannot be undone."
+msgstr "会话及其历史将被删除，且无法撤销。"
+
+msgid "Create"
+msgstr "创建"
+
+msgid "Its sessions move back to the session list."
+msgstr "其中的会话将移回会话列表。"
+
+msgid "New schedule"
+msgstr "新建定时任务"
+
+msgid "Prompt sent on every run (to the open session, or to a new session when none is open)."
+msgstr "每次运行时发送的提示词（发送到当前会话；没有打开的会话时新建会话）。"
+
+msgid "Every N minutes"
+msgstr "每 N 分钟"
+
+msgid "Pinned"
+msgstr "已置顶"
+
+msgid "Input"
+msgstr "输入"
+
+msgid "Output"
+msgstr "输出"
+
+msgid "Terminal {0}"
+msgstr "终端 {0}"
+
+msgid "Thinking…"
+msgstr "思考中…"
+
+msgid "Thought"
+msgstr "思考过程"
+
+msgid "{0} files changed"
+msgstr "{0} 个文件已更改"
+
+msgid "{0} files changed (undone)"
+msgstr "{0} 个文件已更改（已撤销）"
+
+msgid "Undo changes"
+msgstr "撤销更改"
+
+msgid "Reapply changes"
+msgstr "重新应用更改"
+
+msgid "Modified since"
+msgstr "之后已修改"
+
+msgid "Plan"
+msgstr "计划"
+
+msgid "Collapse plan"
+msgstr "收起计划"
+
+msgid "Expand plan"
+msgstr "展开计划"
+
+msgid "Run scheduled prompts"
+msgstr "运行定时提示词"
+
+msgid "No scheduled prompts yet."
+msgstr "还没有定时提示词。"
+
+msgid "Daily at {0}"
+msgstr "每天 {0}"
+
+msgid "Every {0} min"
+msgstr "每 {0} 分钟"
+
+msgid "next in {0} min"
+msgstr "{0} 分钟后运行"
+
+msgid "Run {0} now"
+msgstr "立即运行 {0}"
+
+msgid "Annotate {0}"
+msgstr "标注 {0}"
+
+msgid "Whiteboard"
+msgstr "白板"
+
+msgid "Recent"
+msgstr "最近使用"
+
+msgid "Suggested"
+msgstr "建议"
+
+msgid "Panels"
+msgstr "面板"
+
+msgid "Configure"
+msgstr "配置"
+
+msgid "Undo stroke"
+msgstr "撤销笔画"
+
+msgid "Clear drawing"
+msgstr "清空画布"
+
+msgid "Attach"
+msgstr "添加为附件"
+
+msgid "Group sessions by time"
+msgstr "按时间分组会话"
+
+msgid "Group sessions by project"
+msgstr "按项目分组会话"
+
+msgid "Editing queued message"
+msgstr "正在编辑待发送消息"
+
+msgid "Cancel editing"
+msgstr "取消编辑"
+
+msgid "Steer: run right after the current turn"
+msgstr "引导：在当前回合之后立即运行"
+
+msgid "Queued messages ({0})"
+msgstr "待发送消息（{0}）"
+
+msgid "Drag to reorder: {0}"
+msgstr "拖拽排序：{0}"
+
+msgid "Steer queued message: {0}"
+msgstr "立即发送待发送消息：{0}"
+
+msgid "Edit queued message: {0}"
+msgstr "编辑待发送消息：{0}"
+
+msgid "Sign-in required"
+msgstr "需要登录"
+
+msgid "The agent process exited"
+msgstr "Agent 进程已退出"
+
+msgid "The agent failed to start"
+msgstr "Agent 启动失败"
+
+msgid "Rate limit or network error"
+msgstr "速率限制或网络错误"
+
+msgid "The turn failed"
+msgstr "本轮失败"
+
+msgid "Mode"
+msgstr "模式"
+
+msgid "Effort"
+msgstr "推理强度"
+
+msgid "Sign in to the agent's CLI in a terminal, then retry."
+msgstr "请先在终端中登录该 Agent 的 CLI，然后重试。"
+
+msgid "Hide details"
+msgstr "隐藏详情"
+
+msgid "Details"
+msgstr "详情"
+
+msgid "Copy"
+msgstr "复制"
+
+msgid "Copy error"
+msgstr "复制错误"
+
+msgid "Retry in {0} s"
+msgstr "{0} 秒后重试"
+
+msgid "Error details"
+msgstr "错误详情"
+
+msgid "Send or clear the current draft before editing a queued message."
+msgstr "请先发送或清空当前草稿，再编辑队列消息。"
+
+msgid "Switch branch"
+msgstr "切换分支"
+
+msgid "Push"
+msgstr "推送"
+
+msgid "Commit graph"
+msgstr "提交图"
+
+msgid "More commit options"
+msgstr "更多提交选项"
+
+msgid "Switched to {0}"
+msgstr "已切换到 {0}"
+
+msgid "Committed {0}: {1}"
+msgstr "已提交 {0}：{1}"
+
+msgid "Pushing {0} to {1}…"
+msgstr "正在将 {0} 推送到 {1}…"
+
+msgid "Pushed {0} to {1}"
+msgstr "已将 {0} 推送到 {1}"
+
+msgid "Pushed {0} to {1} and set the upstream"
+msgstr "已将 {0} 推送到 {1} 并设置上游"
+
+msgid "Find or create a branch"
+msgstr "查找或创建分支"
+
+msgid "Can't switch to {0}: local changes to these files would be overwritten. Commit or stash them first."
+msgstr "无法切换到 {0}：这些文件的本地修改会被覆盖。请先提交或贮藏。"
+
+msgid "Create branch {0}"
+msgstr "创建分支 {0}"
+
+msgid "Commit changes"
+msgstr "提交更改"
+
+msgid "Include unstaged changes"
+msgstr "包含未暂存的更改"
+
+msgid "Commit & push"
+msgstr "提交并推送"
+
+msgid "{0} has no upstream yet; the push sets it."
+msgstr "{0} 尚无上游分支，推送时会自动设置。"
+
+msgid "{0} → {1}"
+msgstr "{0} → {1}"
+
+msgid "{0} ahead, {1} behind"
+msgstr "领先 {0}，落后 {1}"
+
+msgid "Push now"
+msgstr "立即推送"
+
+msgid "No commits yet"
+msgstr "暂无提交"
+
+msgid "Copy commit hash"
+msgstr "复制提交哈希"
+
+msgid "{0} · {1} · parents {2}"
+msgstr "{0} · {1} · 父提交 {2}"
+
+msgid "Load more"
+msgstr "加载更多"
+
+msgid "Mode & effort"
+msgstr "模式与推理强度"
+
+msgid "Claude accounts"
+msgstr "Claude 账号"
+
+msgid "Extra Claude subscriptions. When one reaches its limit, the next one in the fallback order takes over. Each account signs in once in its own console; Harness never reads the credentials."
+msgstr "额外的 Claude 订阅。某个账号达到限额时，由回退顺序中的下一个接替。每个账号在自己的控制台中登录一次；Harness 从不读取凭据。"
+
+msgid "Restart to activate"
+msgstr "重启后生效"
+
+msgid "Sign in"
+msgstr "登录"
+
+msgid "Sign in to {0}"
+msgstr "登录 {0}"
+
+msgid "Remove {0}"
+msgstr "移除 {0}"
+
+msgid "Account name, e.g. Work"
+msgstr "账号名称，例如 工作"
+
+msgid "New account name"
+msgstr "新账号名称"
+
+msgid "Add account"
+msgstr "添加账号"
+
+msgid "Add Claude account"
+msgstr "添加 Claude 账号"
+
+msgid "Refresh accounts"
+msgstr "刷新账号"
+
+msgid "After adding: click Sign in, run /login in the console, then restart Harness."
+msgstr "添加后：点击「登录」，在控制台中运行 /login，然后重启 Harness。"
+
+msgid "API providers"
+msgstr "API 提供方"
+
+msgid "Any OpenAI-compatible API (endpoint, API key, model) as a coding agent with file and command tools. The key is stored only in Harness's data folder and never shown again."
+msgstr "任意兼容 OpenAI 的 API（端点、API 密钥、模型）作为带文件和命令工具的编程 agent。密钥只保存在 Harness 数据目录中，之后不再显示。"
+
+msgid "No API key"
+msgstr "无 API 密钥"
+
+msgid "Name, e.g. DeepSeek"
+msgstr "名称，例如 DeepSeek"
+
+msgid "Provider name"
+msgstr "提供方名称"
+
+msgid "Model, e.g. deepseek-chat"
+msgstr "模型，例如 deepseek-chat"
+
+msgid "Endpoint, e.g. https://api.deepseek.com/v1"
+msgstr "端点，例如 https://api.deepseek.com/v1"
+
+msgid "Endpoint"
+msgstr "端点"
+
+msgid "API key"
+msgstr "API 密钥"
+
+msgid "Add provider"
+msgstr "添加提供方"
+
+msgid "Add API provider"
+msgstr "添加 API 提供方"
+
+msgid "The model must support tool (function) calling. A new or removed provider takes effect after Harness restarts."
+msgstr "模型必须支持工具（函数）调用。新增或移除的提供方在 Harness 重启后生效。"
+
+msgid "{0} running"
+msgstr "{0} 个运行中"
+
+msgid "Collapse subagents"
+msgstr "收起子代理"
+
+msgid "Expand subagents"
+msgstr "展开子代理"
+
+msgid "Subagent"
+msgstr "子代理"
+
+msgid "Needs approval — open to answer"
+msgstr "需要批准 — 打开以处理"
+
+msgid "Cancelled"
+msgstr "已取消"
+
+msgid "Subagent of {0}"
+msgstr "{0} 的子代理"
+
+msgid "Back to main session"
+msgstr "返回主会话"

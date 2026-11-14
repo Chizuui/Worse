@@ -1,0 +1,28 @@
+[package]
+name = "harness-core-gate"
+version = "0.1.0"
+description = "Phase 8 core gate (integration-test binary): drives harness-agent-hub against harness-fake-agent; called by scripts/e2e/phase8-core.mjs."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "harness-core-gate"
+path = "src/main.rs"
+
+[dependencies]
+harness-agent-hub = { path = "../harness-agent-hub" }
+# Phase 9.2 gate: fixture import roots (`harness-core-gate phase9-chat`).
+harness-import = { path = "../harness-import" }
+harness-core-api = { path = "../harness-core-api" }
+harness-workspace = { path = "../harness-workspace" }
+# Phase 9.1 gate (`harness-core-gate phase9-settings`, scripts/e2e/phase9-settings.mjs).
+harness-settings = { path = "../harness-settings" }
+harness-agent-config = { path = "../harness-agent-config" }
+# Phase 9.2 gate: the ZCode CLI store fixture (sqlite).
+rusqlite = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["io-std"] }
+
+[lints]
+workspace = true

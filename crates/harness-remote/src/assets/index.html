@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1115" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Harness</title>
+    <link rel="manifest" href="/assets/manifest.webmanifest" />
+    <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/icon.svg" />
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <div id="offline" class="banner" hidden>Offline — reconnecting…</div>
+    <div id="toast" class="toast" hidden></div>
+
+    <!-- 1. Pair -->
+    <section id="view-pair" class="view" hidden>
+      <div class="pair-card">
+        <img class="logo" src="/assets/icon.svg" alt="" width="56" height="56" />
+        <h1>Harness</h1>
+        <p class="muted" id="pair-hint">Enter the 8-character code shown in Harness → Settings → Remote.</p>
+        <form id="pair-form" autocomplete="off">
+          <input
+            id="pair-code"
+            class="code-input"
+            type="text"
+            inputmode="latin"
+            autocapitalize="characters"
+            autocomplete="one-time-code"
+            spellcheck="false"
+            maxlength="8"
+            placeholder="ABCD2345"
+            aria-label="Pairing code"
+            required
+          />
+          <button class="btn primary" type="submit">Pair</button>
+        </form>
+        <p id="pair-error" class="error" role="alert" hidden></p>
+        <button id="pair-retry" class="btn ghost" type="button" hidden>Try again</button>
+      </div>
+    </section>
+
+    <!-- 2. Sessions -->
+    <section id="view-list" class="view" hidden>
+      <header class="bar">
+        <h2>Sessions</h2>
+        <button id="reload" class="icon-btn" type="button" aria-label="Reload sessions">⟳</button>
+      </header>
+      <div id="list-status" class="status" hidden></div>
+      <ul id="list" class="sessions"></ul>
+      <p id="list-empty" class="empty" hidden>No sessions yet. Start one on the desktop.</p>
+    </section>
+
+    <!-- 3. Session -->
+    <section id="view-session" class="view session" hidden>
+      <header class="bar session-bar">
+        <button id="back" class="icon-btn" type="button" aria-label="Back">‹</button>
+        <div class="title-wrap">
+          <h2 id="s-title">Session</h2>
+          <p class="sub"><span id="s-agent" class="agent">—</span><span id="conn" class="dot" title="live"></span></p>
+        </div>
+        <button id="refresh" class="icon-btn" type="button" aria-label="Reload session">⟳</button>
+      </header>
+
+      <!-- one compact bar; the list scrolls inside it when expanded -->
+      <div id="subs-wrap" class="subs-wrap" hidden>
+        <button id="subs-toggle" class="subs-head" type="button" aria-expanded="false" aria-controls="subs">
+          <span id="subs-count" class="subs-label">Subagents</span>
+          <span id="subs-chev" class="chev" aria-hidden="true">▸</span>
+        </button>
+        <ul id="subs" class="subs" hidden></ul>
+      </div>
+
+      <div id="turns" class="turns" role="log" aria-live="polite"></div>
+      <div id="perms" class="perms"></div>
+
+      <div id="queue-wrap" class="queue-wrap" hidden>
+        <p class="queue-head">Queued</p>
+        <ul id="queue" class="queue"></ul>
+      </div>
+
+      <div class="composer-area">
+        <div id="attach-row" class="attach-row" hidden></div>
+        <div id="pickers" class="pickers" hidden>
+          <label class="pick"><span>Mode</span><select id="mode-sel"></select></label>
+          <label class="pick"><span>Model</span><select id="model-sel"></select></label>
+        </div>
+        <form id="composer" class="composer" autocomplete="off">
+          <input id="file-input" class="file-input" type="file" multiple accept="image/*,*/*" hidden />
+          <button id="attach" class="icon-btn attach-btn" type="button" aria-label="Attach files or photos">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21.4 11.6l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.9 1.9 0 0 1-2.7-2.7l8-8" />
+            </svg>
+          </button>
+          <textarea
+            id="input"
+            rows="1"
+            placeholder="Message the agent…"
+            aria-label="Message"
+            enterkeyhint="enter"
+          ></textarea>
+          <button id="send" class="btn primary send" type="submit" aria-label="Send">↑</button>
+          <button id="stop" class="btn danger stop" type="button" aria-label="Stop" hidden>■</button>
+        </form>
+      </div>
+    </section>
+
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+</html>

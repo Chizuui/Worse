@@ -1,0 +1,114 @@
+// Find in session (ZCode find bar, Mod+F): floats at the top right of the transcript. src/chat searches the loaded
+// transcript and moves ChatUi.find-id / find-row; app.slint scrolls the chat list to that row and rings it.
+import { Theme } from "../theme/tokens.slint";
+import { Icon, Icons, IconButton } from "../components/controls.slint";
+import { ChatUi } from "globals.slint";
+
+export component FindBar inherits Rectangle {
+    callback close();
+    property <string> query;
+    height: 38px;
+    background: Theme.card;
+    border-radius: Theme.radius-lg;
+    border-width: 1px;
+    border-color: Theme.border-hover;
+    drop-shadow-blur: Theme.shadow-md-blur;
+    drop-shadow-offset-y: Theme.shadow-md-y;
+    drop-shadow-color: Theme.shadow-md-color;
+    accessible-role: AccessibleRole.groupbox;
+    accessible-label: @tr("Find in session");
+    init => {
+        input.focus();
+        if root.query != "" {
+            ChatUi.find(root.query);
+        }
+    }
+    TouchArea { }
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 4px;
+        spacing: 6px;
+        Icon {
+            source: Icons.search;
+            size: Theme.icon-sm;
+            tint: Theme.icon-subtle;
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+            FocusScope {
+                capture-key-pressed(event) => {
+                    if event.text == Key.Escape {
+                        root.close();
+                        return accept;
+                    }
+                    if event.text == Key.Return {
+                        ChatUi.find-step(event.modifiers.shift ? -1 : 1);
+                        return accept;
+                    }
+                    reject
+                }
+                input := TextInput {
+                    text <=> root.query;
+                    single-line: true;
+                    vertical-alignment: center;
+                    font-size: 13px;
+                    color: Theme.foreground;
+                    selection-background-color: Theme.selected;
+                    accessible-label: @tr("Find");
+                    edited => {
+                        ChatUi.find(self.text);
+                    }
+                }
+            }
+            if root.query == "": Text {
+                width: parent.width;
+                height: parent.height;
+                vertical-alignment: center;
+                text: @tr("Find in session");
+                font-size: 13px;
+                color: Theme.foreground-subtlest;
+                accessible-role: none;
+            }
+        }
+        Text {
+            text: root.query == "" ? "" : ChatUi.find-count == 0 ? @tr("No results") : @tr("{0} of {1}", ChatUi.find-current, ChatUi.find-count);
+            font-size: 11px;
+            color: ChatUi.find-count == 0 && root.query != "" ? Theme.destructive-surface-foreground : Theme.muted;
+            vertical-alignment: center;
+            accessible-role: AccessibleRole.text;
+            accessible-label: "find-status " + self.text;
+        }
+        IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: Icons.chevron-up;
+            label: @tr("Previous match");
+            size: Theme.control-sm;
+            icon-size: Theme.icon-sm;
+            enabled: ChatUi.find-count > 0;
+            clicked => {
+                ChatUi.find-step(-1);
+            }
+        }
+        IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: Icons.chevron-down;
+            label: @tr("Next match");
+            size: Theme.control-sm;
+            icon-size: Theme.icon-sm;
+            enabled: ChatUi.find-count > 0;
+            clicked => {
+                ChatUi.find-step(1);
+            }
+        }
+        IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: Icons.x;
+            label: @tr("Close find");
+            size: Theme.control-sm;
+            icon-size: Theme.icon-sm;
+            clicked => {
+                root.close();
+            }
+        }
+    }
+}

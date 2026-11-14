@@ -1,0 +1,906 @@
+// Orchestra live view (design frame "Orchestra · live", FigCraft): the open session as the Orchestrator node on the
+// left, one node per subagent it delegated to (ChatUi.subagents-active, §9.8) joined by curved edges, a legend chip, zoom
+// control and minimap on a pannable canvas, and a detail panel for the picked subagent (Message / Stop).
+// Not shown until the hub exposes them: claimed paths, token counts, progress %, the full live log and the queue.
+import { Theme } from "../theme/tokens.slint";
+import { Icon, Icons, IconButton } from "../components/controls.slint";
+import { ChatUi, SubagentRow } from "../chat/globals.slint";
+import { AgentTint } from "../panels/common.slint";
+import { SettingsUi } from "../settings/globals.slint";
+
+export global OrchLiveUi {
+    in-out property <bool> open;
+}
+
+// Status helpers (SubagentRow.status: 0 running, 1 needs approval, 2 done, 3 failed, 4 cancelled, 5 interrupted).
+global LiveStatus {
+    public pure function label(s: int) -> string {
+        if s == 0 { return @tr("Running"); }
+        if s == 1 { return @tr("Needs approval"); }
+        if s == 2 { return @tr("Done"); }
+        if s == 3 { return @tr("Failed"); }
+        if s == 4 { return @tr("Cancelled"); }
+        return @tr("Interrupted");
+    }
+    public pure function tint(s: int) -> color {
+        if s == 0 { return #3DD68C; }
+        if s == 1 { return #F5B14C; }
+        if s == 2 { return #5BC0FF; }
+        if s == 3 { return #F2555A; }
+        return #8A909A;
+    }
+    public pure function initial(agent: string) -> string {
+        if agent == "claude-code" || agent == "claude" { return "C"; }
+        if agent == "codex" { return "C"; }
+        if agent.to-lowercase() == "deepseek" || agent.to-lowercase() == "deepseek-api" { return "D"; }
+        if agent == "agy" || agent == "antigravity" { return "A"; }
+        if agent == "gemini" { return "G"; }
+        if agent == "harness" { return "H"; }
+        return "•";
+    }
+}
+
+component StatusPill inherits Rectangle {
+    in property <int> status;
+    height: 18px;
+    width: st.preferred-width + 16px;
+    border-radius: 9px;
+    background: LiveStatus.tint(root.status).with-alpha(0.14);
+    st := Text {
+        text: LiveStatus.label(root.status);
+        font-size: 10px;
+        font-weight: Theme.weight-semibold;
+        color: LiveStatus.tint(root.status);
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// Avatar (design: 28px circle, agent tint 18% fill + 1px tint ring, initial 12 semibold).
+component Avatar inherits Rectangle {
+    in property <string> agent;
+    in property <length> size: 28px;
+    width: root.size;
+    height: root.size;
+    border-radius: root.size / 2;
+    background: AgentTint.of(root.agent).with-alpha(0.18);
+    border-width: 1px;
+    border-color: AgentTint.of(root.agent).with-alpha(0.55);
+    Text {
+        text: LiveStatus.initial(root.agent);
+        font-size: root.size * 0.42;
+        font-weight: Theme.weight-semibold;
+        color: AgentTint.of(root.agent);
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// Progress track (design: 4px, #24272D track, agent tint fill). Running = indeterminate sweep, done = full.
+component Progress inherits Rectangle {
+    in property <int> status;
+    in property <color> tint;
+    height: 4px;
+    border-radius: 2px;
+    background: #24272D;
+    clip: true;
+    property <float> phase: Theme.reduce-motion ? 0.3 : Math.mod(animation-tick() / 1ms, 1800) / 1800;
+    if root.status == 0 || root.status == 1: Rectangle {
+        width: parent.width * 0.35;
+        x: (parent.width * 1.35) * root.phase - parent.width * 0.35;
+        height: parent.height;
+        border-radius: 2px;
+        background: root.status == 1 ? #F5B14C : root.tint;
+    }
+    if root.status >= 2: Rectangle {
+        x: 0;
+        width: parent.width;
+        height: parent.height;
+        border-radius: 2px;
+        background: root.status == 2 ? root.tint : LiveStatus.tint(root.status).with-alpha(0.6);
+    }
+}
+
+// Header / panel button (design: 30px, radius 8; "secondary" #1C1F24 + #2A2D33, "accent" brand gradient,
+// "danger" red outline).
+component LiveButton inherits Rectangle {
+    in property <string> text;
+    in property <string> variant: "secondary";
+    in property <bool> enabled: true;
+    callback clicked();
+    height: 30px;
+    min-width: bt.preferred-width + 26px;
+    border-radius: 8px;
+    opacity: root.enabled ? 1 : 0.45;
+    background: root.variant == "accent" ? Theme.brand-gradient : root.variant == "danger" ? #F2555A.with-alpha(ta.has-hover ? 0.18 : 0.1) : (ta.has-hover && root.enabled ? #23262C : #1C1F24);
+    border-width: root.variant == "accent" ? 0px : 1px;
+    border-color: root.variant == "danger" ? #F2555A.with-alpha(0.5) : #2A2D33;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => {
+        if root.enabled {
+            root.clicked();
+        }
+    }
+    bt := Text {
+        text: root.text;
+        font-size: 12px;
+        font-weight: Theme.weight-medium;
+        color: root.variant == "accent" ? #ffffff : root.variant == "danger" ? #F2555A : Theme.foreground;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+component Caps inherits Text {
+    font-size: 10px;
+    font-weight: Theme.weight-semibold;
+    letter-spacing: 0.8px;
+    color: #5D636D;
+}
+
+// Subagent node (design: 286 wide, #121317, 1px #24272D, r10; selected = accent ring).
+component SubNode inherits Rectangle {
+    in property <SubagentRow> item;
+    in property <bool> selected;
+    callback picked();
+    width: 340px;
+    height: 116px;
+    border-radius: 10px;
+    background: root.selected ? #15171c : #121317;
+    border-width: root.selected ? 1.5px : 1px;
+    border-color: root.selected ? Theme.accent-fg.with-alpha(0.7) : (nta.has-hover ? #2E323A : #24272D);
+    drop-shadow-blur: root.selected ? 18px : 0px;
+    drop-shadow-color: Theme.accent-fg.with-alpha(0.18);
+    accessible-role: button;
+    accessible-label: root.item.agent-name + ": " + root.item.title;
+    accessible-action-default => {
+        root.picked();
+    }
+    nta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.picked();
+        }
+    }
+    VerticalLayout {
+        padding: 12px;
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 8px;
+            Avatar {
+                agent: root.item.agent;
+                size: 22px;
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 1px;
+                Text {
+                    text: root.item.agent-name;
+                    font-size: 12px;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.foreground;
+                    overflow: elide;
+                }
+                Text {
+                    text: root.item.agent + " · " + ChatUi.elapsed(root.item.started-s, root.item.finished-s);
+                    font-size: 10px;
+                    color: #6B717C;
+                    overflow: elide;
+                }
+            }
+            VerticalLayout {
+                alignment: start;
+                StatusPill {
+                    status: root.item.status;
+                }
+            }
+        }
+        Text {
+            text: root.item.title;
+            font-size: 12px;
+            color: Theme.foreground-subtle;
+            overflow: elide;
+        }
+        Progress {
+            status: root.item.status;
+            tint: AgentTint.of(root.item.agent);
+        }
+        // Latest activity (design: path chips row; the hub reports one activity line instead).
+        HorizontalLayout {
+            alignment: start;
+            Rectangle {
+                height: 18px;
+                width: min(316px, at.preferred-width + 12px);
+                border-radius: 4px;
+                background: #1C1F24;
+                border-width: 1px;
+                border-color: #2A2D33;
+                at := Text {
+                    x: 6px;
+                    width: parent.width - 12px;
+                    text: root.item.activity != "" ? root.item.activity : (root.item.status == 0 ? @tr("thinking…") : (root.item.preview != "" ? root.item.preview : LiveStatus.label(root.item.status)));
+                    font-size: 10px;
+                    color: #8A909A;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}
+
+export component OrchestraLive inherits Rectangle {
+    in property <string> session-title;
+    in property <string> agent-id;
+    in property <string> agent-name;
+    in property <string> model-name;
+    in property <bool> session-running;
+    callback close();
+    callback delegate();
+    callback open-settings();
+
+    property <int> count: ChatUi.subagents-active.length;
+    // All subagents of the session, finished ones included (orchestrator footer).
+    property <int> total: ChatUi.subagents.length;
+    property <int> max-conc: max(1, SettingsUi.get-int("orchestra.maxConcurrent", SettingsUi.rev));
+    property <int> sel: 0;
+    property <bool> detail: true;
+    property <bool> has-sel: root.detail && root.sel >= 0 && root.sel < root.count;
+    property <SubagentRow> cur: ChatUi.subagents-active[max(0, root.sel)];
+    // Canvas view state.
+    property <float> zoom: 1.0;
+    property <length> pan-x: 0px;
+    property <length> pan-y: 0px;
+    property <length> press-x;
+    property <length> press-y;
+    property <length> start-x;
+    property <length> start-y;
+
+    background: #0B0C0E;
+    accessible-role: AccessibleRole.groupbox;
+    accessible-label: @tr("Orchestra");
+    TouchArea { }
+
+    // Elapsed clock while anything runs.
+    Timer {
+        interval: 1s;
+        running: ChatUi.subagents-running > 0;
+        triggered => {
+            ChatUi.subagent-action("tick", "");
+        }
+    }
+
+    VerticalLayout {
+        // Header (design: 56px, "Orchestra" 15 semibold | running pill; Auto-layout + Delegate task right).
+        Rectangle {
+            height: 56px;
+            border-width: 0px;
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 16px;
+                spacing: 10px;
+                VerticalLayout {
+                    alignment: center;
+                    IconButton {
+                        icon: Icons.chevron-left;
+                        label: @tr("Back to chat");
+                        clicked => {
+                            root.close();
+                        }
+                    }
+                }
+                Text {
+                    text: @tr("Orchestra");
+                    font-size: 15px;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.foreground;
+                    vertical-alignment: center;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 1px;
+                        height: 16px;
+                        background: #2A2D33;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        height: 20px;
+                        width: rp.preferred-width + 26px;
+                        border-radius: 10px;
+                        background: #3DD68C.with-alpha(0.12);
+                        Rectangle {
+                            x: 9px;
+                            width: 5px;
+                            height: 5px;
+                            border-radius: 2.5px;
+                            background: #3DD68C;
+                        }
+                        rp := Text {
+                            x: 19px;
+                            text: @tr("{0} / {1} running", ChatUi.subagents-running, root.max-conc);
+                            font-size: 11px;
+                            font-weight: Theme.weight-medium;
+                            color: #3DD68C;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+                Text {
+                    text: root.session-title != "" ? root.session-title : @tr("No session open");
+                    font-size: 12px;
+                    color: #6B717C;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    IconButton {
+                        icon: Icons.settings;
+                        label: @tr("Orchestra settings");
+                        clicked => {
+                            root.open-settings();
+                        }
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    LiveButton {
+                        text: @tr("Auto-layout");
+                        clicked => {
+                            root.zoom = 1.0;
+                            root.pan-x = 0px;
+                            root.pan-y = 0px;
+                        }
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    LiveButton {
+                        text: @tr("+  Delegate task");
+                        variant: "accent";
+                        clicked => {
+                            root.delegate();
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: #1C1F24;
+            }
+        }
+        HorizontalLayout {
+            vertical-stretch: 1;
+            // ---- Canvas ----
+            canvas := Rectangle {
+                horizontal-stretch: 1;
+                clip: true;
+                // Pan by dragging the background; wheel zooms.
+                pan := TouchArea {
+                    mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.default;
+                    pointer-event(e) => {
+                        if e.kind == PointerEventKind.down && e.button == PointerEventButton.left {
+                            root.press-x = self.mouse-x;
+                            root.press-y = self.mouse-y;
+                            root.start-x = root.pan-x;
+                            root.start-y = root.pan-y;
+                        }
+                    }
+                    moved => {
+                        if self.pressed {
+                            root.pan-x = root.start-x + self.mouse-x - root.press-x;
+                            root.pan-y = root.start-y + self.mouse-y - root.press-y;
+                        }
+                    }
+                    scroll-event(e) => {
+                        root.zoom = clamp(root.zoom + (e.delta-y > 0 ? 0.1 : -0.1), 0.5, 1.6);
+                        accept
+                    }
+                }
+                world := Rectangle {
+                    // Layout: orchestrator at the left, subagent column at x = 370, centred vertically.
+                    property <length> node-h: 116px;
+                    property <length> gap: 28px;
+                    property <length> col-h: root.count * self.node-h + max(0, root.count - 1) * self.gap;
+                    property <length> top: max(70px, (self.height - self.col-h) / 2);
+                    property <length> orch-y: max(70px, self.height / 2 - 64px);
+                    property <length> orch-x: 38px;
+                    property <length> sub-x: 440px;
+                    x: root.pan-x;
+                    y: root.pan-y;
+                    width: canvas.width;
+                    height: max(canvas.height, self.col-h + 140px);
+                    transform-scale: root.zoom;
+                    // Edges (cubic curves from the orchestrator's right edge to each node's left edge).
+                    for r[i] in ChatUi.subagents-active: Path {
+                        property <float> sx: (world.orch-x + 266px) / 1px;
+                        property <float> sy: (world.orch-y + (root.count > 1 ? 28px + i * 72px / (root.count - 1) : 64px)) / 1px;
+                        property <float> ex: world.sub-x / 1px;
+                        property <float> ey: (world.top + i * (world.node-h + world.gap) + 58px) / 1px;
+                        x: 0;
+                        y: 0;
+                        width: world.width;
+                        height: world.height;
+                        viewbox-width: world.width / 1px;
+                        viewbox-height: world.height / 1px;
+                        commands: "M " + self.sx + " " + self.sy + " C " + (self.sx + 80) + " " + self.sy + " " + (self.ex - 90) + " " + self.ey + " " + (self.ex - 6) + " " + self.ey;
+                        stroke: i == root.sel && root.detail ? Theme.accent-fg.with-alpha(0.9) : Theme.accent-fg.with-alpha(0.45);
+                        stroke-width: i == root.sel && root.detail ? 1.6px : 1.2px;
+                        accessible-role: none;
+                    }
+                    // Arrowhead into each node (design: small filled triangle on the node's left edge).
+                    for r[i] in ChatUi.subagents-active: Path {
+                        x: world.sub-x - 8px;
+                        y: world.top + i * (world.node-h + world.gap) + 58px - 4px;
+                        width: 8px;
+                        height: 8px;
+                        viewbox-width: 8;
+                        viewbox-height: 8;
+                        commands: "M 0 0 L 8 4 L 0 8 Z";
+                        fill: i == root.sel && root.detail ? Theme.accent-fg : Theme.accent-fg.with-alpha(0.7);
+                        accessible-role: none;
+                    }
+                    // Port dot on the orchestrator's right edge for each edge.
+                    for r[i] in ChatUi.subagents-active: Rectangle {
+                        x: world.orch-x + 266px - 3px;
+                        y: world.orch-y + (root.count > 1 ? 28px + i * 72px / (root.count - 1) : 64px) - 3px;
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 3px;
+                        background: Theme.accent-fg.with-alpha(0.85);
+                    }
+                    // Orchestrator node (design: 226x128, #121317, 1px #2A2D33, r10).
+                    Rectangle {
+                        x: world.orch-x;
+                        y: world.orch-y;
+                        width: 266px;
+                        height: 152px;
+                        border-radius: 10px;
+                        background: #121317;
+                        border-width: 1px;
+                        border-color: #2A2D33;
+                        VerticalLayout {
+                            padding: 12px;
+                            spacing: 8px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Avatar {
+                                    agent: root.agent-id;
+                                    size: 26px;
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 1px;
+                                    Text {
+                                        text: @tr("Orchestrator");
+                                        font-size: 12px;
+                                        font-weight: Theme.weight-semibold;
+                                        color: Theme.foreground;
+                                    }
+                                    Text {
+                                        text: root.agent-name + (root.model-name != "" ? " · " + root.model-name : "");
+                                        font-size: 10px;
+                                        color: #6B717C;
+                                        overflow: elide;
+                                    }
+                                }
+                                VerticalLayout {
+                                    alignment: start;
+                                    StatusPill {
+                                        status: root.session-running || ChatUi.subagents-running > 0 ? 0 : 2;
+                                    }
+                                }
+                            }
+                            Rectangle {
+                                height: 1px;
+                                background: #1F2227;
+                            }
+                            Text {
+                                text: root.session-title != "" ? root.session-title : @tr("Open a session to orchestrate.");
+                                font-size: 11px;
+                                color: Theme.foreground-subtle;
+                                wrap: word-wrap;
+                                overflow: elide;
+                                vertical-stretch: 1;
+                            }
+                            HorizontalLayout {
+                                Text {
+                                    text: @tr("{0} of {1} subagents finished", root.total - ChatUi.subagents-running, root.total);
+                                    font-size: 10px;
+                                    color: #6B717C;
+                                    horizontal-stretch: 1;
+                                    overflow: elide;
+                                }
+                                Text {
+                                    text: @tr("{0} active", ChatUi.subagents-running);
+                                    font-size: 10px;
+                                    color: #6B717C;
+                                }
+                            }
+                            // Share of subagents that finished (design: accent bar under the footer).
+                            Rectangle {
+                                height: 4px;
+                                border-radius: 2px;
+                                background: #24272D;
+                                Rectangle {
+                                    x: 0;
+                                    width: root.total == 0 ? 0px : parent.width * (root.total - ChatUi.subagents-running) / root.total;
+                                    height: parent.height;
+                                    border-radius: 2px;
+                                    background: Theme.accent-fg;
+                                }
+                            }
+                        }
+                    }
+                    for r[i] in ChatUi.subagents-active: SubNode {
+                        x: world.sub-x;
+                        y: world.top + i * (world.node-h + world.gap);
+                        item: r;
+                        selected: root.detail && i == root.sel;
+                        picked => {
+                            root.sel = i;
+                            root.detail = true;
+                        }
+                    }
+                    if root.count == 0: Rectangle {
+                        x: world.sub-x;
+                        y: world.orch-y + 14px;
+                        width: 340px;
+                        height: 100px;
+                        border-radius: 10px;
+                        border-width: 1px;
+                        border-color: #24272D;
+                        background: #0F1013;
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 4px;
+                            alignment: center;
+                            Text {
+                                text: root.total == 0 ? @tr("No subagents yet") : @tr("No active subagents");
+                                font-size: 12px;
+                                font-weight: Theme.weight-medium;
+                                color: Theme.foreground-subtle;
+                            }
+                            Text {
+                                text: root.total == 0
+                                    ? @tr("When the orchestrator delegates part of a task, each subagent appears here live.")
+                                    : @tr("All {0} subagents finished. Their results are in the chat; new delegations appear here live.", root.total);
+                                font-size: 11px;
+                                color: #6B717C;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+                // Legend chip (design: top-left, #121317, 1px #24272D, r8).
+                Rectangle {
+                    x: 16px;
+                    y: 14px;
+                    height: 30px;
+                    width: lg.preferred-width + 24px;
+                    border-radius: 8px;
+                    background: #121317;
+                    border-width: 1px;
+                    border-color: #24272D;
+                    lg := HorizontalLayout {
+                        x: 12px;
+                        width: self.preferred-width;
+                        spacing: 14px;
+                        HorizontalLayout {
+                            spacing: 5px;
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 5px;
+                                    height: 5px;
+                                    border-radius: 2.5px;
+                                    background: #3DD68C;
+                                }
+                            }
+                            Text {
+                                text: @tr("{0} running", ChatUi.subagents-running - ChatUi.subagents-waiting);
+                                font-size: 11px;
+                                color: #8A909A;
+                                vertical-alignment: center;
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: 5px;
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 5px;
+                                    height: 5px;
+                                    border-radius: 2.5px;
+                                    background: #F5B14C;
+                                }
+                            }
+                            Text {
+                                text: @tr("{0} waiting", ChatUi.subagents-waiting);
+                                font-size: 11px;
+                                color: #8A909A;
+                                vertical-alignment: center;
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: 5px;
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 5px;
+                                    height: 5px;
+                                    border-radius: 2.5px;
+                                    background: #6B717C;
+                                }
+                            }
+                            Text {
+                                text: @tr("max {0} concurrent", root.max-conc);
+                                font-size: 11px;
+                                color: #8A909A;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+                // Zoom (design: bottom-left "− 100% +").
+                Rectangle {
+                    x: 16px;
+                    y: parent.height - self.height - 16px;
+                    height: 26px;
+                    width: 82px;
+                    border-radius: 8px;
+                    background: #121317;
+                    border-width: 1px;
+                    border-color: #24272D;
+                    HorizontalLayout {
+                        Rectangle {
+                            width: 22px;
+                            Text {
+                                text: "−";
+                                font-size: 12px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                color: zo.has-hover ? Theme.foreground : #8A909A;
+                            }
+                            zo := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.zoom = max(0.5, root.zoom - 0.1);
+                                }
+                            }
+                        }
+                        Text {
+                            horizontal-stretch: 1;
+                            text: round(root.zoom * 100) + "%";
+                            font-size: 10px;
+                            color: #C9CCD2;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        Rectangle {
+                            width: 22px;
+                            Text {
+                                text: "+";
+                                font-size: 12px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                color: zi.has-hover ? Theme.foreground : #8A909A;
+                            }
+                            zi := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.zoom = min(1.6, root.zoom + 0.1);
+                                }
+                            }
+                        }
+                    }
+                }
+                // Minimap (design: bottom-right 140x80, nodes as blocks).
+                Rectangle {
+                    x: parent.width - self.width - 16px;
+                    y: parent.height - self.height - 16px;
+                    width: 140px;
+                    height: 80px;
+                    border-radius: 8px;
+                    background: #121317;
+                    border-width: 1px;
+                    border-color: #24272D;
+                    clip: true;
+                    property <float> k: 0.1;
+                    Rectangle {
+                        x: 10px;
+                        y: (parent.height - 26px) / 2;
+                        width: 24px;
+                        height: 26px;
+                        border-radius: 2px;
+                        background: #2A2D3A;
+                    }
+                    for r[i] in ChatUi.subagents-active: Rectangle {
+                        property <length> step: min(18px, 60px / max(1, root.count));
+                        x: 58px;
+                        y: (parent.height - root.count * self.step) / 2 + i * self.step;
+                        width: 32px;
+                        height: self.step - 3px;
+                        border-radius: 2px;
+                        background: i == root.sel && root.detail ? Theme.accent-fg.with-alpha(0.55) : #2F3446;
+                    }
+                }
+            }
+            // ---- Detail panel (design: 270 wide, left border) ----
+            if root.has-sel: Rectangle {
+                width: 290px;
+                background: #0E0F12;
+                Rectangle {
+                    x: 0;
+                    width: 1px;
+                    background: #1C1F24;
+                }
+                VerticalLayout {
+                    padding: 14px;
+                    padding-left: 15px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        Caps {
+                            text: @tr("SUBAGENT");
+                            horizontal-stretch: 1;
+                            vertical-alignment: center;
+                        }
+                        IconButton {
+                            icon: Icons.x;
+                            label: @tr("Close details");
+                            size: 22px;
+                            icon-size: 12px;
+                            clicked => {
+                                root.detail = false;
+                            }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Avatar {
+                            agent: root.cur.agent;
+                            size: 30px;
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 2px;
+                            Text {
+                                text: root.cur.agent-name;
+                                font-size: 13px;
+                                font-weight: Theme.weight-semibold;
+                                color: Theme.foreground;
+                                overflow: elide;
+                            }
+                            Text {
+                                text: root.cur.id;
+                                font-size: 10px;
+                                color: #6B717C;
+                                overflow: elide;
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            StatusPill {
+                                status: root.cur.status;
+                            }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 3px;
+                            Caps {
+                                text: @tr("AGENT");
+                            }
+                            Text {
+                                text: root.cur.agent-name;
+                                font-size: 12px;
+                                color: Theme.foreground-subtle;
+                                overflow: elide;
+                            }
+                        }
+                        VerticalLayout {
+                            spacing: 3px;
+                            Caps {
+                                text: @tr("ELAPSED");
+                                horizontal-alignment: right;
+                            }
+                            Text {
+                                text: ChatUi.elapsed(root.cur.started-s, root.cur.finished-s);
+                                font-size: 12px;
+                                color: Theme.foreground-subtle;
+                                horizontal-alignment: right;
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        spacing: 6px;
+                        Caps {
+                            text: @tr("TASK");
+                        }
+                        Text {
+                            text: root.cur.title;
+                            font-size: 12px;
+                            color: Theme.foreground;
+                            wrap: word-wrap;
+                        }
+                    }
+                    // Live log (design: mono box). The hub streams one activity line; the latest answer follows.
+                    Rectangle {
+                        border-radius: 8px;
+                        background: #121317;
+                        border-width: 1px;
+                        border-color: #24272D;
+                        VerticalLayout {
+                            padding: 10px;
+                            spacing: 6px;
+                            Caps {
+                                text: @tr("LIVE ACTIVITY");
+                            }
+                            if root.cur.activity != "": Text {
+                                text: root.cur.activity;
+                                font-family: Theme.mono-font;
+                                font-size: 11px;
+                                color: #C9CCD2;
+                                wrap: word-wrap;
+                            }
+                            if root.cur.preview != "": Text {
+                                text: root.cur.preview;
+                                font-family: Theme.mono-font;
+                                font-size: 11px;
+                                color: root.cur.status == 2 ? #3DD68C : (root.cur.status == 3 ? #F2555A : #8A909A);
+                                wrap: word-wrap;
+                                overflow: elide;
+                                max-height: 150px;
+                            }
+                            if root.cur.activity == "" && root.cur.preview == "": Text {
+                                text: root.cur.status == 0 ? @tr("thinking…") : LiveStatus.label(root.cur.status);
+                                font-family: Theme.mono-font;
+                                font-size: 11px;
+                                color: #6B717C;
+                            }
+                        }
+                    }
+                    Rectangle {
+                        vertical-stretch: 1;
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        LiveButton {
+                            horizontal-stretch: 1;
+                            text: @tr("Message");
+                            clicked => {
+                                ChatUi.subagent-action("open", root.cur.id);
+                                root.close();
+                            }
+                        }
+                        LiveButton {
+                            horizontal-stretch: 1;
+                            text: @tr("Stop");
+                            variant: "danger";
+                            enabled: root.cur.status <= 1;
+                            clicked => {
+                                ChatUi.subagent-action("stop", root.cur.id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

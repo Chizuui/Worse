@@ -1,0 +1,184 @@
+// Rust-visible globals of the Side Pane panels — owned by agent A (round 8.2, spec phase-8-ui.md §10).
+// app.slint re-exports everything in this file (`export * from "panels/globals.slint"`), so only globals and
+// structs live here (no components). Contract: .work/phase8/TOKENS_READY.md ("Panel contract").
+// Single owner of every value below: `src/panels` (the `harness-panels` thread computes, the UI thread applies).
+import { TabItem } from "../components/controls.slint";
+
+// Tabs that agent A's panels add to the Side Pane, in display order.
+export global PanelTabs {
+    out property <[TabItem]> tabs: [
+        { id: "diff", label: @tr("Diff") },
+        { id: "terminal", label: @tr("Terminal") },
+        { id: "git", label: @tr("Git") },
+        { id: "search", label: @tr("Search") },
+    ];
+}
+
+// Panel → Side Pane navigation request (a git row opens the Diff tab). Agent B wires `open-tab` to the Side
+// Pane's current tab; until then the request is ignored and the user switches tabs manually.
+export global PanelNav {
+    callback open-tab(string);
+}
+
+// ---- Git ------------------------------------------------------------------------------------------------------
+
+// `code`: M / A / D / R / U / C (ZCode GitPane status letters); `kind`: modified|added|deleted|renamed|untracked|conflicted.
+export struct GitRow {
+    path: string,
+    name: string,
+    dir: string,
+    code: string,
+    kind: string,
+    added: int,
+    removed: int,
+    staged: bool,
+}
+
+export global PanelGit {
+    in property <bool> loading;
+    in property <bool> loaded;
+    in property <bool> is-repo: true;
+    in property <string> branch;
+    // "↑1 ↓2" relative to the upstream, empty when there is none.
+    in property <string> sync;
+    in property <[GitRow]> staged;
+    in property <[GitRow]> unstaged;
+    in property <int> total-added;
+    in property <int> total-removed;
+    in property <string> error;
+    // Result line of the last action ("Committed 1a2b3c4").
+    in property <string> notice;
+    in property <[string]> branches;
+    in-out property <string> message;
+    callback refresh();
+    callback stage(string);
+    callback unstage(string);
+    callback stage-all();
+    callback unstage-all();
+    callback commit();
+    callback open-diff(string, bool);
+}
+
+// ---- Diff -----------------------------------------------------------------------------------------------------
+
+// kind: 0 context, 1 added, 2 removed, 3 hunk header, 4 "no newline" note.
+export struct DiffRow {
+    kind: int,
+    old-no: string,
+    new-no: string,
+    text: string,
+}
+
+// Side-by-side row: either a hunk header (`hunk`) or a left/right pair; side kind -1 = empty filler.
+export struct DiffPair {
+    hunk: bool,
+    header: string,
+    left-kind: int,
+    left-no: string,
+    left-text: string,
+    right-kind: int,
+    right-no: string,
+    right-text: string,
+}
+
+export struct DiffFileRow {
+    path: string,
+    status: string,
+    added: int,
+    removed: int,
+}
+
+export global PanelDiff {
+    in property <bool> loading;
+    // "git" (one working-tree / staged file), "turn" (agent turn changes) or "" (nothing shown yet).
+    in property <string> source;
+    in property <string> title;
+    in property <string> subtitle;
+    in property <int> added;
+    in property <int> removed;
+    in property <[DiffRow]> rows;
+    in property <[DiffPair]> pairs;
+    in property <[DiffFileRow]> files;
+    in property <int> current-file;
+    // Shown instead of rows (binary file, no changes, turn diff unavailable…).
+    in property <string> notice;
+    in-out property <bool> side-by-side;
+    callback select-file(int);
+    callback show-turn();
+    callback refresh();
+}
+
+// ---- Search ---------------------------------------------------------------------------------------------------
+
+export struct SearchHit {
+    path: string,
+    name: string,
+    dir: string,
+    line: int,
+    column: int,
+    text: string,
+    is-dir: bool,
+}
+
+export struct PreviewLine {
+    no: int,
+    text: string,
+    hit: bool,
+}
+
+export global PanelSearch {
+    in-out property <string> query;
+    // "files" or "content".
+    in-out property <string> mode: "files";
+    in-out property <bool> regex;
+    in-out property <bool> case-sensitive;
+    in property <bool> busy;
+    in property <[SearchHit]> hits;
+    in property <string> summary;
+    in property <string> error;
+    in property <string> preview-path;
+    in property <[PreviewLine]> preview;
+    callback run();
+    callback open(int);
+    callback close-preview();
+}
+
+// ---- Terminal -------------------------------------------------------------------------------------------------
+
+// One styled run of a terminal row. Colours: -1 default, -2 the opposite default (inverse video),
+// -3 the explicit `*-rgb` colour, 0..15 `Theme.terminal-ansi[i]`.
+export struct TermRun {
+    col: int,
+    cells: int,
+    text: string,
+    fg: int,
+    fg-rgb: color,
+    bg: int,
+    bg-rgb: color,
+    bold: bool,
+    italic: bool,
+    underline: bool,
+}
+
+export struct TermLine {
+    text: string,
+    runs: [TermRun],
+}
+
+export global PanelTerminal {
+    in property <[TermLine]> lines;
+    in property <int> cursor-row;
+    in property <int> cursor-col;
+    in property <bool> cursor-visible;
+    in property <bool> running;
+    in property <bool> exited;
+    in property <int> exit-code;
+    in property <string> title;
+    in property <string> error;
+    // Text typed (or a Slint key code) with modifiers; Rust maps it to VT input.
+    callback key(string, bool, bool);
+    callback resized(int, int);
+    callback scroll(int);
+    callback restart();
+    callback close();
+}

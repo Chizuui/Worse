@@ -1,0 +1,37 @@
+[package]
+name = "harness-agent-hub"
+version = "0.1.0"
+description = "Harness agent hub: drives external agent CLIs over ACP, owns the session store, sticky agent + quota failover, shared memory and the MCP memory server (spec phase-8-core.md)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "harness-memory-mcp"
+path = "src/bin/harness-memory-mcp.rs"
+
+[dependencies]
+harness-core = { path = "../harness-core" }
+harness-core-api = { path = "../harness-core-api" }
+# Phase 9.1: the Harness MCP overlay (`<home>/mcp.json`) passed on session/new and session/load.
+harness-agent-config = { path = "../harness-agent-config" }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["fs", "net"] }
+tracing = { workspace = true }
+uuid = { workspace = true }
+# Phase 9.2: pasted images (base64) and local time of scheduled prompts.
+base64 = { workspace = true }
+chrono = { workspace = true }
+harness-import = { path = "../harness-import" }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider", "system-proxy"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+sha2 = "0.10"
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
+flate2 = "1"
+tar = "0.4"
+
+[lints]
+workspace = true

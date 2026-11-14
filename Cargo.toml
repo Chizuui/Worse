@@ -1,0 +1,70 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "apps/harness-app/src-tauri", "apps/harness-slint"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.80"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+log = "0.4"
+tokio = { version = "1", features = ["rt-multi-thread", "process", "io-util", "macros", "time", "sync"] }
+ts-rs = "12"
+url = "2"
+tauri = "2"
+tauri-build = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-log = "2"
+# Phase 6 (updater B): signed full-package updates, spec phase-6-updater.md.
+tauri-plugin-updater = "2"
+# Phase 6 fix round: version filter of the updater temp sweep (same crate as tauri's PackageInfo.version).
+semver = "1"
+hex = "0.4"
+uuid = { version = "1", features = ["v4"] }
+ignore = "0.4"
+grep-searcher = "0.1"
+grep-regex = "0.1"
+grep-matcher = "0.1"
+tempfile = "3"
+icu_collator = "2"
+base64 = "0.22"
+notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
+portable-pty = "0.9"
+winapi-util = "0.1"
+windows-version = "0.1"
+win32job = "2"
+nix = { version = "0.28", default-features = false, features = ["signal", "process"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
+# Phase 9.1: Codex config.toml edits that keep comments and unknown keys (spec phase-9-parity.md §9.1.3).
+toml_edit = "0.25"
+# Phase 9.2: local time of day for scheduled prompts (spec phase-9-parity.md §9.2.1; already in the lock file).
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+module_name_repetitions = "allow"
+
+# Fast test builds for manual testing (`cargo build -p harness-slint --profile quick`, output target/quick/).
+# Incremental and many codegen units, so a rebuild after a small change only recompiles what changed.
+# Official releases still use `--release`.
+[profile.quick]
+inherits = "release"
+opt-level = 0
+incremental = true
+codegen-units = 256
+
+[profile.quick.package."*"]
+opt-level = 2

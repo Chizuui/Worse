@@ -1,0 +1,22 @@
+[package]
+name = "harness-import"
+version = "0.1.0"
+description = "Read-only importer of ZCode and Claude Code session history (decision 14A, phase-9-parity.md §9.2.1)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+harness-core-api = { path = "../harness-core-api" }
+rusqlite = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true, features = ["fs", "rt"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#101418</color>
+    <color name="harness_accent">#4ED1A1</color>
+    <color name="harness_bg">#101418</color>
+    <color name="harness_fg">#E6EDF3</color>
+    <color name="harness_muted">#8B98A5</color>
+</resources>

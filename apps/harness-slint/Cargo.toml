@@ -1,0 +1,81 @@
+[package]
+name = "harness-slint"
+version = "0.1.0"
+edition.workspace = true
+# Slint 1.18 itself requires Rust 1.92 (enforced through its own rust-version).
+rust-version.workspace = true
+license.workspace = true
+description = "Harness native UI (Slint), Phase 8 round 1"
+build = "build.rs"
+
+[[bin]]
+name = "harness-slint"
+path = "src/main.rs"
+
+[features]
+default = []
+# Test-only: embedded Slint MCP introspection server (starts only when SLINT_MCP_PORT is set) + element ids.
+automation = ["slint/mcp"]
+
+[dependencies]
+slint = { version = "=1.18.1", default-features = false, features = [
+  "std",
+  "compat-1-2",
+  "backend-winit",
+  "renderer-software",
+  "renderer-femtovg",
+  "renderer-skia",
+  "accessibility",
+  # Phase 9.2: OS file drops (winit DroppedFile / HoveredFile) for composer attachment chips.
+  "unstable-winit-030",
+] }
+tokio = { workspace = true, features = ["rt", "fs", "time", "sync", "macros"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+pulldown-cmark = { version = "0.13", default-features = false }
+harness-core-api = { path = "../../crates/harness-core-api" }
+harness-agent-hub = { path = "../../crates/harness-agent-hub" }
+# §9.9: the API provider agent runs as `harness-slint --api-agent` (one shipped executable).
+harness-api-agent = { path = "../../crates/harness-api-agent" }
+# Phase 9.1: the single writer of settings.json (shared by the cores and the settings UI).
+harness-settings = { path = "../../crates/harness-settings" }
+# Phase 9.1 settings pages: per-CLI MCP / skills / commands / hooks / subagents / instructions (plan → diff → apply).
+harness-agent-config = { path = "../../crates/harness-agent-config" }
+# Resolves the "system" language to the OS locale.
+sys-locale = "0.3.2"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider", "system-proxy"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+# Side Pane panels (agent A, round 8.2): workspace services + terminal emulation.
+harness-workspace = { path = "../../crates/harness-workspace" }
+# Phase 9.2: "Reveal workspace in file manager" (desktop SystemPathRevealer).
+harness-platform = { path = "../../crates/harness-platform" }
+alacritty_terminal = { version = "0.26", default-features = false }
+# Phase 9.2 composer: image paste (clipboard bitmap → PNG), file picker, whiteboard / annotation PNG export.
+image = { version = "0.25", default-features = false, features = ["png", "bmp"] }
+rfd = { version = "0.17", default-features = false, features = ["gtk3"] }
+xcap = "0.9"
+enigo = "0.6"
+# Phase 12 remote phone access: loopback HTTP/WS server serving `HarnessCore` + pairing tokens.
+harness-remote = { path = "../../crates/harness-remote" }
+# Pair link (`https://<host>/p#t=<token>`) as a QR matrix in the Remote settings page.
+qrcode = { version = "0.14", default-features = false }
+[target.'cfg(windows)'.dependencies]
+clipboard-win = "5.4"
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_Security_Credentials"] }
+
+[build-dependencies]
+slint-build = "=1.18.1"
+
+# Same lints as the workspace, except `unsafe_code` is `deny` instead of `forbid`: Slint's generated code
+# (`slint::include_modules!`, vtable macros) carries `#[allow(unsafe_code)]`, which `forbid` rejects.
+# Hand-written code stays unsafe-free (deny); only the generated `ui` module is exempted by the macro itself.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+module_name_repetitions = "allow"

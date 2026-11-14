@@ -1,0 +1,31 @@
+// Side Pane panels host — owned by agent A (round 8.2, spec phase-8-ui.md §10).
+// Contract: .work/phase8/TOKENS_READY.md ("Panel contract"). Only the visible panel is instantiated (`if`), so a
+// closed Side Pane or the Files tab costs nothing; panel state lives in the globals (globals.slint) and Rust.
+import { PanelTabs } from "globals.slint";
+import { DiffPanel } from "diff.slint";
+import { GitPanel } from "git.slint";
+import { SearchPanel } from "search.slint";
+import { TerminalPanel } from "terminal.slint";
+
+export { PanelTabs }
+
+// Renders the panel whose id is `tab` (fills the Side Pane body below the tab bar).
+export component PanelHost inherits Rectangle {
+    in property <string> tab;
+    if root.tab == "diff": DiffPanel {
+        width: parent.width;
+        height: parent.height;
+    }
+    if root.tab == "terminal": TerminalPanel {
+        width: parent.width;
+        height: parent.height;
+    }
+    if root.tab == "git": GitPanel {
+        width: parent.width;
+        height: parent.height;
+    }
+    if root.tab == "search": SearchPanel {
+        width: parent.width;
+        height: parent.height;
+    }
+}

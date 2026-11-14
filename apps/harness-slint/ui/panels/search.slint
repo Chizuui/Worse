@@ -1,0 +1,257 @@
+// Search panel (ZCode workspace-file-search + search in files, spec phase-8-ui.md §10): files / content toggle,
+// regex + case options, results list, read-only preview around a content hit.
+import { ListView } from "std-widgets.slint";
+import { Theme } from "../theme/tokens.slint";
+import { Icon, Icons, IconButton, Segmented, Divider } from "../components/controls.slint";
+import { PanelSearch, SearchHit, PreviewLine } from "globals.slint";
+import { PanelBar, PanelNotice, ToggleChip } from "common.slint";
+
+component HitRow inherits Rectangle {
+    in property <SearchHit> hit;
+    callback clicked();
+    height: hit.line > 0 ? 40px : 28px;
+    border-radius: Theme.radius-md;
+    background: ta.has-hover ? Theme.hover : transparent;
+    accessible-role: list-item;
+    accessible-label: hit.line > 0 ? hit.path + ":" + hit.line + " " + hit.text : hit.path;
+    accessible-action-default => {
+        root.clicked();
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+    VerticalLayout {
+        padding-left: Theme.space-2;
+        padding-right: Theme.space-2;
+        alignment: center;
+        HorizontalLayout {
+            spacing: Theme.space-1-5;
+            Icon {
+                source: hit.is-dir ? Icons.folder : Icons.file;
+                tint: Theme.icon-subtle;
+                size: Theme.icon-xs;
+            }
+            Text {
+                horizontal-stretch: 0;
+                text: hit.line > 0 ? hit.name + ":" + hit.line : hit.name;
+                font-size: Theme.ui-sm;
+                color: Theme.foreground;
+                overflow: elide;
+            }
+            Text {
+                text: hit.dir;
+                font-size: Theme.ui-xs;
+                color: Theme.foreground-subtlest;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+        }
+        if hit.line > 0: Text {
+            text: hit.text;
+            font-family: Theme.mono-font;
+            font-size: Theme.code-size;
+            color: Theme.foreground-subtle;
+            overflow: elide;
+        }
+    }
+}
+
+component PreviewRow inherits Rectangle {
+    in property <PreviewLine> line;
+    height: 18px;
+    background: line.hit ? Theme.find-highlight : transparent;
+    accessible-role: list-item;
+    accessible-label: line.no + " " + line.text;
+    HorizontalLayout {
+        spacing: Theme.space-2;
+        Text {
+            width: 40px;
+            text: line.no;
+            font-family: Theme.mono-font;
+            font-size: Theme.code-size;
+            color: Theme.foreground-subtlest;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+        Text {
+            text: line.text;
+            font-family: Theme.mono-font;
+            font-size: Theme.code-size;
+            color: Theme.foreground;
+            vertical-alignment: center;
+            overflow: clip;
+        }
+    }
+}
+
+export component SearchPanel inherits Rectangle {
+    VerticalLayout {
+        padding: Theme.space-2;
+        spacing: Theme.space-2;
+        // Query input (36px input, rounded-lg, ZCode search field) with option chips.
+        Rectangle {
+            height: Theme.input-height;
+            border-radius: Theme.radius-lg;
+            border-width: 1px;
+            border-color: query.has-focus ? Theme.input-border-focused : Theme.input-border;
+            background: Theme.input;
+            HorizontalLayout {
+                padding-left: Theme.space-2;
+                padding-right: Theme.space-1;
+                spacing: Theme.space-1-5;
+                VerticalLayout {
+                    alignment: center;
+                    Icon {
+                        source: Icons.search;
+                        tint: Theme.icon-subtle;
+                        size: Theme.icon-sm;
+                    }
+                }
+                Rectangle {
+                    query := TextInput {
+                        width: parent.width;
+                        height: parent.height;
+                        text <=> PanelSearch.query;
+                        single-line: true;
+                        vertical-alignment: center;
+                        font-size: Theme.ui-sm;
+                        color: Theme.foreground;
+                        accessible-role: text-input;
+                        accessible-label: @tr("Search query");
+                        accepted => {
+                            PanelSearch.run();
+                        }
+                        edited => {
+                            if PanelSearch.mode == "files" {
+                                PanelSearch.run();
+                            }
+                        }
+                    }
+                    if PanelSearch.query == "": Text {
+                        width: parent.width;
+                        height: parent.height;
+                        text: PanelSearch.mode == "files" ? @tr("Search files by name") : @tr("Search in files (Enter)");
+                        font-size: Theme.ui-sm;
+                        color: Theme.foreground-subtlest;
+                        vertical-alignment: center;
+                    }
+                }
+                if PanelSearch.mode == "content": VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 0;
+                    ToggleChip {
+                        text: ".*";
+                        label: @tr("Regular expression");
+                        checked <=> PanelSearch.regex;
+                        toggled => {
+                            if PanelSearch.query != "" {
+                                PanelSearch.run();
+                            }
+                        }
+                    }
+                }
+                if PanelSearch.mode == "content": VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 0;
+                    ToggleChip {
+                        text: "Aa";
+                        label: @tr("Match case");
+                        checked <=> PanelSearch.case-sensitive;
+                        toggled => {
+                            if PanelSearch.query != "" {
+                                PanelSearch.run();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: Theme.space-2;
+            Segmented {
+                options: [{ id: "files", label: @tr("Files") }, { id: "content", label: @tr("Content") }];
+                current: PanelSearch.mode;
+                select(id) => {
+                    PanelSearch.mode = id;
+                    PanelSearch.close-preview();
+                    if PanelSearch.query != "" {
+                        PanelSearch.run();
+                    }
+                }
+            }
+            Text {
+                text: PanelSearch.busy ? @tr("Searching…") : PanelSearch.summary;
+                font-size: Theme.ui-xs;
+                color: Theme.foreground-subtle;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: AccessibleRole.text;
+                accessible-label: self.text;
+            }
+        }
+        if PanelSearch.error != "": Text {
+            text: PanelSearch.error;
+            wrap: word-wrap;
+            font-size: Theme.ui-xs;
+            color: Theme.destructive;
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            if PanelSearch.hits.length == 0: PanelNotice {
+                width: parent.width;
+                height: parent.height;
+                text: PanelSearch.query == "" ? @tr("Type to search this workspace.") : (PanelSearch.busy ? "" : @tr("No results"));
+            }
+            if PanelSearch.hits.length > 0: ListView {
+                width: parent.width;
+                height: parent.height;
+                for h[i] in PanelSearch.hits: HitRow {
+                    hit: h;
+                    clicked => {
+                        PanelSearch.open(i);
+                    }
+                }
+            }
+        }
+        if PanelSearch.preview-path != "": Divider { }
+        if PanelSearch.preview-path != "": VerticalLayout {
+            vertical-stretch: 1;
+            spacing: Theme.space-1;
+            HorizontalLayout {
+                spacing: Theme.space-1;
+                Text {
+                    text: PanelSearch.preview-path;
+                    font-size: Theme.ui-sm;
+                    font-weight: Theme.weight-medium;
+                    color: Theme.foreground;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+                IconButton {
+                    icon: Icons.x;
+                    label: @tr("Close preview");
+                    size: Theme.control-xs;
+                    icon-size: Theme.icon-xs;
+                    clicked => {
+                        PanelSearch.close-preview();
+                    }
+                }
+            }
+            Rectangle {
+                vertical-stretch: 1;
+                border-radius: Theme.radius-md;
+                background: Theme.surface;
+                clip: true;
+                ListView {
+                    for l in PanelSearch.preview: PreviewRow {
+                        line: l;
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,19 @@
+[package]
+name = "harness-fake-agent"
+version = "0.1.0"
+description = "Scripted ACP agent for Harness gates: streaming, permission requests, cancel, session/load, quota exhaustion, MCP memory calls."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "harness-fake-agent"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["fs", "io-std", "io-util", "macros", "rt", "process", "sync", "time"] }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

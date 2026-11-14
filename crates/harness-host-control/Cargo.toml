@@ -1,0 +1,24 @@
+[package]
+name = "harness-host-control"
+version = "0.1.0"
+description = "Desktop-only supervision of the Harness Node Host sidecar."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+harness-core = { path = "../harness-core" }
+harness-host-protocol = { path = "../harness-host-protocol" }
+harness-sidecar = { path = "../harness-sidecar" }
+hex = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["fs"] }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["fs"] }
+
+[lints]
+workspace = true

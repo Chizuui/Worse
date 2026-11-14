@@ -1,0 +1,21 @@
+[package]
+name = "harness-settings"
+version = "0.1.0"
+description = "Harness app settings: typed settings.json with unknown-key preservation, atomic writes, change events, ui-settings.json migration and data dir relocation (spec phase-9-parity.md §9.1.1-9.1.2)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { version = "1", default-features = false, features = ["fs", "sync", "io-util"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { version = "1", default-features = false, features = ["fs", "sync", "io-util", "macros", "rt"] }
+
+[lints]
+workspace = true

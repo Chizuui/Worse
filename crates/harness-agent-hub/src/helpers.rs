@@ -1,0 +1,174 @@
+//! How Harness starts its own helper processes (phase-9-parity.md §9.9).
+//!
+//! Owner: [`HelperLaunch`] (held in `HubConfig.helpers`) is the only code that turns a helper into
+//! `program + args`. The product ships one executable (`harness-slint`) whose helper modes are selected by a leading
+//! flag; development builds and older gates use the standalone binaries `harness-memory-mcp` and `harness-api-agent`.
+//! The helper bodies live here ([`run_memory_mcp`], [`run_delegate_mcp`]) and in `harness_api_agent::run`, so the
+//! standalone binaries and the app modes share one implementation.
+
+use std::io::{self, BufReader};
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+
+use crate::delegate_mcp::{self, DelegateEnv};
+use crate::error::HubError;
+use crate::memory::MemoryFiles;
+
+/// Mode flag of the memory MCP server (`<exe> --memory-mcp [--project <dir>]`).
+pub const FLAG_MEMORY_MCP: &str = "--memory-mcp";
+/// Mode flag of the `harness-delegate` MCP server (`<exe> --delegate`).
+pub const FLAG_DELEGATE: &str = "--delegate";
+/// Mode flag of the API provider ACP agent (`<exe> --api-agent`).
+pub const FLAG_API_AGENT: &str = "--api-agent";
+pub const FLAG_COMPUTER_MCP: &str = "--computer-mcp";
+
+/// A helper process Harness starts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Helper {
+    /// Memory MCP server (`memory_read` / `memory_write`).
+    MemoryMcp,
+    /// `harness-delegate` MCP server (§9.8).
+    Delegate,
+    /// ACP agent of one OpenAI-compatible provider (§9.7).
+    ApiAgent,
+    Computer,
+}
+
+/// How helpers are launched.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HelperLaunch {
+    /// One multi-mode executable: `program <mode flag> [args]` (the shipped app).
+    SelfExe { program: PathBuf },
+    /// Standalone binaries: `harness-memory-mcp [--delegate]` and `harness-api-agent` (development, gates).
+    Separate {
+        memory_mcp: PathBuf,
+        api_agent: PathBuf,
+    },
+}
+
+fn exe_name(stem: &str) -> String {
+    if cfg!(windows) {
+        format!("{stem}.exe")
+    } else {
+        stem.to_owned()
+    }
+}
+
+fn env_path(key: &str) -> Option<PathBuf> {
+    std::env::var_os(key)
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+}
+
+impl HelperLaunch {
+    /// Standalone binaries: `HARNESS_MEMORY_MCP` and `HARNESS_API_AGENT`, each else next to the current executable
+    /// (the API agent: next to the memory server when only `HARNESS_MEMORY_MCP` is set).
+    ///
+    /// # Errors
+    ///
+    /// The current executable cannot be resolved and no override is set.
+    pub fn from_env() -> Result<Self, HubError> {
+        let memory_mcp = if let Some(path) = env_path("HARNESS_MEMORY_MCP") {
+            path
+        } else {
+            let exe = std::env::current_exe()?;
+            let dir = exe
+                .parent()
+                .ok_or_else(|| HubError::Config("current executable has no parent".into()))?;
+            dir.join(exe_name("harness-memory-mcp"))
+        };
+        let api_agent = env_path("HARNESS_API_AGENT")
+            .unwrap_or_else(|| memory_mcp.with_file_name(exe_name("harness-api-agent")));
+        Ok(Self::Separate {
+            memory_mcp,
+            api_agent,
+        })
+    }
+
+    /// The app's choice: its own executable `exe` with mode flags, unless `HARNESS_MEMORY_MCP` selects the
+    /// standalone binaries (older UI gates).
+    ///
+    /// # Errors
+    ///
+    /// Only from [`HelperLaunch::from_env`] when the override is set.
+    pub fn for_app(exe: PathBuf) -> Result<Self, HubError> {
+        if env_path("HARNESS_MEMORY_MCP").is_some() {
+            return Self::from_env();
+        }
+        Ok(Self::SelfExe { program: exe })
+    }
+
+    /// Program of `helper`.
+    #[must_use]
+    pub fn program(&self, helper: Helper) -> &Path {
+        match (self, helper) {
+            (Self::SelfExe { program }, _) => program,
+            (
+                Self::Separate { memory_mcp, .. },
+                Helper::MemoryMcp | Helper::Delegate | Helper::Computer,
+            ) => memory_mcp,
+            (Self::Separate { api_agent, .. }, Helper::ApiAgent) => api_agent,
+        }
+    }
+
+    /// Leading arguments of `helper` (callers append their own, e.g. `--project <dir>`).
+    #[must_use]
+    pub fn args(&self, helper: Helper) -> Vec<String> {
+        let flag = match (self, helper) {
+            (Self::SelfExe { .. }, Helper::MemoryMcp) => Some(FLAG_MEMORY_MCP),
+            (_, Helper::Delegate) => Some(FLAG_DELEGATE),
+            (Self::SelfExe { .. }, Helper::ApiAgent) => Some(FLAG_API_AGENT),
+            (_, Helper::Computer) => Some(FLAG_COMPUTER_MCP),
+            (Self::Separate { .. }, Helper::MemoryMcp | Helper::ApiAgent) => None,
+        };
+        flag.into_iter().map(str::to_owned).collect()
+    }
+}
+
+/// Memory MCP server over stdio. `args` are the arguments after the mode flag (`--project <dir>`).
+/// Data directory: `HARNESS_HOME`, else `~/.harness`.
+pub fn run_memory_mcp(args: impl IntoIterator<Item = String>) -> ExitCode {
+    let mut project = None;
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
+        if arg == "--project" {
+            project = args.next().map(PathBuf::from);
+        }
+    }
+    let home = match env_path("HARNESS_HOME") {
+        Some(home) => home,
+        None => match crate::config::HubConfig::from_env() {
+            Ok(config) => config.home,
+            Err(error) => {
+                eprintln!("harness memory-mcp: {error}");
+                return ExitCode::FAILURE;
+            }
+        },
+    };
+    let memory = MemoryFiles::new(home);
+    let stdin = BufReader::new(io::stdin().lock());
+    match crate::mcp::serve(&memory, project.as_deref(), stdin, io::stdout().lock()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("harness memory-mcp: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// `harness-delegate` MCP server over stdio, configured by the `HARNESS_DELEGATE_*` env vars (§9.8).
+#[must_use]
+pub fn run_delegate_mcp() -> ExitCode {
+    let Some(env) = DelegateEnv::from_env() else {
+        eprintln!("harness delegate: HARNESS_DELEGATE_ADDR/TOKEN/SESSION are not set");
+        return ExitCode::FAILURE;
+    };
+    let stdin = BufReader::new(io::stdin());
+    match delegate_mcp::serve(&env, stdin, Box::new(io::stdout())) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("harness delegate: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}

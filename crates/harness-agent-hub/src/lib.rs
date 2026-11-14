@@ -1,0 +1,54 @@
+//! Harness agent hub (spec `docs/specs/harness/phase-8-core.md`).
+//!
+//! Implements [`harness_core_api::HarnessCore`]: one actor per session owns its transcript, queue and sticky
+//! agent; [`pool::AgentPool`] owns agent CLI processes (spawned on demand, stopped when idle);
+//! [`quota::QuotaRegistry`] owns exhaustion state; [`store::Store`] is the single SQLite writer.
+
+mod accounts;
+pub mod acp;
+mod admin;
+pub mod agents;
+mod agy_accounts;
+pub mod agy_cred;
+mod agy_ops;
+mod board;
+mod board_sync;
+mod bus;
+pub mod catchup;
+pub mod config;
+mod context;
+mod delegate;
+mod delegate_coord;
+pub mod delegate_mcp;
+mod delegate_server;
+mod error;
+mod failure;
+mod files;
+mod gh;
+pub mod helpers;
+mod hub;
+mod hub_chat;
+mod import;
+mod inbox;
+pub mod machine;
+pub mod mcp;
+pub mod memory;
+mod options;
+mod orchestra;
+pub mod pool;
+mod process;
+mod providers;
+pub mod quota;
+mod schedule;
+mod session;
+pub mod setup;
+mod snapshot;
+pub mod store;
+mod store_chat;
+mod util;
+mod worktree;
+
+pub use agy_cred::{AgyCredStore, CredAttribute, CredBlob, SharedAgyCredStore};
+pub use config::{HubConfig, SharedAuthProbe, SharedFileSearch};
+pub use error::HubError;
+pub use hub::Hub;

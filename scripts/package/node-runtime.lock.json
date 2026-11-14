@@ -1,0 +1,13 @@
+{
+  "$comment": "Pinned official Node.js runtime bundled into host/runtime/node. Version must equal mise.toml [tools] node. SHA-256 values copied from https://nodejs.org/dist/v24.14.0/SHASUMS256.txt. See Worse/docs/specs/harness/phase-6-packaging.md section 2.",
+  "version": "24.14.0",
+  "baseUrl": "https://nodejs.org/dist/v24.14.0/",
+  "artifacts": {
+    "win32-x64": { "file": "node-v24.14.0-win-x64.zip", "sha256": "313fa40c0d7b18575821de8cb17483031fe07d95de5994f6f435f3b345f85c66" },
+    "win32-arm64": { "file": "node-v24.14.0-win-arm64.zip", "sha256": "88d36e8109736a2fa9bdc596f2cf507a3c52c69cdf96e54f8acd473ec14be853" },
+    "darwin-x64": { "file": "node-v24.14.0-darwin-x64.tar.gz", "sha256": "f2879eb810e25993a0578e5d878930266fd2eafcffe9f2839b3d8db354d4879e" },
+    "darwin-arm64": { "file": "node-v24.14.0-darwin-arm64.tar.gz", "sha256": "a1a54f46a750d2523d628d924aab61758a51c9dad3e0238beb14141be9615dd3" },
+    "linux-x64": { "file": "node-v24.14.0-linux-x64.tar.xz", "sha256": "41cd79bb7877c81605a9e68ec4c91547774f46a40c67a17e34d7179ef11729df" },
+    "linux-arm64": { "file": "node-v24.14.0-linux-arm64.tar.xz", "sha256": "e7adfca03d9173276114a6f2219df1a7d25e1bfd6bbd771d3f839118a2053094" }
+  }
+}

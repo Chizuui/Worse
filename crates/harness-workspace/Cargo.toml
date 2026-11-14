@@ -1,0 +1,20 @@
+[package]
+name = "harness-workspace"
+version = "0.1.0"
+description = "Workspace services for one root (files, search, git incl. stage/commit, PTY terminals, watcher), lazy, on top of the harness-* service crates (spec phase-8-core.md §15.3)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+harness-core-api = { path = "../harness-core-api" }
+harness-fs = { path = "../harness-fs" }
+harness-git = { path = "../harness-git" }
+harness-pty = { path = "../harness-pty" }
+harness-search = { path = "../harness-search" }
+harness-watch = { path = "../harness-watch" }
+tokio = { workspace = true, features = ["fs"] }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

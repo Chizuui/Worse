@@ -1,0 +1,182 @@
+// Translated labels for settings ids (Slint has no free functions, so they live in a global).
+export global Labels {
+    pure public function page-label(id: string) -> string {
+        if id == "general" { return @tr("General"); }
+        if id == "appearance" { return @tr("Appearance"); }
+        if id == "agents" { return @tr("Agents"); }
+        if id == "orchestra" { return "Orchestra"; }
+        if id == "inbox" { return "Inbox"; }
+        if id == "remote" { return "Remote (phone)"; }
+        if id == "shortcuts" { return @tr("Keyboard Shortcuts"); }
+        if id == "instructions" { return @tr("Instructions"); }
+        if id == "memory" { return @tr("Memory"); }
+        if id == "projects" { return @tr("Projects"); }
+        if id == "archive" { return @tr("Archive management"); }
+        if id == "import" { return @tr("Import sessions"); }
+        concept-title(id)
+    }
+
+    pure public function group-label(group: int) -> string {
+        if group == 0 { return @tr("APP"); }
+        if group == 1 { return @tr("AGENT CONFIG"); }
+        @tr("DATA")
+    }
+
+    // Short nav labels of the redesign (frames S1–S16). `page-label` above stays the long/accessible name.
+    pure public function nav-label(id: string) -> string {
+        if id == "general" { return @tr("General"); }
+        if id == "appearance" { return @tr("Appearance"); }
+        if id == "agents" { return @tr("Agents"); }
+        if id == "orchestra" { return "Orchestra"; }
+        if id == "inbox" { return "Inbox"; }
+        if id == "remote" { return @tr("Remote"); }
+        if id == "shortcuts" { return @tr("Shortcuts"); }
+        if id == "instructions" { return @tr("Instructions"); }
+        if id == "memory" { return @tr("Memory"); }
+        if id == "projects" { return @tr("Projects"); }
+        if id == "archive" { return @tr("Archive"); }
+        if id == "import" { return @tr("Import"); }
+        if id == "mcp" { return "MCP"; }
+        concept-title(id)
+    }
+
+    // Nav glyphs of the redesign (frame S1 "nav · X" › "ico", 12px text glyphs).
+    pure public function nav-icon(id: string) -> string {
+        if id == "general" { return "⚙"; }
+        if id == "appearance" { return "◐"; }
+        if id == "agents" { return "◎"; }
+        if id == "orchestra" { return "⌘"; }
+        if id == "inbox" { return "▤"; }
+        if id == "remote" { return "↗"; }
+        if id == "shortcuts" { return "⌨"; }
+        if id == "instructions" { return "≡"; }
+        if id == "memory" { return "◇"; }
+        if id == "subagent" { return "⁂"; }
+        if id == "mcp" { return "⧉"; }
+        if id == "skill" { return "✦"; }
+        if id == "command" { return "/"; }
+        if id == "hook" { return "⤳"; }
+        if id == "projects" { return "▢"; }
+        if id == "archive" { return "⏸"; }
+        if id == "import" { return "⤓"; }
+        "•"
+    }
+
+    // Command labels (ZCode settings.shortcuts.command.*).
+    pure public function command-label(id: string) -> string {
+        if id == "openCommandCenter" { return @tr("Open Command Center"); }
+        if id == "openSettings" { return @tr("Open Settings"); }
+        if id == "findInTask" { return @tr("Find in Task"); }
+        if id == "toggleSidebar" { return @tr("Toggle Sidebar"); }
+        if id == "switchTheme" { return @tr("Toggle Light/Dark Theme"); }
+        if id == "toggleTerminal" { return @tr("Toggle Terminal"); }
+        if id == "toggleSidePane" { return @tr("Toggle Side Pane"); }
+        if id == "toggleSidePaneFullView" { return @tr("Enter or Exit Full View"); }
+        if id == "previousConversation" { return @tr("Previous Task"); }
+        if id == "nextConversation" { return @tr("Next Task"); }
+        if id == "navigateBack" { return @tr("Navigate Back"); }
+        if id == "navigateForward" { return @tr("Navigate Forward"); }
+        if id == "openModelMenu" { return @tr("Open Model Menu"); }
+        if id == "cycleSessionMode" { return @tr("Cycle Session Mode"); }
+        if id == "cycleThoughtLevel" { return @tr("Cycle Thought Level"); }
+        if id == "newTask" { return @tr("New Task"); }
+        if id == "openWorkspace" { return @tr("Open Workspace"); }
+        if id == "closeActiveContext" { return @tr("Close Current Context"); }
+        if id == "zoomIn" { return @tr("Zoom In"); }
+        if id == "zoomOut" { return @tr("Zoom Out"); }
+        if id == "resetZoom" { return @tr("Reset Zoom"); }
+        if id == "composerSend" { return @tr("Send Message"); }
+        if id == "composerInsertNewline" { return @tr("Insert Newline in Composer"); }
+        if id == "openOnboarding" { return @tr("Toggle onboarding"); }
+        id
+    }
+
+    pure public function error-text(code: string, conflict: string) -> string {
+        if code == "reserved" { return @tr("This combination is reserved by the system"); }
+        if code == "noModifier" { return @tr("At least one modifier key is required (Ctrl / Cmd / Alt)"); }
+        if code == "invalidKey" { return @tr("Unsupported key"); }
+        if code == "duplicate" { return @tr("Already bound to this command"); }
+        if code == "occupied" { return @tr("Already used by “{0}”", command-label(conflict)); }
+        if code == "saveFailed" { return @tr("Failed to save shortcuts. Try again."); }
+        code
+    }
+
+    pure public function concept-title(concept: string) -> string {
+        if concept == "mcp" { return @tr("MCP Servers"); }
+        if concept == "skill" { return @tr("Skills"); }
+        if concept == "command" { return @tr("Commands"); }
+        if concept == "hook" { return @tr("Hooks"); }
+        if concept == "subagent" { return @tr("Subagents"); }
+        concept
+    }
+
+    pure public function concept-intro(concept: string) -> string {
+        if concept == "mcp" { return @tr("MCP servers give agents extra tools. Harness edits each CLI's own configuration; the Harness overlay is added to every session Harness starts."); }
+        if concept == "skill" { return @tr("Skills are folders with a SKILL.md that agents load on demand."); }
+        if concept == "command" { return @tr("Custom slash commands are prompt templates stored as markdown files."); }
+        if concept == "hook" { return @tr("Hooks run shell commands on agent events. Workspace hooks run with your permissions; only add hooks you trust."); }
+        if concept == "subagent" { return @tr("Subagents are specialised agents with their own prompt, tools and model."); }
+        ""
+    }
+
+    pure public function new-label(concept: string) -> string {
+        if concept == "mcp" { return @tr("Add server"); }
+        if concept == "skill" { return @tr("New skill"); }
+        if concept == "command" { return @tr("New command"); }
+        if concept == "hook" { return @tr("New hook"); }
+        if concept == "subagent" { return @tr("New subagent"); }
+        @tr("New")
+    }
+
+    pure public function agent-name(id: string) -> string {
+        if id == "claude-code" { return "Claude Code"; }
+        if id == "codex" { return "Codex"; }
+        if id == "agy" { return "agy"; }
+        if id == "harness" { return @tr("Harness overlay"); }
+        id
+    }
+
+    pure public function field-label(key: string) -> string {
+        if key == "name" { return @tr("Name"); }
+        if key == "transport" { return @tr("Type"); }
+        if key == "command" { return @tr("Command"); }
+        if key == "args" { return @tr("Arguments"); }
+        if key == "env" { return @tr("Environment variables"); }
+        if key == "url" { return "URL"; }
+        if key == "headers" { return @tr("Headers"); }
+        if key == "timeout" { return @tr("Timeout (seconds)"); }
+        if key == "description" { return @tr("Description"); }
+        if key == "argumentHint" { return @tr("Argument hint"); }
+        if key == "prompt" { return @tr("Prompt"); }
+        if key == "body" { return @tr("Content"); }
+        if key == "event" { return @tr("Event"); }
+        if key == "matcher" { return @tr("Matcher"); }
+        if key == "statusMessage" { return @tr("Status message"); }
+        if key == "async" { return @tr("Run in background"); }
+        if key == "model" { return @tr("Model"); }
+        if key == "color" { return @tr("Color"); }
+        if key == "tools" { return @tr("Tools"); }
+        if key == "systemPrompt" { return @tr("System prompt"); }
+        if key == "enabled" { return @tr("Enabled"); }
+        key
+    }
+
+    pure public function field-hint(key: string) -> string {
+        if key == "args" { return @tr("One argument per line"); }
+        if key == "env" { return @tr("KEY=value, one per line"); }
+        if key == "headers" { return @tr("Header: value, one per line"); }
+        if key == "tools" { return @tr("Comma separated; empty inherits all tools"); }
+        if key == "matcher" { return @tr("Tool name pattern, e.g. Bash|Write"); }
+        ""
+    }
+
+    // Title of the diff confirmation (Rust passes an action code).
+    pure public function diff-title(code: string) -> string {
+        if code == "delete" { return @tr("Review deletion"); }
+        if code == "toggle" { return @tr("Review change"); }
+        if code == "copy" { return @tr("Review copy to Harness"); }
+        if code == "memory" { return @tr("Review memory changes"); }
+        if code == "instructions" { return @tr("Review instructions changes"); }
+        @tr("Review changes")
+    }
+}
