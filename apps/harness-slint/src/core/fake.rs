@@ -167,24 +167,57 @@ fn demo_subagents(parent: &SessionId) -> Vec<harness_core_api::SubagentView> {
             .as_millis(),
     )
     .unwrap_or(0);
-    let row = |n: u32, agent: &str, title: &str, status, activity: &str, preview: &str, ago: i64| {
-        SubagentView {
-            session_id: ApiId::new(format!("sess_demo{n}")),
-            parent_id: ApiId::new(parent.clone()),
-            agent: AgentId::new(agent.to_owned()),
-            title: title.to_owned(),
-            status,
-            activity: activity.to_owned(),
-            started_at: now - ago * 1000,
-            finished_at: (status == SubagentStatus::Done).then_some(now - 20_000),
-            result_preview: preview.to_owned(),
-        }
-    };
+    let row =
+        |n: u32, agent: &str, title: &str, status, activity: &str, preview: &str, ago: i64| {
+            SubagentView {
+                session_id: ApiId::new(format!("sess_demo{n}")),
+                parent_id: ApiId::new(parent.clone()),
+                agent: AgentId::new(agent.to_owned()),
+                title: title.to_owned(),
+                status,
+                activity: activity.to_owned(),
+                started_at: now - ago * 1000,
+                finished_at: (status == SubagentStatus::Done).then_some(now - 20_000),
+                result_preview: preview.to_owned(),
+            }
+        };
     vec![
-        row(1, "deepseek", "Rewrite hub path claiming", SubagentStatus::Running, "edit src/core/hub.rs · +38 −12", "", 221),
-        row(2, "deepseek", "Backfill claim_paths tests", SubagentStatus::Running, "cargo check -p harness-core", "", 140),
-        row(3, "codex", "Port shell runner to tokio", SubagentStatus::NeedsApproval, "Run cargo test?", "", 95),
-        row(4, "agy", "Audit agent picker revert", SubagentStatus::Done, "", "No regressions found in agent_picker.slint.", 400),
+        row(
+            1,
+            "deepseek",
+            "Rewrite hub path claiming",
+            SubagentStatus::Running,
+            "edit src/core/hub.rs · +38 −12",
+            "",
+            221,
+        ),
+        row(
+            2,
+            "deepseek",
+            "Backfill claim_paths tests",
+            SubagentStatus::Running,
+            "cargo check -p harness-core",
+            "",
+            140,
+        ),
+        row(
+            3,
+            "codex",
+            "Port shell runner to tokio",
+            SubagentStatus::NeedsApproval,
+            "Run cargo test?",
+            "",
+            95,
+        ),
+        row(
+            4,
+            "agy",
+            "Audit agent picker revert",
+            SubagentStatus::Done,
+            "",
+            "No regressions found in agent_picker.slint.",
+            400,
+        ),
     ]
 }
 

@@ -9,7 +9,7 @@ use std::path::Path;
 use harness_core_api::{AgyAccountInfo, AgyAccounts, ApiError};
 use serde::{Deserialize, Serialize};
 
-use crate::agy_cred::{slot_target, AgyCredStore, AGY_LIVE_TARGET};
+use crate::agy_cred::{slot_target, AgyCredStore, CredBlob, AGY_LIVE_TARGET};
 use crate::util::now_ms;
 
 pub(crate) const AGY_ACCOUNTS_FILE: &str = "agy_accounts.json";
@@ -176,14 +176,37 @@ pub(crate) fn save_live(store: &dyn AgyCredStore, file: &mut AgyFile) -> Result<
     if let Some(active) = &file.active {
         return store.write(&slot_target(active), &live);
     }
+    if let Some(pending) = file.pending.take() {
+        store.write(&slot_target(&pending), &live)?;
+        file.active = Some(pending);
+        return Ok(());
+    }
     for entry in &file.accounts {
-        if store.read(&slot_target(&entry.id))?.as_ref() == Some(&live) {
-            return Ok(());
+        if let Some(slot) = store.read(&slot_target(&entry.id))? {
+            if same_login(&slot, &live) {
+                return Ok(());
+            }
         }
     }
     let name = file.free_name("Main");
     let id = file.add(&name, now_ms())?;
-    store.write(&slot_target(&id), &live)
+    store.write(&slot_target(&id), &live)?;
+    file.active = Some(id);
+    Ok(())
+}
+
+fn login_email(blob: &CredBlob) -> Option<String> {
+    let json: serde_json::Value = serde_json::from_slice(&blob.secret).ok()?;
+    json["id_token_email"]
+        .as_str()
+        .map(str::trim)
+        .filter(|e| !e.is_empty())
+        .map(str::to_ascii_lowercase)
+}
+
+/// Same Google account: identical blobs, or the same `id_token_email` (agy refreshes tokens in place).
+fn same_login(a: &CredBlob, b: &CredBlob) -> bool {
+    a == b || login_email(a).is_some_and(|e| login_email(b).as_deref() == Some(e.as_str()))
 }
 
 /// Saves the current login, signs agy out and marks `id` as waiting for its login.

@@ -118,10 +118,12 @@ fn begin_sign_in_auto_imports_live_when_inactive() {
     // A second unimported live login when "Main" is already taken gets "Main 2"; an identical slot is not duplicated.
     login(&store, b"pre-existing");
     file.active = None;
+    file.pending = None;
     begin_sign_in(&store, &mut file, &work).unwrap();
     assert_eq!(file.accounts.len(), 2);
 
     login(&store, b"another-unimported");
+    file.pending = None;
     begin_sign_in(&store, &mut file, &work).unwrap();
     assert_eq!(file.accounts.len(), 3);
     assert_eq!(file.accounts[2].name, "Main 2");
@@ -144,4 +146,53 @@ fn view_and_debug_never_show_secrets() {
     assert!(!debug.contains("top-secret"));
     let unavailable = crate::agy_cred::UnavailableCredStore;
     assert!(!view(&unavailable, &file, &HashSet::new()).available);
+}
+
+#[test]
+fn live_login_during_pending_sign_in_goes_to_pending_account() {
+    let store = MemStore::default();
+    let mut file = AgyFile::default();
+    login(&store, b"main-token");
+    let work = file.add("Work", 0).unwrap();
+    begin_sign_in(&store, &mut file, &work).unwrap();
+    assert_eq!(file.accounts.len(), 2);
+
+    login(&store, b"work-token");
+    let other = file.add("Other", 0).unwrap();
+    begin_sign_in(&store, &mut file, &other).unwrap();
+    assert_eq!(file.accounts.len(), 3);
+    assert_eq!(store.secret(&slot_target(&work)).unwrap(), b"work-token");
+    assert_eq!(file.pending.as_deref(), Some(other.as_str()));
+}
+
+#[test]
+fn refreshed_token_of_auto_imported_login_is_not_duplicated() {
+    let store = MemStore::default();
+    let mut file = AgyFile::default();
+    login(&store, b"token-v1");
+    save_live(&store, &mut file).unwrap();
+    assert_eq!(file.active.as_deref(), Some("main"));
+
+    login(&store, b"token-v2-refreshed");
+    let sek = file.add("Sek2", 0).unwrap();
+    begin_sign_in(&store, &mut file, &sek).unwrap();
+    assert_eq!(file.accounts.len(), 2);
+    assert_eq!(
+        store.secret(&slot_target("main")).unwrap(),
+        b"token-v2-refreshed"
+    );
+}
+
+#[test]
+fn same_email_with_new_token_is_not_imported_again() {
+    let store = MemStore::default();
+    let mut file = AgyFile::default();
+    login(&store, br#"{"token":{"access_token":"a1"},"id_token_email":"me@example.com"}"#);
+    save_live(&store, &mut file).unwrap();
+    file.active = None;
+    login(&store, br#"{"token":{"access_token":"a2"},"id_token_email":"Me@Example.com"}"#);
+    let sek = file.add("Sek2", 0).unwrap();
+    begin_sign_in(&store, &mut file, &sek).unwrap();
+    assert_eq!(file.accounts.len(), 2);
+    assert!(file.accounts.iter().all(|a| a.name != "Main 2"));
 }

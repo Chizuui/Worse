@@ -5,6 +5,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod agy_cred;
+mod agy_usage;
 mod bridge;
 mod chat;
 mod computer_mcp;
@@ -58,9 +59,7 @@ fn workspace(last: Option<&str>) -> PathBuf {
     }
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     // The exe that owns the shipped files: the source exe when this is a live-update shadow copy.
-    let exe_dir = live_update::launch_exe()
-        .parent()
-        .map(Path::to_path_buf);
+    let exe_dir = live_update::launch_exe().parent().map(Path::to_path_buf);
     let same = |a: &Path, b: &Path| match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
         (Ok(a), Ok(b)) => a == b,
         _ => false,

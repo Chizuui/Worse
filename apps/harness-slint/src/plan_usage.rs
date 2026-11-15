@@ -6,7 +6,7 @@ use harness_core_api as api;
 use serde_json::Value;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
-use crate::ui::{AppWindow, ChatUi, PlanLimit};
+use crate::ui::{AppWindow, ChatUi, PlanBar, PlanLimit};
 
 const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 const MIN_INTERVAL: Duration = Duration::from_secs(60);
@@ -20,6 +20,7 @@ struct Account {
 struct State {
     window: slint::Weak<AppWindow>,
     accounts: Vec<Account>,
+    agy: Vec<crate::agy_usage::AgySlot>,
     last: Option<Instant>,
     busy: bool,
     wanted: bool,
@@ -34,6 +35,7 @@ pub fn install(window: &AppWindow) {
         *cell.borrow_mut() = Some(State {
             window: window.as_weak(),
             accounts: Vec::new(),
+            agy: Vec::new(),
             last: None,
             busy: false,
             wanted: false,
@@ -54,10 +56,35 @@ pub fn refresh() {
         true
     });
     if due {
+        // agy 账号列表先到，随后的 Claude 账号列表触发读取。
+        crate::bridge::send(crate::core::Command::AgyAccounts(
+            api::AgyAccountOp::List,
+        ));
         crate::bridge::send(crate::core::Command::Accounts(
             crate::core::AccountsCall::List,
         ));
     }
+}
+
+/// Saved agy accounts (from every Event::AgyAccounts); each gets its own usage row.
+pub fn agy_accounts(result: &Result<api::AgyAccounts, String>) {
+    let Ok(list) = result else {
+        return;
+    };
+    STATE.with(|cell| {
+        if let Some(s) = cell.borrow_mut().as_mut() {
+            s.agy = list
+                .accounts
+                .iter()
+                .filter(|a| a.signed_in)
+                .map(|a| crate::agy_usage::AgySlot {
+                    id: a.id.clone(),
+                    name: a.name.clone(),
+                    active: a.active,
+                })
+                .collect();
+        }
+    });
 }
 
 pub fn accounts(result: &Result<Vec<api::AccountInfo>, String>) {
@@ -92,10 +119,10 @@ pub fn accounts(result: &Result<Vec<api::AccountInfo>, String>) {
             label: a.label.clone(),
             dir: a.dir.clone(),
         }));
-        Some((s.window.clone(), list))
+        Some((s.window.clone(), list, s.agy.clone()))
     });
-    if let Some((window, list)) = job {
-        fetch(window, list);
+    if let Some((window, list, agy)) = job {
+        fetch(window, list, agy);
     }
 }
 
@@ -109,23 +136,26 @@ pub(crate) fn default_dir() -> Option<PathBuf> {
         .map(|home| PathBuf::from(home).join(".claude"))
 }
 
-struct Fetched {
-    id: String,
-    label: String,
-    plan: String,
-    error: String,
-    five: Option<(f32, String)>,
-    week: Option<(f32, String)>,
-    opus: Option<(f32, String)>,
+pub(crate) struct Fetched {
+    pub id: String,
+    pub label: String,
+    pub plan: String,
+    pub error: String,
+    pub five: Option<(f32, String)>,
+    pub week: Option<(f32, String)>,
+    pub opus: Option<(f32, String)>,
+    pub labels: [String; 3],
+    pub summary: String,
+    pub bars: Vec<(String, f32, String)>,
 }
 
-fn fetch(window: slint::Weak<AppWindow>, list: Vec<Account>) {
+fn fetch(window: slint::Weak<AppWindow>, list: Vec<Account>, agy: Vec<crate::agy_usage::AgySlot>) {
     std::thread::spawn(move || {
         let rows = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
         {
-            Ok(rt) => rt.block_on(fetch_all(list)),
+            Ok(rt) => rt.block_on(fetch_all(list, agy)),
             Err(error) => list
                 .into_iter()
                 .map(|a| failed(a, &format!("runtime: {error}")))
@@ -139,10 +169,13 @@ fn fetch(window: slint::Weak<AppWindow>, list: Vec<Account>) {
                 }
             });
             if let Some(window) = window.upgrade() {
+                let agy = rows
+                    .iter()
+                    .any(|r| r.id.starts_with(crate::agy_usage::AGY_ID));
                 let model: Vec<PlanLimit> = rows.into_iter().map(to_row).collect();
-                window
-                    .global::<ChatUi>()
-                    .set_plan_limits(ModelRc::new(VecModel::from(model)));
+                let chat = window.global::<ChatUi>();
+                chat.set_agy_plan(agy);
+                chat.set_plan_limits(ModelRc::new(VecModel::from(model)));
             }
         });
     });
@@ -157,10 +190,13 @@ fn failed(a: Account, error: &str) -> Fetched {
         five: None,
         week: None,
         opus: None,
+        labels: Default::default(),
+        summary: String::new(),
+        bars: Vec::new(),
     }
 }
 
-async fn fetch_all(list: Vec<Account>) -> Vec<Fetched> {
+async fn fetch_all(list: Vec<Account>, agy: Vec<crate::agy_usage::AgySlot>) -> Vec<Fetched> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let client = match reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(15))
@@ -180,6 +216,7 @@ async fn fetch_all(list: Vec<Account>) -> Vec<Fetched> {
     for account in list {
         out.push(fetch_one(&client, account).await);
     }
+    out.extend(crate::agy_usage::fetch(&client, &agy).await);
     out
 }
 
@@ -277,6 +314,20 @@ fn to_row(f: Fetched) -> PlanLimit {
         has_opus: f.opus.is_some(),
         opus: opus / 100.0,
         opus_reset: sv(&opus_reset),
+        five_label: sv(&f.labels[0]),
+        week_label: sv(&f.labels[1]),
+        opus_label: sv(&f.labels[2]),
+        summary: sv(&f.summary),
+        bars: ModelRc::new(VecModel::from(
+            f.bars
+                .iter()
+                .map(|(label, used, reset)| PlanBar {
+                    label: sv(label),
+                    value: used / 100.0,
+                    reset: sv(reset),
+                })
+                .collect::<Vec<_>>(),
+        )),
     }
 }
 
@@ -299,7 +350,7 @@ fn now_ms() -> u64 {
         .unwrap_or_default()
 }
 
-fn resets_in(at: i64) -> String {
+pub(crate) fn resets_in(at: i64) -> String {
     let now = i64::try_from(now_ms() / 1000).unwrap_or(i64::MAX);
     let left = (at - now).max(0);
     let days = left / 86_400;
@@ -314,7 +365,7 @@ fn resets_in(at: i64) -> String {
     }
 }
 
-fn parse_rfc3339(text: &str) -> Option<i64> {
+pub(crate) fn parse_rfc3339(text: &str) -> Option<i64> {
     let num = |s: &str| s.parse::<i64>().ok();
     let year = num(text.get(0..4)?)?;
     let month = num(text.get(5..7)?)?;

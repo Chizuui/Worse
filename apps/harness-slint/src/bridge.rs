@@ -554,6 +554,7 @@ impl UiState {
             }
             Event::Providers(result) => crate::settings::providers(result),
             Event::AgyAccounts { sign_in, result } => {
+                crate::plan_usage::agy_accounts(&result);
                 crate::settings::agy::accounts(sign_in.as_deref(), result);
             }
             Event::SetupStatus(result) => crate::setup::status(result),

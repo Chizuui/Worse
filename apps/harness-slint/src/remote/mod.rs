@@ -375,11 +375,18 @@ fn refresh(window: &AppWindow) {
     ui.set_pair_expiry(sv(&expiry_text(offer_expires)));
     ui.set_note(sv(&note));
     if let Some(settings) = &settings {
-        ui.set_tunnel_hint(sv(&match (&settings.remote.subdomain, &settings.remote.tunnel_domain) {
-            (sub, _) if !sub.is_empty() => "Named tunnel: the host stays the same between starts.".to_owned(),
-            (_, domain) if !domain.is_empty() => "Quick tunnel: a random host; the zone field is the fallback URL.".to_owned(),
-            _ => "Quick tunnel: a new random host on every start, so re-pair by QR afterwards.".to_owned(),
-        }));
+        ui.set_tunnel_hint(sv(
+            &match (&settings.remote.subdomain, &settings.remote.tunnel_domain) {
+                (sub, _) if !sub.is_empty() => {
+                    "Named tunnel: the host stays the same between starts.".to_owned()
+                }
+                (_, domain) if !domain.is_empty() => {
+                    "Quick tunnel: a random host; the zone field is the fallback URL.".to_owned()
+                }
+                _ => "Quick tunnel: a new random host on every start, so re-pair by QR afterwards."
+                    .to_owned(),
+            },
+        ));
     }
     CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
@@ -389,7 +396,9 @@ fn refresh(window: &AppWindow) {
             cache.log = log;
         }
         if cache.offer_url != offer_url || !cache.rendered {
-            let rendered = (!offer_url.is_empty()).then(|| qr::image(&offer_url)).flatten();
+            let rendered = (!offer_url.is_empty())
+                .then(|| qr::image(&offer_url))
+                .flatten();
             let has_qr = rendered.is_some();
             ui.set_has_qr(has_qr);
             if let Some(image) = rendered {
@@ -407,8 +416,14 @@ fn refresh(window: &AppWindow) {
                 .iter()
                 .map(|d| RemoteDevice {
                     id: sv(&d.id),
-                    name: sv(if d.name.is_empty() { "Phone" } else { d.name.as_str() }),
-                    created: sv(&crate::settings::date_of(i64::try_from(d.created_ms).unwrap_or(0))),
+                    name: sv(if d.name.is_empty() {
+                        "Phone"
+                    } else {
+                        d.name.as_str()
+                    }),
+                    created: sv(&crate::settings::date_of(
+                        i64::try_from(d.created_ms).unwrap_or(0),
+                    )),
                     last_seen: sv(&if d.last_seen_ms == 0 {
                         "never".to_owned()
                     } else {
@@ -467,7 +482,11 @@ fn wire(window: &AppWindow) {
     });
     ui.on_start_tunnel(start_tunnel);
     ui.on_stop_tunnel(stop_tunnel);
-    ui.on_pair_new(|| send(Cmd::Pair { name: "Phone".into() }));
+    ui.on_pair_new(|| {
+        send(Cmd::Pair {
+            name: "Phone".into(),
+        })
+    });
     ui.on_revoke(|id| send(Cmd::Revoke(id.to_string())));
     ui.on_refresh(|| send(Cmd::Devices));
     let weak = window.as_weak();

@@ -14,7 +14,7 @@ import { SettingsShell, FallbackRow } from "settings/shell.slint";
 import { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow } from "settings/globals.slint";
 import { SelectOption, ConfirmDialog } from "settings/parts.slint";
 import { Labels } from "settings/labels.slint";
-import { ChatUi, MdLink, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, ChangeRow, PlanRow, GroupRow, ScheduleRow } from "chat/globals.slint";
+import { ChatUi, MdLink, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, PlanBar, ChangeRow, PlanRow, GroupRow, ScheduleRow } from "chat/globals.slint";
 import { ToolCard, ThinkingRow, ChangesCard, StatusPanel, SubagentBar, TextDialog, SchedulesDialog } from "chat/turns.slint";
 import { OverviewPanel } from "panels/overview.slint";
 import { CommandCenter, ResultList } from "chat/palette.slint";
@@ -38,7 +38,7 @@ export { BoardUi, BoardCard, BoardColumn }
 export { OrchestraUi, OrchNode, OrchEdge, OrchLink, OrchAgent, OrchConn }
 export { InboxUi, InboxSourceRow, InboxTicketRow, InboxTriggerRow, InboxNotice }
 export { SetupUi, SetupRow }
-export { ChatUi, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, ChangeRow, PlanRow, GroupRow, ScheduleRow, WhiteboardUi, WbStroke, DockUi, OptionRow, GitUi, BranchRow, GraphRow }
+export { ChatUi, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, PlanBar, ChangeRow, PlanRow, GroupRow, ScheduleRow, WhiteboardUi, WbStroke, DockUi, OptionRow, GitUi, BranchRow, GraphRow }
 export { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow, SelectOption, FallbackRow, Labels }
 
 // Title bar drag handle: a plain press starts the move (Rust drags the window and still detects
@@ -1506,9 +1506,9 @@ component AgentPicker inherits HorizontalLayout {
             property <bool> selectable: a.state == 0 || (a.state == 2 && root.paused);
             text: a.name;
             label: "agent-option " + a.name;
-            detail: a.id == root.sticky ? "" : a.state == 0 ? (i + 1) + "" : (a.state == 1 ? @tr("Not installed") : (a.reset != "" ? @tr("Limit reached · resets {0}", a.reset) : @tr("Limit reached")));
+            detail: a.id == root.sticky ? @tr("Active") : a.state == 0 ? @tr("Fallback #{0}", i + 1) : (a.state == 1 ? @tr("Not installed") : (a.reset != "" ? @tr("Limit reached · resets {0}", a.reset) : @tr("Limit reached")));
             detail-color: a.state == 2 ? Theme.warning-surface-foreground : Theme.foreground-subtle;
-            description: a.state == 0 ? @tr("Available") : self.detail;
+            description: a.id == root.sticky ? @tr("Active agent; on a usage limit Harness switches automatically down the fallback order") : a.state == 0 ? @tr("Fallback #{0}: used automatically when the agents above hit their limit", i + 1) : self.detail;
             enabled: self.selectable;
             checked: a.id == root.sticky;
             clicked => {
@@ -1927,7 +1927,7 @@ component UsageRing inherits Rectangle {
                     color: Theme.foreground-subtle;
                 }
                 if ChatUi.plan-limits.length == 0: Text {
-                    text: "Checking Claude accounts…";
+                    text: "Checking plan usage…";
                     font-size: Theme.ui-sm;
                     color: Theme.foreground-subtle;
                 }
@@ -1965,7 +1965,7 @@ component UsageRing inherits Rectangle {
                                 horizontal-stretch: 1;
                             }
                             Text {
-                                text: p.error != "" ? p.error : (open ? "" : "5h " + round(p.five * 100) + "% · week " + round(p.week * 100) + "%");
+                                text: p.error != "" ? p.error : (open ? "" : p.summary != "" ? p.summary : "5h " + round(p.five * 100) + "% · week " + round(p.week * 100) + "%");
                                 font-size: Theme.ui-xs;
                                 color: p.error != "" ? Theme.warning-surface-foreground : Theme.foreground-subtle;
                                 vertical-alignment: center;
@@ -1975,24 +1975,30 @@ component UsageRing inherits Rectangle {
                         }
                     }
                     if open && p.known: LimitBar {
-                        label: "5-hour limit";
+                        label: p.five-label != "" ? p.five-label : "5-hour limit";
                         reset: p.five-reset;
                         value: p.five;
                     }
                     if open && p.known: LimitBar {
-                        label: "Weekly · all models";
+                        label: p.week-label != "" ? p.week-label : "Weekly · all models";
                         reset: p.week-reset;
                         value: p.week;
                     }
                     if open && p.known && p.has-opus: LimitBar {
-                        label: "Weekly · Opus";
+                        label: p.opus-label != "" ? p.opus-label : "Weekly · Opus";
                         reset: p.opus-reset;
                         value: p.opus;
                     }
+                    for b in (open ? p.bars : []): LimitBar {
+                        label: b.label;
+                        reset: b.reset;
+                        value: b.value;
+                    }
                 }
                 for a in root.agents: HorizontalLayout {
-                    visible: !a.claude;
-                    height: a.claude ? 0px : 22px;
+                    property <bool> hidden: a.claude || (a.id == "agy" && ChatUi.agy-plan);
+                    visible: !self.hidden;
+                    height: self.hidden ? 0px : 22px;
                     spacing: 8px;
                     Rectangle {
                         width: Theme.icon-xs;

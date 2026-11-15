@@ -96,6 +96,7 @@ pub(crate) enum ActorMsg {
     SteerDone(Result<Value, RpcError>),
     Wake,
     AgentExited(AgentId, u64),
+    IdleEnd(u64, u64),
 }
 
 pub(crate) type ActorTx = mpsc::UnboundedSender<ActorMsg>;
@@ -260,6 +261,10 @@ impl SessionActor {
                 }
                 ActorMsg::AgentExited(agent, generation) => {
                     self.on_agent_exited(&agent, generation).await;
+                    false
+                }
+                ActorMsg::IdleEnd(key, stamp) => {
+                    self.on_idle_end(key, stamp).await;
                     false
                 }
             };
@@ -991,6 +996,9 @@ impl SessionActor {
                     self.on_task_update(&native, &update).await;
                 } else if self.running.as_ref().and_then(|r| r.native.as_ref()) == Some(&native) {
                     self.on_update(&update).await;
+                    self.arm_idle_end();
+                } else if self.running.is_none() {
+                    self.on_unprompted_update(&native, &update).await;
                 }
             }
             Inbound::Request {
@@ -1882,7 +1890,11 @@ async fn apply_prefs(
                 // Newer agents (Claude Code ACP) list their models only as the `model` config option.
                 if let Some(model) = params.get("modelId").and_then(Value::as_str) {
                     let retry = json!({"sessionId": native, "configId": "model", "value": model});
-                    if connection.call("session/set_config_option", retry).await.is_ok() {
+                    if connection
+                        .call("session/set_config_option", retry)
+                        .await
+                        .is_ok()
+                    {
                         applied.model = Some(model.to_owned());
                         continue;
                     }

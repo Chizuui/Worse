@@ -3,8 +3,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use harness_core_api::{
-    AgentId, ApiError, ApiResult, BackgroundTask, ErrorClass, EventKind, TurnAttempt, TurnId,
-    TurnOrigin, TurnOutcome, TurnStatus, TurnView,
+    AgentId, ApiError, ApiResult, BackgroundTask, ErrorClass, EventKind, ToolCallStatus, TurnAttempt,
+    TurnId, TurnOrigin, TurnOutcome, TurnStatus, TurnView,
 };
 use serde_json::{json, Value};
 
@@ -14,6 +14,7 @@ use crate::store;
 use crate::util::{new_id, now_ms};
 
 const MAX_TASKS: usize = 50;
+const IDLE_END: Duration = Duration::from_secs(20);
 const TERMINAL: [&str; 5] = ["completed", "failed", "stopped", "cancelled", "killed"];
 
 pub(super) struct Tracked {
@@ -38,6 +39,21 @@ impl Drop for Watch {
 pub(super) struct Autonomous {
     pub(super) task_id: String,
     _watch: Watch,
+    idle: bool,
+    stamp: u64,
+}
+
+pub(super) fn is_turn_content(update: &Value) -> bool {
+    matches!(
+        update.get("sessionUpdate").and_then(Value::as_str),
+        Some(
+            "agent_message_chunk"
+                | "agent_thought_chunk"
+                | "tool_call"
+                | "tool_call_update"
+                | "plan"
+        )
+    )
 }
 
 pub(super) fn is_task_update(update: &Value) -> bool {
@@ -161,7 +177,8 @@ impl SessionActor {
         let task_type = text(update, "taskType").unwrap_or_default();
         let description = text(update, "description").unwrap_or_default();
         if task_type == "turn" {
-            self.start_autonomous(agent, native, id, &description).await;
+            self.start_autonomous(agent, native, id, &description, false)
+                .await;
             return;
         }
         if self.tasks.iter().any(|t| t.view.id == id) {
@@ -245,6 +262,7 @@ impl SessionActor {
         native: &str,
         task_id: String,
         description: &str,
+        idle: bool,
     ) {
         if self.running.is_some() || self.steering.is_some() || self.paused.is_some() {
             return;
@@ -254,7 +272,9 @@ impl SessionActor {
         };
         let turn_id = TurnId::new(new_id("turn"));
         let seq = self.turns.last().map_or(1, |t| t.seq + 1);
-        let user_text = if description.trim().is_empty() {
+        let user_text = if idle {
+            "Agent continued on its own (background work finished)".to_owned()
+        } else if description.trim().is_empty() {
             "Background task finished".to_owned()
         } else {
             format!("Background task finished: {}", description.trim())
@@ -332,9 +352,79 @@ impl SessionActor {
             autonomous: Some(Autonomous {
                 task_id,
                 _watch: watch,
+                idle,
+                stamp: 0,
             }),
         });
         self.touch().await;
+    }
+
+    pub(super) async fn on_unprompted_update(&mut self, native: &str, update: &Value) {
+        if self.running.is_some() || !is_turn_content(update) {
+            return;
+        }
+        let Some(agent) = self.agent_of_native(native) else {
+            return;
+        };
+        self.start_autonomous(agent, native, new_id("agent"), "", true)
+            .await;
+        if self
+            .running
+            .as_ref()
+            .is_some_and(|r| r.native.as_deref() == Some(native))
+        {
+            self.on_update(update).await;
+            self.arm_idle_end();
+        }
+    }
+
+    pub(super) fn arm_idle_end(&mut self) {
+        let Some(running) = self.running.as_mut() else {
+            return;
+        };
+        let key = running.key;
+        let Some(autonomous) = running.autonomous.as_mut().filter(|a| a.idle) else {
+            return;
+        };
+        autonomous.stamp += 1;
+        let stamp = autonomous.stamp;
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(IDLE_END).await;
+            let _ = tx.send(ActorMsg::IdleEnd(key, stamp));
+        });
+    }
+
+    pub(super) async fn on_idle_end(&mut self, key: u64, stamp: u64) {
+        let Some(running) = self.running.as_ref() else {
+            return;
+        };
+        let current = running.key == key
+            && running
+                .autonomous
+                .as_ref()
+                .is_some_and(|a| a.idle && a.stamp == stamp);
+        if !current {
+            return;
+        }
+        let turn_id = running.turn_id.clone();
+        let tool_running = self
+            .turns
+            .iter()
+            .find(|t| t.id == turn_id)
+            .is_some_and(|t| {
+                t.tool_calls.iter().any(|c| {
+                    matches!(
+                        c.status,
+                        Some(ToolCallStatus::Pending | ToolCallStatus::InProgress)
+                    )
+                })
+            });
+        if tool_running {
+            self.arm_idle_end();
+        } else {
+            self.end_autonomous("completed", None).await;
+        }
     }
 
     async fn end_autonomous(&mut self, state: &str, summary: Option<String>) {

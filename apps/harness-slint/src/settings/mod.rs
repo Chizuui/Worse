@@ -7,8 +7,8 @@
 //! - Page-local state (form fields, query, recorder) lives here and is not persisted.
 
 pub mod agy;
-pub mod keymap;
 mod docview;
+pub mod keymap;
 mod values;
 mod worker;
 
@@ -30,8 +30,8 @@ use tokio::sync::mpsc;
 
 use crate::ui::{
     AccountRow, AgentCard, AgentsUi, AppWindow, ArchiveRow, ArchiveUi, ConfigUi, DiffLine, DiffUi,
-    DocUi, FormField, Labels, NavEntry, ProjectRow, ProjectsUi, ProviderRow, ResGroup, ResRow, SelectOption,
-    SettingsUi, ShortcutRow, ShortcutsUi, Theme,
+    DocUi, FormField, Labels, NavEntry, ProjectRow, ProjectsUi, ProviderRow, ResGroup, ResRow,
+    SelectOption, SettingsUi, ShortcutRow, ShortcutsUi, Theme,
 };
 use keymap::{Keymap, Press, Verdict};
 use worker::{DocKind, PlanOp};
@@ -1368,9 +1368,9 @@ impl State {
                 if offset == 0 {
                     self.archive.clear();
                 }
-let names = crate::bridge::agent_names();
-                                self.archive
-                    .extend(page.rows.into_iter().map(|a| ArchiveRow {
+                let names = crate::bridge::agent_names();
+                self.archive.extend(page.rows.into_iter().map(|a| {
+                    ArchiveRow {
                         id: sv(&a.summary.id.0),
                         title: sv(&a.summary.title),
                         project: sv(folder_name(&a.summary.workspace_path)),
@@ -1378,8 +1378,12 @@ let names = crate::bridge::agent_names();
                         agent: sv(names
                             .iter()
                             .find(|(id, _)| *id == a.summary.active_agent.to_string())
-                            .map_or_else(|| a.summary.active_agent.to_string(), |(_, n)| n.clone())),
-                    }));
+                            .map_or_else(
+                                || a.summary.active_agent.to_string(),
+                                |(_, n)| n.clone(),
+                            )),
+                    }
+                }));
                 ui.set_available(true);
                 ui.set_has_more(page.has_more);
                 ui.set_rows(model(self.archive.clone()));
@@ -1409,7 +1413,11 @@ let names = crate::bridge::agent_names();
 /// "#RRGGBB" → colour (settings S2 accent swatches).
 /// Last two segments of a path ("D:\\work\\ZCode\\Worse" -> "ZCode/Worse").
 fn same_path(a: &str, b: &str) -> bool {
-    let norm = |s: &str| s.trim_end_matches(['\\', '/']).replace('/', "\\").to_lowercase();
+    let norm = |s: &str| {
+        s.trim_end_matches(['\\', '/'])
+            .replace('/', "\\")
+            .to_lowercase()
+    };
     !b.is_empty() && norm(a) == norm(b)
 }
 
@@ -1462,15 +1470,20 @@ fn sync_launch_at_startup(on: bool) {
 /// remote access and API keys are kept.
 fn reset_settings(s: &State) {
     let defaults = serde_json::to_value(Settings::default()).unwrap_or(Value::Null);
-    for section in ["general", "appearance", "notifications", "updates", "orchestra"] {
+    for section in [
+        "general",
+        "appearance",
+        "notifications",
+        "updates",
+        "orchestra",
+    ] {
         if let Some(v) = defaults.get(section) {
             let mut v = v.clone();
             // Keep the last workspace so the next start reopens the same project.
             if section == "general" {
-                if let (Some(obj), Some(last)) = (
-                    v.as_object_mut(),
-                    s.settings.general.last_workspace.clone(),
-                ) {
+                if let (Some(obj), Some(last)) =
+                    (v.as_object_mut(), s.settings.general.last_workspace.clone())
+                {
                     obj.insert("lastWorkspace".into(), Value::from(last));
                 }
             }
@@ -2246,12 +2259,18 @@ mod mcp_agents_tests {
     fn overlay_form_round_trips_agents() {
         let mut fields = fields_of(&server(), true);
         let agents = fields.iter_mut().find(|(k, _)| k == "agents");
-        assert_eq!(agents.as_ref().map(|(_, v)| v.as_str()), Some("claude-code, codex"));
+        assert_eq!(
+            agents.as_ref().map(|(_, v)| v.as_str()),
+            Some("claude-code, codex")
+        );
         if let Some((_, v)) = agents {
             *v = " codex ,\napi-deepseek, ".into();
         }
         let body = body_from(server(), &fields, true);
-        assert_eq!(agents_of(&body), vec!["codex".to_string(), "api-deepseek".to_string()]);
+        assert_eq!(
+            agents_of(&body),
+            vec!["codex".to_string(), "api-deepseek".to_string()]
+        );
     }
 
     #[test]
@@ -2259,6 +2278,9 @@ mod mcp_agents_tests {
         let fields = fields_of(&server(), false);
         assert!(fields.iter().all(|(k, _)| k != "agents"));
         let body = body_from(server(), &fields, false);
-        assert_eq!(agents_of(&body), vec!["claude-code".to_string(), "codex".to_string()]);
+        assert_eq!(
+            agents_of(&body),
+            vec!["claude-code".to_string(), "codex".to_string()]
+        );
     }
 }

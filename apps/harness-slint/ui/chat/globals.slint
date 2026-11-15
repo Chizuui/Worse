@@ -36,6 +36,12 @@ export struct UsagePart {
     start: float,
 }
 
+export struct PlanBar {
+    label: string,
+    value: float,
+    reset: string,
+}
+
 export struct PlanLimit {
     id: string,
     label: string,
@@ -49,6 +55,11 @@ export struct PlanLimit {
     has-opus: bool,
     opus: float,
     opus-reset: string,
+    five-label: string,
+    week-label: string,
+    opus-label: string,
+    summary: string,
+    bars: [PlanBar],
 }
 
 export struct OutputRow {
@@ -161,6 +172,7 @@ export global ChatUi {
     in property <[OutputRow]> outputs;
     in property <[UsagePart]> usage-parts;
     in property <[PlanLimit]> plan-limits;
+    in property <bool> agy-plan;
     in-out property <string> limit-open;
     pure public function usage-tone(tone: int) -> color {
         if tone == 0 { return #4a8af4; }

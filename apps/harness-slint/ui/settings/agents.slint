@@ -1572,7 +1572,7 @@ export component AgentsPage inherits VerticalLayout {
                 }
             }
             Text {
-                text: "Enabled agents join the fallback order; turn one off in Agents to take it out. New or removed providers take effect after Harness restarts.";
+                text: "Fallback is automatic: each session uses the agent you pick, and when it hits a usage limit Harness switches to the next ready agent in this order and continues the turn. Enabled agents join the fallback order; turn one off in Agents to take it out. New or removed providers take effect after Harness restarts.";
                 font-size: 11px;
                 color: Theme.icon-subtlest;
                 wrap: word-wrap;

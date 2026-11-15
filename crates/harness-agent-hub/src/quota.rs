@@ -78,6 +78,10 @@ pub fn classify_generic(info: &AgentErrorInfo, dialect: ErrorDialect) -> ErrorCl
         ErrorDialect::ClaudeCode => &[
             "usage limit",
             "limit reached",
+            "hit your",
+            "-hour limit",
+            "weekly limit",
+            "session limit",
             "billing_error",
             "credit balance",
             "out of credits",
@@ -91,6 +95,9 @@ pub fn classify_generic(info: &AgentErrorInfo, dialect: ErrorDialect) -> ErrorCl
         ErrorDialect::Agy | ErrorDialect::Generic => &[
             "usage limit",
             "limit reached",
+            "hit your",
+            "-hour limit",
+            "weekly limit",
             "quota",
             "out of credits",
             "credit balance",
@@ -163,10 +170,44 @@ fn parse_reset_from_text(text: &str) -> Option<i64> {
         }
     }
     let lower = text.to_ascii_lowercase();
-    let index = lower.find("resets at ")?;
-    let rest = text.get(index + "resets at ".len()..)?;
-    let token = rest.split_whitespace().next()?;
-    parse_epoch_or_iso(token.trim_end_matches(&[')', '.', ','][..]))
+    if let Some(index) = lower.find("resets at ") {
+        let rest = text.get(index + "resets at ".len()..)?;
+        let token = rest.split_whitespace().next()?;
+        if let Some(n) = parse_epoch_or_iso(token.trim_end_matches(&[')', '.', ','][..])) {
+            return Some(n);
+        }
+    }
+    let index = lower.find("resets ")?;
+    let token = lower.get(index + "resets ".len()..)?.split_whitespace().next()?;
+    parse_clock(token, chrono::Local::now())
+}
+
+/// 修复：Claude Code 的 "resets 10:40am (Asia/Bangkok)" 没有被解析，额度耗尽后没有恢复时间。
+/// 按本机时区取下一次出现的该时刻。
+fn parse_clock(token: &str, now: chrono::DateTime<chrono::Local>) -> Option<i64> {
+    use chrono::{Duration, NaiveTime, TimeZone};
+    let token = token.trim_end_matches(&[')', '.', ','][..]);
+    let (clock, pm) = if let Some(c) = token.strip_suffix("pm") {
+        (c, true)
+    } else {
+        (token.strip_suffix("am")?, false)
+    };
+    let (hour, minute) = match clock.split_once(':') {
+        Some((h, m)) => (h.parse::<u32>().ok()?, m.parse::<u32>().ok()?),
+        None => (clock.parse::<u32>().ok()?, 0),
+    };
+    if !(1..=12).contains(&hour) {
+        return None;
+    }
+    let hour = hour % 12 + if pm { 12 } else { 0 };
+    let time = NaiveTime::from_hms_opt(hour, minute, 0)?;
+    let mut at = chrono::Local
+        .from_local_datetime(&now.date_naive().and_time(time))
+        .earliest()?;
+    if at <= now {
+        at += Duration::days(1);
+    }
+    Some(at.timestamp())
 }
 
 fn parse_epoch_or_iso(s: &str) -> Option<i64> {
@@ -293,4 +334,37 @@ pub fn format_utc(secs: i64) -> String {
         (rem % 3600) / 60,
         rem % 60
     )
+}
+
+#[cfg(test)]
+mod limit_text_tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+    use chrono::{Local, TimeZone, Timelike};
+
+    #[test]
+    fn claude_five_hour_limit_is_quota_with_reset() {
+        let info = AgentErrorInfo {
+            code: Some(-32603),
+            message: "Internal error: You've hit your 5-hour limit · resets 10:40am (Asia/Bangkok)"
+                .into(),
+            data: None,
+        };
+        match classify_generic(&info, ErrorDialect::ClaudeCode) {
+            ErrorClass::QuotaExhausted { resets_at } => {
+                let at = Local.timestamp_opt(resets_at.unwrap(), 0).unwrap();
+                assert_eq!((at.hour(), at.minute()), (10, 40));
+            }
+            other => panic!("expected quota, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn clock_reset_rolls_to_tomorrow_when_passed() {
+        let now = Local.with_ymd_and_hms(2026, 11, 15, 12, 0, 0).unwrap();
+        let at = parse_clock("10:40am", now).unwrap();
+        assert_eq!(at, Local.with_ymd_and_hms(2026, 11, 16, 10, 40, 0).unwrap().timestamp());
+        let pm = parse_clock("3pm", now).unwrap();
+        assert_eq!(pm, Local.with_ymd_and_hms(2026, 11, 15, 15, 0, 0).unwrap().timestamp());
+    }
 }
