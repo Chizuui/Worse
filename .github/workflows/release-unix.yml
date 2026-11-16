@@ -12,6 +12,10 @@ on:
         description: "linux, macos or all"
         required: false
         default: all
+      macos_runner:
+        description: "macOS runner label (macos-15, macos-14, macos-15-intel)"
+        required: false
+        default: macos-15
 
 permissions:
   contents: write
@@ -68,7 +72,8 @@ jobs:
 
   macos:
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platforms != 'linux' }}
-    runs-on: macos-15
+    runs-on: ${{ github.event.inputs.macos_runner || 'macos-15' }}
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
