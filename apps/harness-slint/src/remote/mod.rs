@@ -5,6 +5,7 @@
 //! settings page. Starting is user-driven: the page toggle starts the server, nothing runs at launch.
 
 pub mod qr;
+mod settings_view;
 pub mod tunnel;
 
 use std::cell::RefCell;
@@ -171,6 +172,9 @@ fn serve(rx: mpsc::Receiver<Cmd>) {
                         let addr = started.local_addr().to_string();
                         snapshot().devices = started.devices();
                         started.set_public_host(host_of(&snapshot().public_url));
+                        started.set_settings_view(std::sync::Arc::new(
+                            settings_view::DesktopSettings,
+                        ));
                         handle = Some(started);
                         set_server(ServerState::Up { addr });
                     }
@@ -339,6 +343,7 @@ fn refresh(window: &AppWindow) {
         note,
     ) = state;
     let settings = crate::settings::current();
+    settings_view::mirror(settings.clone());
     let ui = window.global::<RemoteUi>();
     ui.set_server_state(match &server {
         ServerState::Off => 0,

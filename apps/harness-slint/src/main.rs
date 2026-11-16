@@ -20,6 +20,7 @@ mod markdown;
 mod orchestra;
 mod panels;
 mod plan_usage;
+mod release_update;
 mod remote;
 mod settings;
 mod setup;
@@ -165,7 +166,7 @@ fn relaunch() {
         return;
     };
     // A shadow copy restarts the newest build (its source exe), not itself.
-    let exe = live_update::launch_exe();
+    let exe = release_update::installed_exe().unwrap_or_else(live_update::launch_exe);
     if let Err(error) = std::process::Command::new(exe)
         .current_dir(&dir)
         .env("HARNESS_WORKSPACE", &dir)
@@ -504,6 +505,7 @@ fn main() -> ExitCode {
         live_update::cleanup_old_copies();
         live_update::watch(window.as_weak());
     }
+    release_update::watch(window.as_weak());
     let result = window.run();
     panels::trace("main: event loop returned");
     remote::shutdown();

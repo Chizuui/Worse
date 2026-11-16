@@ -223,7 +223,8 @@ Quota state is global per agent (accounts are per machine, not per session) and 
    run the turn again on an agent that tried it before, with every earlier partial output forwarded.
 3. Re-runs the **same** turn on Y. The user message is not duplicated in the transcript; Y receives the
    catch-up context plus a labelled block `Partial output from <X> before its limit was reached: …` with
-   X's partial text and tool calls, then the user message.
+   X's partial text and its tool calls **with their results** (see the budget in §8), so Y continues
+   instead of re-running reads it already has, then the user message.
 4. Emits `AgentSwitched` and appends a `failover` turn event. Y stays sticky afterwards.
 
 Transient errors do not fail over: the turn ends `failed` with `ErrorClass::Transient` (the user resends).
@@ -259,11 +260,18 @@ When turn `N` goes to agent `A`:
 - No handle → `session/new` (with `mcpServers`), first prompt = memory block + seed transcript of turns
   `< N` + user message.
 
-Seed/catch-up budget: 48 000 characters of history text (~12k tokens). Newest turns are kept verbatim
+Seed/catch-up budget: 120 000 characters of history text (~30k tokens). Newest turns are kept verbatim
 until the budget is reached; older turns are reduced to one line each
 (`[turn k, <agent>] user: <first 160 chars> / assistant: <first 160 chars>`); if even that exceeds the budget,
 the oldest lines are dropped with a note `(<n> earlier turns omitted)`. No LLM summarisation (Harness has
 no model). The budget is a constant in `harness-agent-hub::catchup`.
+
+Unless a turn has no tool calls, a verbatim turn also carries its tool calls, newest first within a
+4 000-character budget: `[turn k] tools:` followed by one `- <title>` line per call, its first 300
+characters of input, and its output clipped to its head and tail (400 characters here). The failover block
+(§6.4) uses the same rendering with a 24 000-character budget and 1 500-character output, and it tells the
+agent the results are already known so it does not re-run those calls. A tool result is clipped when the
+digest is built (`session::tool_digests`), so a huge output is never copied per prompt.
 
 After the turn, `last_seq = N` for A.
 
@@ -293,15 +301,30 @@ content any time via MCP.
 
 ### 8.3 MCP memory server
 
-`harness-memory-mcp --project <workspace_path>` (env `HARNESS_HOME`), MCP over stdio (protocol
-`2025-06-18`): `initialize`, `tools/list`, `tools/call`, `ping`. Tools:
+`harness-memory-mcp --project <workspace_path> --session <session_id>` (env `HARNESS_HOME`), MCP over
+stdio (protocol `2025-06-18`): `initialize`, `tools/list`, `tools/call`, `ping`. Tools:
 
 - `memory_read { scope: "global" | "project" }` → text content.
 - `memory_write { scope, content, mode: "replace" | "append" }` → `ok`.
+- `session_notes_read {}` → the working notes of this session (8.4), `(no notes yet)` when empty.
+- `session_notes_write { content }` → `ok`; replaces the notes, at most 16000 characters.
 
 Passed in every ACP `session/new`/`session/load` as
-`{ name: "harness-memory", command: <abs path>, args: ["--project", <ws>], env: [{name:"HARNESS_HOME", value}] }`.
-The hub emits `MemoryChanged` for its own writes; agent writes are seen on next read (8.2: file watch).
+`{ name: "harness-memory", command: <abs path>, args: ["--project", <ws>, "--session", <id>], env: [{name:"HARNESS_HOME", value}] }`.
+The session id comes from `--session`, else `HARNESS_SESSION_ID`; without one both notes tools answer with
+a clear error and stay listed. The hub emits `MemoryChanged` for its own writes; agent writes are seen on
+next read (8.2: file watch).
+
+### 8.4 Session working notes
+
+`<HARNESS_HOME>/session-notes/<session>.md` (`crates/harness-agent-hub/src/session_notes.rs`), one small
+markdown file per session, written only through `session_notes_write`. Session ids are sanitized to
+`[A-Za-z0-9_-]` for the file name, so a hostile id cannot leave the directory. The hub injects
+`session_notes::block(home, session_id)` (`<harness-session-notes>`, instructions, notes) into a prompt
+whenever a native session starts fresh for this SessionId — another agent took over after quota failover,
+or the agent CLI compacted its own context. The block always exists; `(no notes yet)` stands in for an
+empty file. Read errors are treated as empty notes, a write over 16000 characters is rejected with an
+error that asks the agent to condense.
 
 ## 9. Ownership and event order
 

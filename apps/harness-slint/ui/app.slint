@@ -1,6 +1,14 @@
 // Harness main window (spec docs/specs/harness/phase-8-ui.md, visuals phase-10-midnight-glass-ui.md). All state comes
 // from the core via Rust; this file only holds view state (overlays, draft, scroll stickiness, side-pane tab).
 import { ListView, ScrollView } from "std-widgets.slint";
+import "fonts/PlusJakartaSans-Regular.ttf";
+import "fonts/PlusJakartaSans-Medium.ttf";
+import "fonts/PlusJakartaSans-SemiBold.ttf";
+import "fonts/PlusJakartaSans-Bold.ttf";
+import "fonts/Inter-Regular.ttf";
+import "fonts/Inter-Medium.ttf";
+import "fonts/Inter-SemiBold.ttf";
+import "fonts/Inter-Bold.ttf";
 import { Theme } from "theme/tokens.slint";
 import { MidnightBackdrop } from "theme/backdrop.slint";
 import { Icon, Icons, IconsFill, Glass, Spinner, Button, IconButton, Tag, Divider, Card, MenuShell, MenuItem, TabBar, TabItem, SectionLabel, StatusDot, Segmented, SegmentOption } from "components/controls.slint";
@@ -15,8 +23,8 @@ import { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow,
 import { SelectOption, ConfirmDialog } from "settings/parts.slint";
 import { Labels } from "settings/labels.slint";
 import { AgentLogo, AgentMark } from "components/agent_logo.slint";
-import { ChatUi, FleetGroup, MdLink, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, PlanBar, ChangeRow, PlanRow, GroupRow, ScheduleRow } from "chat/globals.slint";
-import { ToolCard, ThinkingRow, ChangesCard, StatusPanel, SubagentBar, TextDialog, SchedulesDialog } from "chat/turns.slint";
+import { ChatUi, ChatImage, FleetGroup, MdLink, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, PlanBar, ChangeRow, PlanRow, GroupRow, ScheduleRow } from "chat/globals.slint";
+import { ToolCard, ImageStrip, ThinkingRow, ChangesCard, StatusPanel, SubagentBar, TextDialog, SchedulesDialog } from "chat/turns.slint";
 import { OverviewPanel } from "panels/overview.slint";
 import { CommandCenter, ResultList } from "chat/palette.slint";
 import { WhiteboardUi, WhiteboardDialog, WbStroke } from "chat/whiteboard.slint";
@@ -131,6 +139,8 @@ export struct ChatItem {
     changes: [ChangeRow],
     change-dir: int,
     change-note: string,
+    images: [ChatImage],
+    images-more: int,
 }
 
 // header: on the first row of a section: "pinned", a timeline group id ("today", "yesterday", "week", "month",
@@ -558,6 +568,12 @@ component ChatRow inherits VerticalLayout {
         uta := TouchArea {
             ul := VerticalLayout {
                 spacing: 2px;
+                if root.item.images.length > 0: ImageStrip {
+                    images: root.item.images;
+                    more: root.item.images-more;
+                    at-end: true;
+                    padding-bottom: 4px;
+                }
                 HorizontalLayout {
                     alignment: end;
                     Rectangle {
@@ -745,6 +761,8 @@ component ChatRow inherits VerticalLayout {
         parts: root.item.parts;
         expanded: root.item.expanded;
         hit: root.hit;
+        images: root.item.images;
+        images-more: root.item.images-more;
     }
     // Thinking (live agent thought): collapsed line, expands to the text.
     if root.item.kind == 5: ThinkingRow {
@@ -1327,16 +1345,6 @@ component Sidebar inherits Rectangle {
                             clicked => {
                                 acct-menu.close();
                                 root.open-page("agents");
-                            }
-                        }
-                        MenuItem {
-                            text: @tr("Language");
-                            show-check: false;
-                            has-icon: true;
-                            icon: Icons.settings-2;
-                            clicked => {
-                                acct-menu.close();
-                                root.open-page("general");
                             }
                         }
                         MenuItem {
@@ -2169,63 +2177,75 @@ component Composer inherits VerticalLayout {
             padding-left: 10px;
             padding-top: 10px;
             spacing: 6px;
-            if ChatUi.chips.length > 0: HorizontalLayout {
-                spacing: 6px;
-                alignment: start;
-                padding-left: 4px;
-                for c[ci] in ChatUi.chips: Rectangle {
-                    height: 28px;
-                    width: chip-row.preferred-width;
-                    border-radius: Theme.radius-full;
-                    background: Theme.surface;
-                    border-width: 1px;
-                    border-color: Theme.glass-border;
-                    accessible-role: AccessibleRole.text;
-                    accessible-label: c.kind + " " + c.label;
-                    accessible-description: c.detail;
-                    chip-row := HorizontalLayout {
-                        padding-left: 10px;
-                        padding-right: 4px;
+            if ChatUi.chips.length > 0: Rectangle {
+                height: 28px;
+                min-width: 0px;
+                horizontal-stretch: 1;
+                clip: true;
+                Flickable {
+                    width: parent.width;
+                    height: parent.height;
+                    content-width: max(self.width, chips-row.preferred-width);
+                    content-height: self.height;
+                    chips-row := HorizontalLayout {
                         spacing: 6px;
-                        Icon {
-                            source: c.kind == "paste" ? Icons.file-text : c.kind == "image" ? Icons.image : c.kind == "skill" ? Icons.wand-sparkles : Icons.paperclip;
-                            size: Theme.icon-sm;
-                            tint: Theme.icon-subtle;
-                        }
-                        Text {
-                            text: c.label;
-                            font-size: Theme.ui-sm;
-                            color: Theme.foreground;
-                            vertical-alignment: center;
-                            overflow: elide;
-                            max-width: 200px;
-                            accessible-role: none;
-                        }
-                        if c.detail != "": Text {
-                            text: c.detail;
-                            font-size: Theme.ui-xs;
-                            color: Theme.foreground-subtle;
-                            vertical-alignment: center;
-                            accessible-role: none;
-                        }
-                        if c.kind == "image": IconButton {
-                            y: (parent.height - self.height) / 2;
-                            icon: Icons.pencil;
-                            label: @tr("Annotate {0}", c.label);
-                            size: 20px;
-                            icon-size: 12px;
-                            clicked => {
-                                ChatUi.annotate-chip(ci);
-                            }
-                        }
-                        IconButton {
-                            y: (parent.height - self.height) / 2;
-                            icon: Icons.x;
-                            label: @tr("Remove attachment {0}", c.label);
-                            size: 20px;
-                            icon-size: 12px;
-                            clicked => {
-                                ChatUi.remove-chip(ci);
+                        alignment: start;
+                        padding-left: 4px;
+                        for c[ci] in ChatUi.chips: Rectangle {
+                            height: 28px;
+                            width: chip-row.preferred-width;
+                            border-radius: Theme.radius-full;
+                            background: Theme.surface;
+                            border-width: 1px;
+                            border-color: Theme.glass-border;
+                            accessible-role: AccessibleRole.text;
+                            accessible-label: c.kind + " " + c.label;
+                            accessible-description: c.detail;
+                            chip-row := HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 4px;
+                                spacing: 6px;
+                                Icon {
+                                    source: c.kind == "paste" ? Icons.file-text : c.kind == "image" ? Icons.image : c.kind == "skill" ? Icons.wand-sparkles : Icons.paperclip;
+                                    size: Theme.icon-sm;
+                                    tint: Theme.icon-subtle;
+                                }
+                                Text {
+                                    text: c.label;
+                                    font-size: Theme.ui-sm;
+                                    color: Theme.foreground;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    max-width: 200px;
+                                    accessible-role: none;
+                                }
+                                if c.detail != "": Text {
+                                    text: c.detail;
+                                    font-size: Theme.ui-xs;
+                                    color: Theme.foreground-subtle;
+                                    vertical-alignment: center;
+                                    accessible-role: none;
+                                }
+                                if c.kind == "image": IconButton {
+                                    y: (parent.height - self.height) / 2;
+                                    icon: Icons.pencil;
+                                    label: @tr("Annotate {0}", c.label);
+                                    size: 20px;
+                                    icon-size: 12px;
+                                    clicked => {
+                                        ChatUi.annotate-chip(ci);
+                                    }
+                                }
+                                IconButton {
+                                    y: (parent.height - self.height) / 2;
+                                    icon: Icons.x;
+                                    label: @tr("Remove attachment {0}", c.label);
+                                    size: 20px;
+                                    icon-size: 12px;
+                                    clicked => {
+                                        ChatUi.remove-chip(ci);
+                                    }
+                                }
                             }
                         }
                     }
@@ -3295,33 +3315,6 @@ export component AppWindow inherits Window {
                     padding-left: 16px;
                     padding-right: 12px;
                     spacing: 2px;
-                    HorizontalLayout {
-                        spacing: 10px;
-                        Rectangle {
-                            y: (parent.height - self.height) / 2;
-                            width: 26px;
-                            height: 26px;
-                            border-radius: 7px;
-                            background: Theme.brand-gradient;
-                            Text {
-                                text: "H";
-                                font-size: 13px;
-                                font-weight: 700;
-                                color: #ffffff;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                                accessible-role: none;
-                            }
-                        }
-                        Text {
-                            text: "Harness";
-                            font-size: Theme.ui-lg;
-                            font-weight: Theme.weight-semibold;
-                            color: Theme.foreground;
-                            vertical-alignment: center;
-                            accessible-role: none;
-                        }
-                    }
                     Rectangle {
                         horizontal-stretch: 1;
                         TitleDrag {

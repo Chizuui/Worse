@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0f1115" />
+    <meta name="theme-color" content="#141218" />
     <meta name="color-scheme" content="dark light" />
     <meta name="mobile-web-app-capable" content="yes" />
     <title>Harness</title>
@@ -11,6 +11,10 @@
     <link rel="icon" href="/assets/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/assets/icon.svg" />
     <link rel="stylesheet" href="/assets/style.css" />
+    <link rel="stylesheet" href="/assets/pair.css" />
+    <link rel="stylesheet" href="/assets/sessions.css" />
+    <link rel="stylesheet" href="/assets/chat.css" />
+    <link rel="stylesheet" href="/assets/settings.css" />
   </head>
   <body>
     <div id="offline" class="banner" hidden>Offline — reconnecting…</div>
@@ -18,41 +22,71 @@
 
     <!-- 1. Pair -->
     <section id="view-pair" class="view" hidden>
-      <div class="pair-card">
-        <img class="logo" src="/assets/icon.svg" alt="" width="56" height="56" />
-        <h1>Harness</h1>
-        <p class="muted" id="pair-hint">Enter the 8-character code shown in Harness → Settings → Remote.</p>
-        <form id="pair-form" autocomplete="off">
-          <input
-            id="pair-code"
-            class="code-input"
-            type="text"
-            inputmode="latin"
-            autocapitalize="characters"
-            autocomplete="one-time-code"
-            spellcheck="false"
-            maxlength="8"
-            placeholder="ABCD2345"
-            aria-label="Pairing code"
-            required
-          />
-          <button class="btn primary" type="submit">Pair</button>
-        </form>
-        <p id="pair-error" class="error" role="alert" hidden></p>
-        <button id="pair-retry" class="btn ghost" type="button" hidden>Try again</button>
+      <header class="pair-bar">
+        <h1>Pair device</h1>
+        <span class="pair-pill"><i class="pair-dot" aria-hidden="true"></i>8-char code</span>
+      </header>
+      <div class="pair-scroll">
+        <div class="pair-card">
+          <div class="pair-hero">
+            <img class="logo" src="/assets/icon.svg" alt="" width="64" height="64" />
+          </div>
+          <div class="pair-intro">
+            <h2>Connect this phone</h2>
+            <p class="muted" id="pair-hint">
+              Enter the 8-character code shown in Harness → Settings → Remote.
+            </p>
+          </div>
+          <form id="pair-form" autocomplete="off">
+            <input
+              id="pair-code"
+              class="code-input"
+              type="text"
+              inputmode="latin"
+              autocapitalize="characters"
+              autocomplete="one-time-code"
+              spellcheck="false"
+              maxlength="8"
+              placeholder="ABCD2345"
+              aria-label="Pairing code"
+              required
+            />
+            <button class="btn primary" type="submit">Pair this device</button>
+          </form>
+          <p id="pair-error" class="error" role="alert" hidden></p>
+          <button id="pair-retry" class="btn ghost" type="button" hidden>Try again</button>
+          <ul class="pair-steps">
+            <li class="pair-step">
+              <span class="pair-step-n" aria-hidden="true">1</span>
+              <span class="pair-step-t">
+                <b>Open Remote settings on the desktop</b>
+                <span>Harness → Settings → Remote shows the pairing code and the tunnel URL.</span>
+              </span>
+            </li>
+            <li class="pair-step">
+              <span class="pair-step-n" aria-hidden="true">2</span>
+              <span class="pair-step-t">
+                <b>Type the 8-character code</b>
+                <span>Codes are single use and expire quickly. Both devices need the same Wi-Fi or the tunnel.</span>
+              </span>
+            </li>
+            <li class="pair-step">
+              <span class="pair-step-n" aria-hidden="true">3</span>
+              <span class="pair-step-t">
+                <b>Approve this device</b>
+                <span>Harness asks once on the desktop before the phone gets access. Revoke it from the same page.</span>
+              </span>
+            </li>
+          </ul>
+        </div>
       </div>
     </section>
 
     <!-- 2. Sessions -->
-    <section id="view-list" class="view" hidden>
-      <header class="bar">
-        <h2>Sessions</h2>
-        <button id="reload" class="icon-btn" type="button" aria-label="Reload sessions">⟳</button>
-      </header>
-      <div id="list-status" class="status" hidden></div>
-      <ul id="list" class="sessions"></ul>
-      <p id="list-empty" class="empty" hidden>No sessions yet. Start one on the desktop.</p>
-    </section>
+    <section id="view-list" class="view" hidden></section>
+
+    <!-- 2b. Settings -->
+    <section id="view-settings" class="view" hidden></section>
 
     <!-- 3. Session -->
     <section id="view-session" class="view session" hidden>
@@ -83,18 +117,9 @@
       </div>
 
       <div class="composer-area">
-        <div id="attach-row" class="attach-row" hidden></div>
-        <div id="pickers" class="pickers" hidden>
-          <label class="pick"><span>Mode</span><select id="mode-sel"></select></label>
-          <label class="pick"><span>Model</span><select id="model-sel"></select></label>
-        </div>
         <form id="composer" class="composer" autocomplete="off">
           <input id="file-input" class="file-input" type="file" multiple accept="image/*,*/*" hidden />
-          <button id="attach" class="icon-btn attach-btn" type="button" aria-label="Attach files or photos">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M21.4 11.6l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.9 1.9 0 0 1-2.7-2.7l8-8" />
-            </svg>
-          </button>
+          <div id="attach-row" class="attach-row" hidden></div>
           <textarea
             id="input"
             rows="1"
@@ -102,9 +127,39 @@
             aria-label="Message"
             enterkeyhint="enter"
           ></textarea>
-          <button id="send" class="btn primary send" type="submit" aria-label="Send">↑</button>
-          <button id="stop" class="btn danger stop" type="button" aria-label="Stop" hidden>■</button>
+          <div class="composer-row">
+            <div class="composer-left">
+              <button id="attach" class="icon-btn attach-btn" type="button" aria-label="Attach files or photos">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+              </button>
+              <div id="pickers" class="pickers" hidden>
+                <select id="mode-sel" aria-label="Mode" tabindex="-1" hidden></select>
+                <select id="model-sel" aria-label="Model" tabindex="-1" hidden></select>
+                <select id="effort-sel" aria-label="Effort" tabindex="-1" hidden></select>
+                <button id="model-chip" class="model-chip" type="button" aria-label="Model and options"><span id="chip-model" class="chip-model"></span><span id="chip-effort" class="chip-effort"></span></button>
+              </div>
+            </div>
+            <div class="composer-right">
+              <button id="stop" class="btn danger stop" type="button" aria-label="Stop" hidden>■</button>
+              <button id="send" class="btn primary send" type="submit" aria-label="Send">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 19V5M5 12l7-7 7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
         </form>
+      </div>
+      <div id="sheet" class="sheet-wrap" hidden>
+        <div class="sheet-backdrop"></div>
+        <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+          <div class="sheet-head">
+            <button id="sheet-nav" class="sheet-nav" type="button" aria-label="Close"></button>
+            <p id="sheet-title" class="sheet-title"></p>
+            <span class="sheet-nav-pad" aria-hidden="true"></span>
+          </div>
+          <div id="sheet-list" class="sheet-list" role="listbox"></div>
+        </div>
       </div>
     </section>
 

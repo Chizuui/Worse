@@ -216,6 +216,8 @@ pub struct ProxySettings {
 #[serde(default, rename_all = "camelCase")]
 pub struct AppearanceSettings {
     pub theme: ThemePref,
+    /// "jakarta" | "inter" | "system".
+    pub ui_font: String,
     pub ui_font_size: u16,
     pub zoom_percent: u16,
     pub code_theme_light: String,
@@ -239,6 +241,7 @@ impl Default for AppearanceSettings {
     fn default() -> Self {
         Self {
             theme: ThemePref::System,
+            ui_font: "jakarta".into(),
             ui_font_size: 14,
             zoom_percent: 100,
             code_theme_light: "github-light".into(),

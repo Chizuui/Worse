@@ -120,6 +120,9 @@ pub enum Item {
         /// not as a user bubble.
         #[serde(default)]
         background: bool,
+        /// Paths of the images attached to the message.
+        #[serde(default)]
+        images: Vec<String>,
     },
     Assistant {
         agent: AgentId,

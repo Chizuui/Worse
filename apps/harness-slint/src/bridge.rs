@@ -27,6 +27,7 @@ use harness_core_api::{ContextItem, PermissionOptionKind};
 mod board;
 mod dock;
 mod fleet;
+mod thumbs;
 mod turns;
 
 struct UiState {
@@ -61,6 +62,7 @@ struct UiState {
     /// Round 3 dock state (queue edit, effort option id, failure banner): `bridge/dock.rs`.
     dock_state: dock::DockState,
     board: board::BoardState,
+    thumbs: thumbs::Thumbs,
 }
 
 thread_local! {
@@ -222,6 +224,7 @@ impl UiState {
             Item::User {
                 text,
                 background: true,
+                ..
             } => {
                 // Autonomous turn (§9.17): one muted line with a refresh icon, not a user bubble.
                 row.kind = 6;
@@ -230,9 +233,11 @@ impl UiState {
             Item::User {
                 text,
                 background: false,
+                images,
             } => {
                 row.kind = 0;
                 row.text = text.as_str().into();
+                (row.images, row.images_more) = self.row_images(id, images);
             }
             Item::Assistant {
                 agent,
@@ -252,6 +257,10 @@ impl UiState {
                 row.kind = 2;
                 row.title = one_line(title).into();
                 row.status = tool_status(*status);
+                let image: Vec<String> = thumbs::tool_image(title, &self.workspace)
+                    .into_iter()
+                    .collect();
+                (row.images, row.images_more) = self.row_images(id, &image);
             }
             Item::Notice {
                 notice: Notice::Failover { from, to, reset },
@@ -329,6 +338,7 @@ impl UiState {
             *existing = summary.clone();
         }
         self.rows.clear();
+        self.thumbs.clear_rows();
         self.texts.clear();
         self.blocks.clear();
         self.chat.set_vec(Vec::new());
@@ -406,6 +416,7 @@ impl UiState {
         self.turn.keep_unread = None;
         self.reset_turn_view();
         self.rows.clear();
+        self.thumbs.clear_rows();
         self.texts.clear();
         self.blocks.clear();
         self.chat.set_vec(Vec::new());
@@ -639,7 +650,15 @@ impl UiState {
                         .and_then(|&index| self.chat.row_data(index))
                         .is_some_and(|row| row.title.as_str() != one_line(&title));
                 if changed {
-                    self.update_row(id, |row| row.title = one_line(&title).into());
+                    let image: Vec<String> = thumbs::tool_image(&title, &self.workspace)
+                        .into_iter()
+                        .collect();
+                    let (images, more) = self.row_images(id, &image);
+                    self.update_row(id, |row| {
+                        row.title = one_line(&title).into();
+                        row.images = images;
+                        row.images_more = more;
+                    });
                 }
             }
             Event::PermissionRequested {
@@ -941,8 +960,12 @@ fn one_line(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-pub(crate) fn ui_font_family(zh: bool) -> &'static str {
-    if cfg!(windows) {
+pub(crate) fn ui_font_family(zh: bool, choice: &str) -> &'static str {
+    if !zh && choice == "inter" {
+        "Inter"
+    } else if !zh && choice != "system" {
+        "Plus Jakarta Sans"
+    } else if cfg!(windows) {
         if zh {
             "Microsoft YaHei UI"
         } else {
@@ -982,7 +1005,6 @@ pub fn install(
     let chat = Rc::new(VecModel::default());
     let files = Rc::new(VecModel::default());
     let queue = Rc::new(VecModel::default());
-    window.set_ui_font_family(ui_font_family(false).into());
     window.set_sessions(ModelRc::from(sessions.clone()));
     window.set_agents(ModelRc::from(agents.clone()));
     window.set_fallback(ModelRc::from(fallback.clone()));
@@ -1020,6 +1042,7 @@ pub fn install(
         active: None,
         opened_title: String::new(),
         rows: HashMap::new(),
+        thumbs: thumbs::Thumbs::default(),
         texts: HashMap::new(),
         blocks: HashMap::new(),
         agent_list: Vec::new(),

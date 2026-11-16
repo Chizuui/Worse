@@ -18,6 +18,8 @@ const EMPTY_RETRIES: u32 = 2;
 const CUT_OFF_NOTE: &str = "[Harness] Your last response hit the output limit and was cut off; any tool call in it was dropped. Continue the task: keep your reasoning short and split large edits into several smaller edit_file calls.";
 /// Rough history budget in characters (~100k tokens); older turns are dropped first.
 const HISTORY_CHARS: usize = 400_000;
+/// Images kept in the history; older ones are replaced by a short note.
+const KEEP_IMAGES: usize = 4;
 
 pub struct Session {
     pub cwd: String,
@@ -102,10 +104,10 @@ impl Session {
             .iter()
             .filter_map(|m| {
                 let role = m.get("role").and_then(Value::as_str)?;
-                let text = m.get("content").and_then(Value::as_str)?;
+                let text = llm::content_text(m.get("content"))?;
                 match role {
-                    "user" => Some((true, text.to_owned())),
-                    "assistant" if !text.is_empty() => Some((false, text.to_owned())),
+                    "user" => Some((true, text)),
+                    "assistant" if !text.is_empty() => Some((false, text)),
                     _ => None,
                 }
             })
@@ -114,7 +116,7 @@ impl Session {
 
     /// Drops the oldest turns (whole user→… groups) until the history fits the budget.
     fn trim(&mut self) {
-        let size = |messages: &[Value]| messages.iter().map(|m| m.to_string().len()).sum::<usize>();
+        let size = |messages: &[Value]| messages.iter().map(llm::message_size).sum::<usize>();
         while size(&self.messages) > HISTORY_CHARS {
             let next_user = self
                 .messages
@@ -221,12 +223,37 @@ pub(crate) fn request_messages(system: &str, history: &[Value], system_as_user: 
     messages
 }
 
+/// The user message content of a prompt: plain text, or text plus image parts when images are attached.
+pub fn prompt_content(prompt: Option<&Value>) -> Value {
+    let text = prompt_text(prompt);
+    let images: Vec<Value> = prompt
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|b| b.get("type").and_then(Value::as_str) == Some("image"))
+        .filter_map(|b| {
+            let data = b.get("data").and_then(Value::as_str)?;
+            let mime = b.get("mimeType").and_then(Value::as_str).unwrap_or("image/png");
+            Some(llm::image_part(mime, data))
+        })
+        .collect();
+    if images.is_empty() {
+        return json!(text);
+    }
+    let mut parts = Vec::new();
+    if !text.is_empty() {
+        parts.push(json!({"type": "text", "text": text}));
+    }
+    parts.extend(images);
+    json!(parts)
+}
+
 /// One prompt turn: model call → tools → model call … until the model answers without tools.
 pub async fn run_turn(
     agent: &Agent,
     id: &str,
     session: &mut Session,
-    user: String,
+    user: Value,
     token: &CancellationToken,
 ) -> Reply {
     if agent.provider.base_url.is_empty() || agent.provider.model.is_empty() {
@@ -242,6 +269,7 @@ pub async fn run_turn(
     session
         .messages
         .push(json!({"role": "user", "content": user}));
+    llm::prune_images(&mut session.messages, KEEP_IMAGES);
     session.trim();
     let mut input_tokens = 0;
     let mut output_tokens = 0;
@@ -322,6 +350,7 @@ pub async fn run_turn(
         let empty = McpSet::default();
         let mut always = std::mem::take(&mut session.always);
         let mut results = Vec::new();
+        let images = std::sync::Mutex::new(Vec::new());
         {
             let mut ctx = Ctx {
                 agent,
@@ -331,6 +360,7 @@ pub async fn run_turn(
                 always: &mut always,
                 token,
                 mcp: session.mcp.as_ref().unwrap_or(&empty),
+                images: &images,
             };
             for call in &completion.tool_calls {
                 let text = if token.is_cancelled() {
@@ -343,6 +373,13 @@ pub async fn run_turn(
         }
         session.always = always;
         session.messages.extend(results);
+        let images = images.into_inner().unwrap_or_default();
+        if !images.is_empty() {
+            let mut parts = vec![json!({"type": "text", "text": "Images returned by read_file:"})];
+            parts.extend(images);
+            session.messages.push(json!({"role": "user", "content": parts}));
+            llm::prune_images(&mut session.messages, KEEP_IMAGES);
+        }
         if token.is_cancelled() {
             return Ok(json!({"stopReason": "cancelled"}));
         }

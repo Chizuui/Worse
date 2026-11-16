@@ -7,7 +7,46 @@ import { Theme } from "../theme/tokens.slint";
 import { Icon, Icons, IconsFill, Spinner, Button, IconButton, Tag, Divider, Dialog } from "../components/controls.slint";
 import { TextField, TextArea, Switch } from "../settings/parts.slint";
 import { AgentTint, Pill, ProgressTrack, CapsHeader } from "../panels/common.slint";
-import { ChatUi, ToolPart, ChangeRow, PlanRow, ScheduleRow, SubagentRow } from "globals.slint";
+import { ChatUi, ChatImage, ToolPart, ChangeRow, PlanRow, ScheduleRow, SubagentRow } from "globals.slint";
+
+// Row of small image previews; a click opens the file in the OS viewer.
+export component ImageStrip inherits HorizontalLayout {
+    in property <[ChatImage]> images;
+    in property <int> more;
+    in property <bool> at-end;
+    alignment: root.at-end ? end : start;
+    spacing: 6px;
+    for img in root.images: Rectangle {
+        height: 72px;
+        width: max(48px, min(112px, 72px * img.image.width / max(1, img.image.height)));
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: ita.has-hover ? Theme.border-hover : Theme.border;
+        background: Theme.surface;
+        clip: true;
+        accessible-role: AccessibleRole.button;
+        accessible-label: img.path;
+        Image {
+            width: parent.width;
+            height: parent.height;
+            source: img.image;
+            image-fit: cover;
+            accessible-role: none;
+        }
+        ita := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                ChatUi.open-path(img.path);
+            }
+        }
+    }
+    if root.more > 0: Text {
+        text: "+" + root.more;
+        font-size: Theme.ui-sm;
+        color: Theme.foreground-subtle;
+        vertical-alignment: center;
+    }
+}
 
 // Tool call row (ZCode inline tool row) that expands into its content: diffs, text, locations, raw input/output.
 export component ToolCard inherits VerticalLayout {
@@ -18,6 +57,8 @@ export component ToolCard inherits VerticalLayout {
     in property <[ToolPart]> parts;
     in property <bool> expanded;
     in property <bool> hit;
+    in property <[ChatImage]> images;
+    in property <int> images-more;
     property <string> status-text: root.status == 0 ? @tr("Running") : root.status == 1 ? @tr("Awaiting permission") : root.status == 2 ? @tr("Done") : root.status == 3 ? @tr("Denied") : @tr("Failed");
     property <string> tone: root.status == 2 ? "success" : root.status == 1 ? "progress" : root.status == 0 ? "neutral" : root.status == 3 ? "warning" : "destructive";
     property <length> content-width: 400px;
@@ -109,6 +150,11 @@ export component ToolCard inherits VerticalLayout {
                 accessible-role: none;
             }
         }
+    }
+    if root.images.length > 0: ImageStrip {
+        images: root.images;
+        more: root.images-more;
+        padding-left: 12px;
     }
     if root.expanded && root.parts.length > 0: Rectangle {
         property <bool> shown: false;

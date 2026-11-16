@@ -77,6 +77,9 @@ pub enum EventKind {
         /// instead of a user bubble.
         #[serde(default)]
         background: bool,
+        /// Paths of the images attached to the turn (API 0.19.0).
+        #[serde(default)]
+        images: Vec<String>,
     },
     #[serde(rename_all = "camelCase")]
     TurnStarted {

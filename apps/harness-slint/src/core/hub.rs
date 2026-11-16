@@ -67,6 +67,8 @@ struct View {
     /// Queued (not yet running) turns in admission order with their user text. Their user bubble is added
     /// when the turn starts; until then they are shown (and cancellable) in the composer's queue list.
     queued: Vec<(api::TurnId, String)>,
+    /// Image paths of queued turns, shown on the user bubble once the turn starts.
+    queued_images: HashMap<api::TurnId, Vec<String>>,
     /// Queued turns this UI cancelled; their later `TurnFinished` must not end the running turn.
     cancelled: HashSet<api::TurnId>,
     /// Turn of every shown item: turn actions (fork, rewind, retry, files) take an item id (`ChatCall`).
@@ -96,6 +98,7 @@ impl View {
             merged: HashMap::new(),
             denied: HashSet::new(),
             queued: Vec::new(),
+            queued_images: HashMap::new(),
             cancelled: HashSet::new(),
             item_turn: HashMap::new(),
         }
@@ -1474,13 +1477,12 @@ impl Adapter {
             .queue
             .iter()
             .map(|id| {
-                let text = detail
-                    .turns
-                    .iter()
-                    .find(|t| &t.id == id)
-                    .map(|t| t.user_text.clone())
-                    .unwrap_or_default();
-                (id.clone(), text)
+                let turn = detail.turns.iter().find(|t| &t.id == id);
+                let images = turn.map_or_else(Vec::new, |t| api::ContextItem::image_paths(&t.context));
+                if !images.is_empty() {
+                    view.queued_images.insert(id.clone(), images);
+                }
+                (id.clone(), turn.map(|t| t.user_text.clone()).unwrap_or_default())
             })
             .collect();
         let id = detail.summary.id.0.clone();
@@ -1845,10 +1847,14 @@ impl Adapter {
                 user_text,
                 position,
                 background,
+                images,
                 ..
             } => {
                 view.turns.insert(turn_id.clone(), TurnMap::default());
                 if position > 0 {
+                    if !images.is_empty() {
+                        view.queued_images.insert(turn_id.clone(), images);
+                    }
                     view.queued.push((turn_id, user_text));
                     emit(
                         &ev,
@@ -1868,6 +1874,7 @@ impl Adapter {
                             item: Item::User {
                                 text: user_text,
                                 background,
+                                images,
                             },
                         },
                     );
@@ -1877,6 +1884,7 @@ impl Adapter {
                 turn_id, attempt, ..
             } => {
                 if let Some(text) = view.dequeue(&turn_id) {
+                    let images = view.queued_images.remove(&turn_id).unwrap_or_default();
                     let id = view.alloc_in(&turn_id);
                     view.turns.entry(turn_id.clone()).or_default().user = Some(id);
                     emit(
@@ -1887,6 +1895,7 @@ impl Adapter {
                             item: Item::User {
                                 text,
                                 background: false,
+                                images,
                             },
                         },
                     );
@@ -2237,6 +2246,7 @@ impl Adapter {
                         item: Item::User {
                             text,
                             background: false,
+                            images: Vec::new(),
                         },
                     },
                 );
@@ -2334,6 +2344,7 @@ fn snapshot_turn(view: &mut View, turn: &api::TurnView, items: &mut Vec<(ItemId,
         Item::User {
             text: turn.user_text.clone(),
             background: turn.origin.as_ref().is_some_and(|o| o.background.is_some()),
+            images: api::ContextItem::image_paths(&turn.context),
         },
     ));
     let last = turn.attempts.len().saturating_sub(1);
@@ -2391,6 +2402,7 @@ fn snapshot_turn(view: &mut View, turn: &api::TurnView, items: &mut Vec<(ItemId,
                 Item::User {
                     text: text.clone(),
                     background: false,
+                    images: Vec::new(),
                 },
             ));
         }

@@ -16,6 +16,7 @@ use serde_json::{json, Value};
 /// The only methods a remote client may call (contract §"RPC allowlist").
 pub(crate) const ALLOWED: &[&str] = &[
     "list_agents",
+    "get_fallback_order",
     "list_sessions",
     "open_session",
     "send_message",
@@ -31,7 +32,35 @@ pub(crate) const ALLOWED: &[&str] = &[
     "turn_diff",
     "list_modes",
     "list_models",
+    "list_config_options",
+    "set_config_option",
+    "settings_overview",
+    "settings_page",
 ];
+
+pub(crate) fn settings_call(
+    view: Option<&dyn crate::SettingsView>,
+    method: &str,
+    params: &Value,
+) -> Option<Value> {
+    match method {
+        "settings_overview" => Some(view.map_or_else(
+            || json!({ "host": "", "items": {} }),
+            crate::SettingsView::overview,
+        )),
+        "settings_page" => {
+            let page = params
+                .get("page")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            Some(view.map_or_else(
+                || json!({ "title": page, "subtitle": "", "sections": [] }),
+                |view| view.page(page),
+            ))
+        }
+        _ => None,
+    }
+}
 
 /// True when `method` is allowlisted.
 pub(crate) fn is_allowed(method: &str) -> bool {
@@ -46,6 +75,7 @@ pub(crate) async fn call(
 ) -> Result<Value, String> {
     match method {
         "list_agents" => out(core.list_agents().await),
+        "get_fallback_order" => out(core.get_fallback_order().await),
         "list_sessions" => {
             let request: ListSessions = parse(params)?;
             out(core.list_sessions(request).await)
@@ -53,6 +83,17 @@ pub(crate) async fn call(
         "open_session" => out(core.open_session(session(params)?).await),
         "list_modes" => out(core.list_modes(session(params)?).await),
         "list_models" => out(core.list_models(session(params)?).await),
+        "list_config_options" => out(core.list_config_options(session(params)?).await),
+        "set_config_option" => {
+            let request: ConfigChange = strict(params)?;
+            out(core
+                .set_config_option(
+                    SessionId::from(request.session_id.as_str()),
+                    request.config_id,
+                    request.value,
+                )
+                .await)
+        }
         "send_message" => {
             // `agent`, `clientMessageId` and `context` may be omitted by a small client.
             let filled = fill(
@@ -246,6 +287,16 @@ struct ModeChange {
     session_id: String,
     #[serde(alias = "mode_id")]
     mode_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ConfigChange {
+    #[serde(alias = "session_id")]
+    session_id: String,
+    #[serde(alias = "config_id")]
+    config_id: String,
+    value: String,
 }
 
 #[derive(Debug, Deserialize)]

@@ -244,7 +244,7 @@ impl HubCtx {
         caps: (bool, bool),
         session: &SessionId,
     ) -> Value {
-        let mut servers = vec![self.memory_mcp_server(cwd)];
+        let mut servers = vec![self.memory_mcp_server(cwd, session)];
         if let Some(delegate) = self.delegate_mcp_server(session) {
             servers.push(delegate);
         }
@@ -302,11 +302,17 @@ impl HubCtx {
         }))
     }
 
-    /// ACP `McpServer` (stdio) entry for the Harness memory server.
-    pub(crate) fn memory_mcp_server(&self, workspace_path: &str) -> Value {
+    /// ACP `McpServer` (stdio) entry for the Harness memory server. `session` is passed as `--session` so the
+    /// server can read and write the working notes of this session.
+    pub(crate) fn memory_mcp_server(&self, workspace_path: &str, session: &SessionId) -> Value {
         let helper = crate::helpers::Helper::MemoryMcp;
         let mut args = self.config.helpers.args(helper);
-        args.extend(["--project".to_owned(), workspace_path.to_owned()]);
+        args.extend([
+            "--project".to_owned(),
+            workspace_path.to_owned(),
+            "--session".to_owned(),
+            session.as_str().to_owned(),
+        ]);
         json!({
             "name": "harness-memory",
             "command": self.config.helpers.program(helper).to_string_lossy(),

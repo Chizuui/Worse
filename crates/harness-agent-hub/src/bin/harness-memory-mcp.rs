@@ -1,4 +1,6 @@
-//! `harness-memory-mcp [--project <dir>]` — stdio MCP server exposing `memory_read` / `memory_write`.
+//! `harness-memory-mcp [--project <dir>] [--session <id>]` — stdio MCP server exposing `memory_read` /
+//! `memory_write` and the per-session `session_notes_read` / `session_notes_write` (`--session`, else
+//! `HARNESS_SESSION_ID`).
 //! `harness-memory-mcp --delegate` — the `harness-delegate` server (phase-9-parity.md §9.8), configured by the
 //! `HARNESS_DELEGATE_*` env vars the hub passes.
 //! Data directory: `HARNESS_HOME` (else `~/.harness`).

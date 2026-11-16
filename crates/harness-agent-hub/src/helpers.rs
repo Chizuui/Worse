@@ -14,7 +14,7 @@ use crate::delegate_mcp::{self, DelegateEnv};
 use crate::error::HubError;
 use crate::memory::MemoryFiles;
 
-/// Mode flag of the memory MCP server (`<exe> --memory-mcp [--project <dir>]`).
+/// Mode flag of the memory MCP server (`<exe> --memory-mcp [--project <dir>] [--session <id>]`).
 pub const FLAG_MEMORY_MCP: &str = "--memory-mcp";
 /// Mode flag of the `harness-delegate` MCP server (`<exe> --delegate`).
 pub const FLAG_DELEGATE: &str = "--delegate";
@@ -125,14 +125,18 @@ impl HelperLaunch {
     }
 }
 
-/// Memory MCP server over stdio. `args` are the arguments after the mode flag (`--project <dir>`).
-/// Data directory: `HARNESS_HOME`, else `~/.harness`.
+/// Memory MCP server over stdio. `args` are the arguments after the mode flag (`--project <dir>`,
+/// `--session <id>`). Data directory: `HARNESS_HOME`, else `~/.harness`. The Harness session id comes from
+/// `--session`, else `HARNESS_SESSION_ID`; without one the `session_notes_*` tools answer with a clear error.
 pub fn run_memory_mcp(args: impl IntoIterator<Item = String>) -> ExitCode {
     let mut project = None;
+    let mut session = None;
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         if arg == "--project" {
             project = args.next().map(PathBuf::from);
+        } else if arg == "--session" {
+            session = args.next();
         }
     }
     let home = match env_path("HARNESS_HOME") {
@@ -145,9 +149,21 @@ pub fn run_memory_mcp(args: impl IntoIterator<Item = String>) -> ExitCode {
             }
         },
     };
-    let memory = MemoryFiles::new(home);
+    let memory = MemoryFiles::new(home.as_path());
     let stdin = BufReader::new(io::stdin().lock());
-    match crate::mcp::serve(&memory, project.as_deref(), stdin, io::stdout().lock()) {
+    let session = session.or_else(|| {
+        std::env::var("HARNESS_SESSION_ID")
+            .ok()
+            .filter(|id| !id.trim().is_empty())
+    });
+    match crate::mcp::serve(
+        &memory,
+        &home,
+        project.as_deref(),
+        session.as_deref(),
+        stdin,
+        io::stdout().lock(),
+    ) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("harness memory-mcp: {error}");

@@ -53,6 +53,11 @@ impl Default for RemoteConfig {
     }
 }
 
+pub trait SettingsView: Send + Sync {
+    fn overview(&self) -> serde_json::Value;
+    fn page(&self, page: &str) -> serde_json::Value;
+}
+
 /// One paired device, as shown in Settings.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -92,6 +97,7 @@ pub(crate) struct Inner {
     pub(crate) last_seq: AtomicU64,
     /// Flips to `true` on shutdown; every connection selects on it.
     pub(crate) closing: watch::Sender<bool>,
+    pub(crate) settings: RwLock<Option<Arc<dyn SettingsView>>>,
 }
 
 impl Inner {
@@ -159,6 +165,7 @@ impl RemoteHandle {
             local_addr,
             last_seq: AtomicU64::new(0),
             closing,
+            settings: RwLock::new(None),
         });
         let accept = Arc::clone(&inner);
         let task = tokio::spawn(async move { http::accept_loop(accept, listener).await });
@@ -166,6 +173,12 @@ impl RemoteHandle {
             inner,
             task: Arc::new(Mutex::new(Some(task))),
         })
+    }
+
+    pub fn set_settings_view(&self, view: Arc<dyn SettingsView>) {
+        if let Ok(mut slot) = self.inner.settings.write() {
+            *slot = Some(view);
+        }
     }
 
     /// The bound loopback address (port 0 in the config resolves here).

@@ -330,6 +330,7 @@ impl SessionActor {
             user_text: turn.user_text.clone(),
             position: 0,
             background: true,
+            images: Vec::new(),
         });
         self.turns.push(turn);
         self.persist_attempt(&turn_id, attempt).await;

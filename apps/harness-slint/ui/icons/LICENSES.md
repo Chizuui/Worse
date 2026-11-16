@@ -30,3 +30,10 @@ WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEM
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
+
+## Fonts
+
+Embedded in the executable, both under the SIL Open Font License 1.1:
+
+- `ui/fonts/PlusJakartaSans-*.ttf`: Plus Jakarta Sans by Tokotype (https://github.com/tokotype/PlusJakartaSans), license in `ui/fonts/PlusJakartaSans-OFL.txt`.
+- `ui/fonts/Inter-*.ttf`: Inter by Rasmus Andersson (https://github.com/rsms/inter), license in `ui/fonts/Inter-OFL.txt`.

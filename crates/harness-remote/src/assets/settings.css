@@ -1,0 +1,533 @@
+/* Mobile settings (phone web client) — Material Design 3.
+   Struktur: .set-page > .set-head + .set-body. Index = 大号搜索框 + 分组卡片（.set-card）>
+   行（.set-row，圆形字标 .set-icon + 标题/次行 .set-lines + 右侧 chevron）；详情页复用
+   .set-section/.set-card，行元素是 .set-line（同一套字标/两行文本/switch 规范）。
+   只用 style.css 的设计 token，不写字面色值；卡片不用 1px 描边，靠 surface-container 层次。 */
+
+#view-settings { background: var(--bg); min-height: 0; }
+
+#view-settings .set-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- page header ---- */
+#view-settings .set-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(20px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px
+    calc(16px + env(safe-area-inset-left));
+}
+#view-settings .set-head-page {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  padding-bottom: 4px;
+}
+#view-settings .set-head-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+/* M3 headline-small；全局 style.css 的 h1/h2 权重会被这里覆盖。 */
+#view-settings .set-title {
+  margin: 0;
+  font: 400 28px/36px var(--font);
+  font-weight: 400;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+
+#view-settings .set-host {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font: 400 12px/16px var(--font);
+  color: var(--muted);
+}
+#view-settings .set-host-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view-settings .set-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--subtle);
+}
+#view-settings .set-dot.on { background: var(--success); }
+#view-settings .set-dot.off { background: var(--warning); }
+
+/* 头部头像跟字标同色系（primary-container 上的 primary 字） */
+#view-settings .set-avatar {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  font: 500 16px/1 var(--font);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 详情页返回：M3 pill 图标按钮（40px 触控区） */
+#view-settings .set-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 14px 0 8px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--accent);
+  font: 500 14px/20px var(--font);
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#view-settings .set-back:active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+#view-settings .set-back-chev {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+}
+
+/* ---- scroll body ---- */
+#view-settings .set-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 4px calc(16px + env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom))
+    calc(16px + env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#view-settings .set-body > * { flex: 0 0 auto; }
+
+/* ---- large rounded search field ---- */
+#view-settings .set-searchbox {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--md-surface-highest);
+  color: var(--muted);
+}
+#view-settings .set-searchbox:focus-within {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+#view-settings .set-search-glyph {
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--muted);
+}
+#view-settings .set-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font: 400 16px/24px var(--font);
+  -webkit-appearance: none;
+  appearance: none;
+}
+#view-settings .set-search:focus { outline: none; }
+#view-settings .set-search::placeholder { color: var(--muted); }
+#view-settings .set-search::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+
+/* ---- section label + card ---- */
+#view-settings .set-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+#view-settings .set-caps {
+  margin: 0;
+  padding: 0 4px;
+  font: 500 12px/16px var(--font);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+#view-settings .set-card {
+  flex: 0 0 auto;
+  min-width: 0;
+  background: var(--surface);
+  border: 0;
+  border-radius: var(--r-card);
+  padding: 4px 0;
+  overflow: hidden;
+}
+#view-settings .set-card > * + * { border-top: 0; }
+
+/* ---- index row: circular tonal badge + title + secondary line + chevron ---- */
+#view-settings .set-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 16px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 400 16px/24px var(--font);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#view-settings .set-row:active,
+#view-settings .set-row.selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+/* 当前/被选中的详情行：tonal 填充代替描边 */
+#view-settings .set-line.active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+#view-settings .set-lines,
+#view-settings .set-line-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+#view-settings .set-label {
+  font: 400 16px/22px var(--font);
+  letter-spacing: 0.1px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#view-settings .set-value {
+  min-width: 0;
+  font: 400 14px/20px var(--font);
+  letter-spacing: 0.25px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#view-settings .set-lines > .set-value:empty,
+#view-settings .set-value.empty { display: none; }
+#view-settings .set-chev {
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+/* ---- circular tonal badge (index rows and detail rows share it) ---- */
+#view-settings .set-icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-pill);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  font: 500 15px/1 var(--font);
+  letter-spacing: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: none;
+}
+#view-settings .set-icon.tone-accent,
+#view-settings .set-icon.tone-default,
+#view-settings .set-icon.tone-muted {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+#view-settings .set-icon.tone-info {
+  background: color-mix(in srgb, var(--info) 22%, transparent);
+  color: var(--info);
+}
+#view-settings .set-icon.tone-success {
+  background: color-mix(in srgb, var(--success) 22%, transparent);
+  color: var(--success);
+}
+#view-settings .set-icon.tone-warning {
+  background: color-mix(in srgb, var(--warning) 22%, transparent);
+  color: var(--warning);
+}
+#view-settings .set-icon.tone-danger {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  color: var(--danger);
+}
+
+/* ---- detail rows ---- */
+#view-settings .set-line {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 16px;
+}
+#view-settings .set-line-title {
+  margin: 0;
+  font: 400 16px/22px var(--font);
+  letter-spacing: 0.1px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+#view-settings .set-line-detail {
+  margin: 0;
+  font: 400 14px/20px var(--font);
+  letter-spacing: 0.25px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+#view-settings .set-line.kind-stat .set-line-text { justify-items: start; }
+#view-settings .set-line.kind-stat .set-value {
+  max-width: 52%;
+  font: 500 16px/24px var(--font);
+  color: var(--text);
+}
+#view-settings .set-line.kind-stat .set-value.tone-accent { color: var(--accent); }
+#view-settings .set-line.kind-stat .set-value.tone-success { color: var(--success); }
+#view-settings .set-line.kind-stat .set-value.tone-warning { color: var(--warning); }
+#view-settings .set-line.kind-stat .set-value.tone-danger { color: var(--danger); }
+#view-settings .set-line.kind-stat .set-value.tone-info { color: var(--info); }
+#view-settings .set-line.kind-stat .set-value.tone-muted { color: var(--muted); }
+
+#view-settings .set-line.kind-code {
+  display: block;
+  padding: 12px 16px;
+}
+#view-settings .set-line.kind-code .set-line-title { margin-bottom: 6px; }
+
+#view-settings .set-sub {
+  margin: 0;
+  padding: 0 4px;
+  color: var(--muted);
+  font: 400 14px/20px var(--font);
+  letter-spacing: 0.25px;
+  overflow-wrap: anywhere;
+}
+#view-settings .set-note {
+  margin: 0;
+  padding: 0 4px;
+  color: var(--muted);
+  font: 400 12px/16px var(--font);
+  overflow-wrap: anywhere;
+}
+#view-settings .set-empty,
+#view-settings .set-none {
+  margin: 0;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--muted);
+  font: 400 14px/20px var(--font);
+}
+
+#view-settings .set-code {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: 12px 14px;
+  background: var(--raised);
+  border: 0;
+  border-radius: var(--r-row);
+  color: var(--text-2);
+  font: 12px/18px ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ---- M3 switch (52x32, knob 24/16, 2px outline; 包裹层提供 40px+ 触控高度) ---- */
+#view-settings .set-line.has-toggle { min-height: 56px; }
+#view-settings .set-switch {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 52px;
+  height: 32px;
+  border: 2px solid var(--md-outline);
+  border-radius: var(--r-pill);
+  background: var(--md-surface-highest);
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+#view-settings .set-switch.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  justify-content: flex-end;
+}
+#view-settings .set-knob {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--md-outline);
+}
+#view-settings .set-switch.on .set-knob {
+  width: 24px;
+  height: 24px;
+  margin: 0 2px;
+  background: var(--acc-fg);
+}
+
+/* ---- tonal badge/chip ---- */
+#view-settings .set-badge {
+  flex: 0 0 auto;
+  max-width: 42%;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--r-chip);
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  font: 500 12px/16px var(--font);
+  letter-spacing: 0.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#view-settings .set-badge.tone-accent {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+#view-settings .set-badge.tone-info {
+  background: color-mix(in srgb, var(--info) 18%, transparent);
+  color: var(--info);
+}
+#view-settings .set-badge.tone-success {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
+}
+#view-settings .set-badge.tone-warning {
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--warning);
+}
+#view-settings .set-badge.tone-danger {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+}
+#view-settings .set-badge.tone-muted {
+  background: var(--raised);
+  color: var(--muted);
+}
+
+/* tone 只用于文字着色；字标与 badge 自带背景，不被这个兜底规则影响。 */
+#view-settings .set-value.tone-accent,
+#view-settings .set-line.tone-accent .set-value { color: var(--accent); }
+#view-settings .set-value.tone-success,
+#view-settings .set-line.tone-success .set-value { color: var(--success); }
+#view-settings .set-value.tone-warning,
+#view-settings .set-line.tone-warning .set-value { color: var(--warning); }
+#view-settings .set-value.tone-danger,
+#view-settings .set-line.tone-danger .set-value { color: var(--danger); }
+#view-settings .set-value.tone-info,
+#view-settings .set-line.tone-info .set-value { color: var(--info); }
+#view-settings .set-value.tone-muted,
+#view-settings .set-line.tone-muted .set-value { color: var(--muted); }
+#view-settings .set-value.tone-accent,
+#view-settings .set-value.tone-success,
+#view-settings .set-value.tone-warning,
+#view-settings .set-value.tone-danger,
+#view-settings .set-value.tone-info { font-weight: 500; }
+
+/* screen-reader only */
+#view-settings .set-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+#view-settings .set-head { min-height: 64px; gap: 4px; padding: env(safe-area-inset-top) calc(4px + env(safe-area-inset-right)) 0 calc(24px + env(safe-area-inset-left)); }
+#view-settings .set-head .set-title { flex: 1 1 auto; min-width: 0; font: 400 24px/32px var(--font); }
+#view-settings .set-head-page { flex-direction: row; align-items: center; gap: 4px; padding-left: calc(4px + env(safe-area-inset-left)); }
+#view-settings .set-head-page .set-title { font: 400 22px/28px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#view-settings .set-action,
+#view-settings .set-back {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#view-settings .set-action:active,
+#view-settings .set-back:active { background: color-mix(in srgb, var(--fg) 12%, transparent); }
+#view-settings .set-action.on { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+#view-settings .set-action-icon,
+#view-settings .set-back-icon { display: inline-flex; }
+#view-settings .set-body { gap: 12px; padding-top: 8px; padding-bottom: 24px; }
+#view-settings .set-searchbox[hidden] { display: none; }
+#view-settings .set-searchbox { min-height: 56px; gap: 12px; padding: 0 20px; border-radius: 28px; background: var(--surface); }
+#view-settings .set-search { min-height: 44px; padding: 0; border: 0; border-radius: 0; background: none; }
+#view-settings .set-search:focus { box-shadow: none; }
+#view-settings .set-search-glyph { display: inline-flex; color: var(--muted); }
+#view-settings .set-search-glyph svg { width: 20px; height: 20px; }
+#view-settings .set-section { gap: 8px; }
+#view-settings .set-caps { padding: 8px 24px 0; font: 400 14px/20px var(--font); letter-spacing: 0.1px; text-transform: none; color: var(--muted); }
+#view-settings .set-card { padding: 6px 0; border-radius: 28px; background: var(--surface); }
+#view-settings .set-card > * + * { border-top: 0; }
+#view-settings .set-row { gap: 16px; min-height: 60px; padding: 8px 20px 8px 22px; }
+#view-settings .set-row:active { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+#view-settings .set-glyph { flex: 0 0 auto; display: inline-flex; color: var(--text); }
+#view-settings .set-lines { gap: 0; }
+#view-settings .set-label { font: 400 17px/24px var(--font); letter-spacing: 0.15px; }
+#view-settings .set-lines .set-value { font: 400 14px/20px var(--font); letter-spacing: 0.25px; color: var(--muted); }
+#view-settings .set-side { flex: 0 1 auto; min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 14px/20px var(--font); letter-spacing: 0.25px; color: var(--muted); }
+#view-settings .set-side:empty { display: none; }
+#view-settings .set-chev { flex: 0 0 auto; display: inline-flex; color: var(--muted); opacity: 0.7; }
+#view-settings .set-chev svg { width: 18px; height: 18px; }
+#view-settings .set-line { padding: 8px 20px 8px 22px; }
+#view-settings .set-icon,
+#view-settings .set-icon[class*="tone-"] { width: 36px; height: 36px; background: var(--md-surface-highest); color: var(--text); font: 500 14px/1 var(--font); }
+#view-settings .set-sub,
+#view-settings .set-note { padding: 0 24px; }
+#view-settings .set-line.kind-code { padding: 12px 22px; }

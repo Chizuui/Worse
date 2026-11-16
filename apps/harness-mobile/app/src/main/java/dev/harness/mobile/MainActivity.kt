@@ -11,6 +11,7 @@ import android.webkit.CookieManager
 import android.webkit.SslErrorHandler
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -183,14 +184,16 @@ class MainActivity : AppCompatActivity() {
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>Offline</title>
             <style>
-              html,body{height:100%;margin:0;background:#101418;color:#e6edf3;
-                font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+              html,body{height:100%;margin:0;background:#0b0c0e;color:#edeef0;
+                font:15px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
               .wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;
                 justify-content:center;gap:14px;padding:24px;box-sizing:border-box;text-align:center}
-              h1{font-size:20px;margin:0}
-              p{color:#8b98a5;margin:0;max-width:32ch}
-              a{display:inline-block;margin-top:10px;padding:12px 22px;border-radius:10px;
-                background:#4ed1a1;color:#09120e;font-weight:600;text-decoration:none}
+              h1{font-size:22px;font-weight:600;margin:0}
+              p{color:#8a909a;margin:0;max-width:32ch}
+              small{color:#6b717c}
+              a{display:inline-block;margin-top:10px;padding:12px 28px;border-radius:10px;
+                background:linear-gradient(135deg,#7c8cff,#b07cff);color:#fff;font-weight:600;
+                text-decoration:none}
             </style></head>
             <body><div class="wrap">
               <h1>Can't reach Harness</h1>
@@ -253,6 +256,16 @@ class MainActivity : AppCompatActivity() {
             if (!request.isForMainFrame) return
             Log.w(TAG, "main frame error ${error.errorCode}")
             showOffline(error.description?.toString().orEmpty())
+        }
+
+        override fun onReceivedHttpError(
+            view: WebView,
+            request: WebResourceRequest,
+            errorResponse: WebResourceResponse,
+        ) {
+            if (!request.isForMainFrame || errorResponse.statusCode < 400) return
+            Log.w(TAG, "main frame http ${errorResponse.statusCode}")
+            showOffline("The tunnel answered HTTP ${errorResponse.statusCode}")
         }
 
         override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {

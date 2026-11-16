@@ -135,6 +135,20 @@ pub struct Ctx<'a> {
     pub always: &'a mut HashSet<String>,
     pub token: &'a CancellationToken,
     pub mcp: &'a McpSet,
+    pub images: &'a std::sync::Mutex<Vec<Value>>,
+}
+
+const IMAGE_BYTES_MAX: usize = 5 * 1024 * 1024;
+
+fn image_mime(path: &Path) -> Option<&'static str> {
+    let ext = path.extension()?.to_str()?.to_ascii_lowercase();
+    match ext.as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        _ => None,
+    }
 }
 
 /// Lexical normalisation (no filesystem access, works for files that do not exist yet).
@@ -330,6 +344,26 @@ impl Ctx<'_> {
         }
     }
 
+    fn read_image(&self, path: &Path, mime: &str, bytes: &[u8]) -> Outcome {
+        use base64::Engine as _;
+        if !self.agent.vision() {
+            return Outcome::err("image file: this model cannot view images");
+        }
+        if bytes.len() > IMAGE_BYTES_MAX {
+            return Outcome::err("image is larger than 5 MB");
+        }
+        let data = base64::engine::general_purpose::STANDARD.encode(bytes);
+        let Ok(mut images) = self.images.lock() else {
+            return Outcome::err("image could not be attached");
+        };
+        images.push(crate::llm::image_part(mime, &data));
+        Outcome::ok(format!(
+            "Image {} ({} bytes) is attached in the next message.",
+            path.display(),
+            bytes.len()
+        ))
+    }
+
     async fn read_file(&self, args: &Value) -> Outcome {
         let Some(path) = str_arg(args, "path") else {
             return Outcome::err("path is required");
@@ -347,6 +381,9 @@ impl Ctx<'_> {
             Ok(bytes) => bytes,
             Err(e) => return Outcome::err(format!("{}: {e}", path.display())),
         };
+        if let Some(mime) = image_mime(&path) {
+            return self.read_image(&path, mime, &bytes);
+        }
         if bytes.iter().take(8192).any(|b| *b == 0) {
             return Outcome::err("binary file");
         }

@@ -53,6 +53,36 @@ const ASSETS: &[Asset] = &[
         body: include_bytes!("assets/style.css"),
     },
     Asset {
+        name: "pair.css",
+        content_type: "text/css; charset=utf-8",
+        body: include_bytes!("assets/pair.css"),
+    },
+    Asset {
+        name: "sessions.css",
+        content_type: "text/css; charset=utf-8",
+        body: include_bytes!("assets/sessions.css"),
+    },
+    Asset {
+        name: "chat.css",
+        content_type: "text/css; charset=utf-8",
+        body: include_bytes!("assets/chat.css"),
+    },
+    Asset {
+        name: "settings.css",
+        content_type: "text/css; charset=utf-8",
+        body: include_bytes!("assets/settings.css"),
+    },
+    Asset {
+        name: "sessions.js",
+        content_type: "text/javascript; charset=utf-8",
+        body: include_bytes!("assets/sessions.js"),
+    },
+    Asset {
+        name: "settings.js",
+        content_type: "text/javascript; charset=utf-8",
+        body: include_bytes!("assets/settings.js"),
+    },
+    Asset {
         name: "manifest.webmanifest",
         content_type: "application/manifest+json",
         body: include_bytes!("assets/manifest.webmanifest"),
@@ -245,6 +275,10 @@ async fn rpc_call(inner: &Arc<Inner>, peer: SocketAddr, req: Request<Incoming>) 
     let args = params.get("params").cloned().unwrap_or(Value::Null);
     if !rpc::is_allowed(&method) {
         return json_response(StatusCode::OK, &rpc::not_allowed(&method));
+    }
+    let view = inner.settings.read().ok().and_then(|slot| slot.clone());
+    if let Some(value) = rpc::settings_call(view.as_deref(), &method, &args) {
+        return json_response(StatusCode::OK, &json!({ "ok": true, "value": value }));
     }
     let response = match rpc::call(inner.core.as_ref(), &method, args).await {
         Ok(value) => json!({ "ok": true, "value": value }),

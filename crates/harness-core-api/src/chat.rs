@@ -281,6 +281,22 @@ pub enum ContextItem {
     Session { session_id: SessionId },
 }
 
+impl ContextItem {
+    /// Paths of the stored images among `items`.
+    #[must_use]
+    pub fn image_paths(items: &[Self]) -> Vec<String> {
+        items
+            .iter()
+            .filter_map(|item| match item {
+                Self::Image {
+                    path: Some(path), ..
+                } => Some(path.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+}
+
 /// Limits of context items (spec §9.2.1).
 pub mod limits {
     /// Items per turn.

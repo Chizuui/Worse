@@ -784,10 +784,12 @@ impl FakeCore {
             let id = s.push(Item::User {
                 text: prompt.clone(),
                 background: false,
+                images: Vec::new(),
             });
             let item = Item::User {
                 text: prompt.clone(),
                 background: false,
+                images: Vec::new(),
             };
             emit(
                 &self.ev,

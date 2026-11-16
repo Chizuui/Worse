@@ -19,6 +19,12 @@ export struct ChipRow {
     detail: string,
 }
 
+// Small preview of an image in the transcript (attached to a user message, or a file a tool read).
+export struct ChatImage {
+    path: string,
+    image: image,
+}
+
 // One line of an expanded tool card (core Event::ToolDetail, R8).
 // kind: 0 text, 1 diff file header, 2 added line, 3 removed line, 4 location, 5 section label, 6 raw (mono),
 // 7 terminal reference.

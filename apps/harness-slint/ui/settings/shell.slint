@@ -22,6 +22,29 @@ export { FallbackRow }
 
 // Nav item (design "nav · X", frame S1): 196x32, radius 8, pad [0,10], gap 10; glyph icon 12 #6B717C + label 13
 // #C9CCD2; active = fill #1C1F24, icon #7C8CFF, label #EDEEF0.
+global NavIcons {
+    pure public function of(id: string) -> image {
+        if id == "general" { return Icons.settings; }
+        if id == "appearance" { return Icons.palette; }
+        if id == "agents" { return Icons.bot; }
+        if id == "orchestra" { return Icons.network; }
+        if id == "inbox" { return Icons.inbox; }
+        if id == "remote" { return Icons.monitor; }
+        if id == "shortcuts" { return Icons.keyboard; }
+        if id == "instructions" { return Icons.file-text; }
+        if id == "memory" { return Icons.brain; }
+        if id == "subagent" { return Icons.git-fork; }
+        if id == "mcp" { return Icons.cable; }
+        if id == "skill" { return Icons.sparkles; }
+        if id == "command" { return Icons.square-terminal; }
+        if id == "hook" { return Icons.anchor; }
+        if id == "projects" { return Icons.folders; }
+        if id == "archive" { return Icons.archive; }
+        if id == "import" { return Icons.download; }
+        Icons.settings-2
+    }
+}
+
 component NavButton inherits Rectangle {
     in property <string> id;
     in property <bool> rail;
@@ -41,17 +64,11 @@ component NavButton inherits Rectangle {
         padding-right: root.rail ? 0px : 10px;
         spacing: 10px;
         alignment: root.rail ? LayoutAlignment.center : LayoutAlignment.start;
-        Text {
-            min-width: 20px;
-            text: Labels.nav-icon(root.id);
-            // The UI font lacks most of these glyphs (tofu / colour emoji); Segoe UI Symbol has monochrome ones.
-            font-family: "Segoe UI Symbol";
-            font-size: 16px;
-            color: root.active ? Theme.accent-fg : Theme.icon-subtlest;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-            accessible-role: none;
-            animate color { duration: Theme.dur-hover; }
+        Icon {
+            source: NavIcons.of(root.id);
+            size: 18px;
+            tint: root.active ? Theme.accent-fg : Theme.icon-subtlest;
+            animate tint { duration: Theme.dur-hover; }
         }
         if !root.rail: Text {
             text: Labels.nav-label(root.id);

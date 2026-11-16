@@ -9,13 +9,16 @@ use harness_core_api::{
     AgentId, ApiError, ApiResult, ErrorClass, EventKind, PauseReason, PermissionDecision,
     PermissionOption, PermissionOptionKind, PermissionRequestId, PermissionRequestView, QuotaState,
     SendAccepted, SendMessage, SessionDetail, SwitchReason, ToolCallStatus, ToolCallView,
-    TurnAttempt, TurnId, TurnOutcome, TurnStatus, TurnView,
+    ToolContent, TurnAttempt, TurnId, TurnOutcome, TurnStatus, TurnView,
 };
 use serde_json::{json, Value};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::acp::{AcpConnection, Inbound, RouteSink, RpcError};
-use crate::catchup::{catchup_block, partial_block, seed_block, ContextTurn};
+use crate::catchup::{
+    catchup_block, clip_head_tail, partial_block, seed_block, ContextTurn, ToolDigest,
+    TOOL_OUTPUT_CHARS,
+};
 use crate::hub::HubCtx;
 use crate::memory::{injection_block, MemoryTarget};
 use crate::options::{PrefChange, Prefs};
@@ -462,6 +465,7 @@ impl SessionActor {
             user_text: turn.user_text.clone(),
             position: ahead,
             background: false,
+            images: harness_core_api::ContextItem::image_paths(&turn.context),
         });
         self.turns.push(turn);
         self.touch().await;
@@ -905,6 +909,7 @@ impl SessionActor {
             return Vec::new();
         };
         let seq = turn.seq;
+        let tools = tool_digests(&turn.tool_calls);
         let mut blocks = Vec::new();
         let earlier = |include: &dyn Fn(&TurnView) -> bool| -> Vec<ContextTurn> {
             self.turns
@@ -918,11 +923,17 @@ impl SessionActor {
                         .map_or_else(String::new, |a| self.ctx.display_name(a)),
                     user: queue::user_with_steers(t),
                     assistant: t.assistant_text.clone(),
+                    tools: tool_digests(&t.tool_calls),
                 })
                 .collect()
         };
+        let mut notes_pushed = false;
         if fresh {
             blocks.push(text_block(&self.memory_block().await));
+            if let Some(notes) = self.notes_block().await {
+                blocks.push(text_block(&notes));
+                notes_pushed = true;
+            }
             if let Some(seed) = seed_block(&earlier(&|_| true)) {
                 blocks.push(text_block(&seed));
             }
@@ -930,18 +941,28 @@ impl SessionActor {
             t.seq > previous_seq && t.agent.as_ref() != Some(agent)
         })) {
             blocks.push(text_block(&catchup));
+            if let Some(notes) = self.notes_block().await {
+                blocks.push(text_block(&notes));
+                notes_pushed = true;
+            }
         }
+        let mut failed_over = false;
         for attempt in turn
             .attempts
             .iter()
             .filter(|a| a.status == "quotaExhausted")
         {
-            let tools: Vec<String> = turn.tool_calls.iter().map(|t| t.title.clone()).collect();
+            failed_over = true;
             blocks.push(text_block(&partial_block(
                 &self.ctx.display_name(&attempt.agent),
                 &attempt.partial_text,
                 &tools,
             )));
+        }
+        if failed_over && !notes_pushed {
+            if let Some(notes) = self.notes_block().await {
+                blocks.push(text_block(&notes));
+            }
         }
         blocks.extend(
             crate::context::blocks(
@@ -980,6 +1001,15 @@ impl SessionActor {
         })
         .await
         .unwrap_or_default()
+    }
+
+    async fn notes_block(&self) -> Option<String> {
+        let home = self.ctx.config.home.clone();
+        let session = self.row.id.as_str().to_owned();
+        tokio::task::spawn_blocking(move || crate::session_notes::block(&home, &session))
+            .await
+            .ok()
+            .filter(|block| !block.is_empty())
     }
 
     // ---- agent traffic ----------------------------------------------------------------------------
@@ -1908,6 +1938,41 @@ async fn apply_prefs(
 
 fn text_block(text: &str) -> Value {
     json!({"type": "text", "text": text})
+}
+
+/// What the agent already saw of a tool call: its text content, or the raw output as fallback.
+///
+/// The output is clipped here, before it is kept in a `ContextTurn`: a tool result can be well over a
+/// megabyte and `prompt_blocks` builds one digest per call of every turn, so keeping the full text would
+/// copy it repeatedly only for [`render_tools`](crate::catchup::render_tools) to cut it again.
+fn tool_digests(calls: &[ToolCallView]) -> Vec<ToolDigest> {
+    calls
+        .iter()
+        .map(|call| ToolDigest {
+            title: call.title.clone(),
+            input: call.raw_input.clone().unwrap_or_default(),
+            output: clip_head_tail(&tool_output(call), TOOL_OUTPUT_CHARS),
+        })
+        .collect()
+}
+
+fn tool_output(call: &ToolCallView) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for item in &call.content {
+        match item {
+            ToolContent::Text { text } => parts.push(text.clone()),
+            ToolContent::Diff { path, new_text, .. } => {
+                parts.push(format!("(diff {path}, {} lines)", new_text.lines().count()));
+            }
+            ToolContent::Terminal { terminal_id } => {
+                parts.push(format!("(terminal {terminal_id})"));
+            }
+        }
+    }
+    if parts.is_empty() {
+        return call.raw_output.clone().unwrap_or_default();
+    }
+    parts.join("\n")
 }
 
 fn tool_view(value: &Value) -> ToolCallView {

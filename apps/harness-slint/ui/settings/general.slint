@@ -657,6 +657,27 @@ export component AppearancePage inherits VerticalLayout {
         SettingRow {
             stacked: root.stacked;
             pad-y: 10px;
+            title: @tr("Interface font");
+            description: @tr("Typeface for chat, sidebar and settings.");
+            Select {
+                fit: true;
+                property <string> value: SettingsUi.get-string("appearance.uiFont", SettingsUi.rev);
+                label: @tr("Interface font");
+                options: [
+                    { id: "jakarta", label: "Plus Jakarta Sans" },
+                    { id: "inter", label: "Inter" },
+                    { id: "system", label: @tr("System default") },
+                ];
+                current: self.value;
+                current-label: self.value == "inter" ? "Inter" : self.value == "system" ? @tr("System default") : "Plus Jakarta Sans";
+                select(id) => {
+                    SettingsUi.set-string("appearance.uiFont", id);
+                }
+            }
+        }
+        SettingRow {
+            stacked: root.stacked;
+            pad-y: 10px;
             title: @tr("Font size");
             description: @tr("Base size for chat, sidebar and settings.");
             SegmentedControl {

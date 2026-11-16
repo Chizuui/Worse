@@ -482,8 +482,9 @@ impl State {
         if slint::select_bundled_translation(bundle).is_err() {
             self.status("language unavailable", true);
         }
-        self.window
-            .set_ui_font_family(crate::bridge::ui_font_family(bundle == "zh_CN").into());
+        self.window.set_ui_font_family(
+            crate::bridge::ui_font_family(bundle == "zh_CN", &settings.appearance.ui_font).into(),
+        );
         self.window
             .global::<crate::ui::ChatUi>()
             .set_auto_compact(settings.general.auto_compact);
@@ -1756,7 +1757,7 @@ pub fn install(
 const BUILTIN_MCP: [(&str, &str); 3] = [
     (
         "harness-memory",
-        "Global and project memory (MEMORY.md) for every session",
+        "Global and project memory (MEMORY.md) and the working notes of each session",
     ),
     (
         "harness-delegate",

@@ -58,6 +58,9 @@ function el(tag, cls, text) {
 
 class Unauthorized extends Error {}
 
+import { initSessions, renderSessions } from '/assets/sessions.js';
+import { initSettings, showSettings } from '/assets/settings.js';
+
 const BACKOFF_MIN = 500;
 const BACKOFF_MAX = 15000;
 const BUSY = new Set(['running', 'paused']);
@@ -65,6 +68,7 @@ const BUSY = new Set(['running', 'paused']);
 const state = {
   authed: false,
   agents: new Map(),
+  fallbackOrder: [],
   sessions: [],
   view: 'pair',
   sessionId: null,
@@ -273,7 +277,7 @@ async function afterPaired() {
 
 /* ---------- views / routing ---------- */
 
-const VIEWS = { pair: '#view-pair', list: '#view-list', session: '#view-session' };
+const VIEWS = { pair: '#view-pair', list: '#view-list', session: '#view-session', settings: '#view-settings' };
 
 function show(name) {
   state.view = name;
@@ -290,8 +294,13 @@ async function route() {
     return;
   }
   const hit = /^#\/s\/(.+)$/.exec(location.hash);
+  const settings = /^#\/settings(?:\/([a-z-]+))?$/.exec(location.hash);
   if (hit) {
     await openSession(decodeURIComponent(hit[1]));
+  } else if (settings) {
+    leaveSession();
+    show('settings');
+    showSettings(settings[1] || '');
   } else {
     leaveSession();
     await loadList();
@@ -310,15 +319,20 @@ function leaveSession() {
 
 /* ---------- sessions list ---------- */
 
+let listStatus = '';
+
 function setListStatus(text) {
-  const node = $('#list-status');
-  node.textContent = text || '';
-  node.hidden = !text;
+  listStatus = text || '';
+  renderList();
 }
 
 async function loadAgents() {
-  const agents = await rpcSoft('list_agents', {}, null);
+  const [agents, order] = await Promise.all([
+    rpcSoft('list_agents', {}, null),
+    rpcSoft('get_fallback_order', {}, null),
+  ]);
   if (Array.isArray(agents)) state.agents = new Map(agents.map((a) => [a.id, a]));
+  if (Array.isArray(order)) state.fallbackOrder = order;
 }
 
 async function loadList() {
@@ -328,8 +342,8 @@ async function loadList() {
     const [sessions] = await Promise.all([rpc('list_sessions', {}), loadAgents()]);
     state.sessions = (Array.isArray(sessions) ? sessions : []).filter((s) => !s.parentId);
     state.sessions.sort((a, b) => (b.pinned - a.pinned) || (b.updatedAt || 0) - (a.updatedAt || 0));
+    state.remote = (await getStatus()) || state.remote;
     setListStatus('');
-    renderList();
   } catch (err) {
     if (err instanceof Unauthorized) return;
     setListStatus('Could not load sessions: ' + err.message);
@@ -337,28 +351,52 @@ async function loadList() {
 }
 
 function renderList() {
-  const list = $('#list');
-  list.textContent = '';
-  $('#list-empty').hidden = state.sessions.length > 0;
-  for (const s of state.sessions) {
-    const li = el('li');
-    const link = el('a');
-    link.href = sessionHash(s.id);
-    const row1 = el('div', 'row1');
-    row1.appendChild(el('span', 'name', s.title || baseName(s.workspacePath) || 'Untitled'));
-    if (s.unread) row1.appendChild(el('span', 'chip unread', 'new'));
-    if (s.pinned) row1.appendChild(el('span', 'chip', 'pinned'));
-    link.appendChild(row1);
-    const meta = el('div', 'meta');
-    meta.appendChild(el('span', '', agentName(s.activeAgent)));
-    const folder = baseName(s.workspacePath);
-    if (folder) meta.appendChild(el('span', '', folder));
-    meta.appendChild(el('span', '', (s.turnCount || 0) + (s.turnCount === 1 ? ' turn' : ' turns')));
-    meta.appendChild(el('span', '', fmtWhen(s.updatedAt)));
-    link.appendChild(meta);
-    li.appendChild(link);
-    list.appendChild(li);
-  }
+  renderSessions({
+    sessions: state.sessions,
+    statusText: listStatus,
+    live: wsLive(),
+    remote: state.remote || null,
+  });
+}
+
+function agentTone(id) {
+  const key = String(id || '').toLowerCase();
+  if (key.includes('claude')) return 'claude';
+  if (key.includes('deepseek')) return 'deepseek';
+  if (key.includes('codex') || key.includes('gpt')) return 'codex';
+  if (key.includes('agy') || key.includes('antigravity') || key.includes('gemini')) return 'agy';
+  return '';
+}
+
+async function createSession(params) {
+  const created = await rpc('create_session', params || {});
+  const id = created && (created.id || (created.summary && created.summary.id));
+  if (id) location.hash = sessionHash(id);
+  return created;
+}
+
+function viewApi() {
+  return {
+    el,
+    rpc,
+    rpcSoft,
+    getStatus,
+    toast,
+    agentName,
+    agents: () => state.agents,
+    fmtWhen,
+    baseName,
+    sessionHash,
+    reload: () => loadList().catch(() => undefined),
+    createSession,
+    openSettings: (page) => {
+      location.hash = page ? '#/settings/' + page : '#/settings';
+    },
+    closeSettings: () => {
+      history.replaceState(null, '', '/');
+      route().catch(() => undefined);
+    },
+  };
 }
 
 let listTimer = 0;
@@ -761,6 +799,7 @@ function renderHeader() {
   const s = state.summary;
   $('#s-title').textContent = (s && (s.title || baseName(s.workspacePath))) || 'Session';
   $('#s-agent').textContent = agentName(s && s.activeAgent);
+  $('#s-agent').parentElement.dataset.agent = agentTone(s && s.activeAgent);
   $('#back').setAttribute('aria-label', state.stack.length ? 'Back to parent session' : 'Back to sessions');
 }
 
@@ -925,13 +964,9 @@ function openChild(childId) {
 /* ---------- mode / model ---------- */
 
 function fillPicker(select, data) {
-  const wrap = select.closest('.pick');
   select.textContent = '';
   const items = data && Array.isArray(data.available) ? data.available : [];
-  if (!items.length) {
-    wrap.hidden = true;
-    return false;
-  }
+  if (!items.length) return false;
   for (const item of items) {
     const opt = el('option', null, item.name || item.id);
     opt.value = item.id;
@@ -939,31 +974,233 @@ function fillPicker(select, data) {
     select.appendChild(opt);
   }
   select.value = data.current || '';
-  wrap.hidden = false;
+  if (select.selectedIndex < 0 && select.options.length) select.selectedIndex = 0;
   return true;
 }
 
+function selectedName(select) {
+  const opt = select.options[select.selectedIndex];
+  return opt ? opt.textContent : '';
+}
+
+function syncChip() {
+  const model = selectedName($('#model-sel'));
+  const effort = selectedName($('#effort-sel'));
+  const mode = selectedName($('#mode-sel'));
+  const effortNode = $('#chip-effort');
+  $('#chip-model').textContent = model || mode || agentName(state.summary && state.summary.activeAgent);
+  effortNode.textContent = model || mode ? effort : '';
+  effortNode.hidden = !effortNode.textContent;
+  $('#model-chip').title = [model, effort, mode].filter(Boolean).join(' · ');
+}
+
+const SHEET_TITLES = { mode: 'Mode', model: 'Select model', effort: 'Effort' };
+const ICON_CLOSE = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>';
+const ICON_BACK = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>';
+const ICON_CHEVRON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>';
+let sheetView = 'main';
+
+function closeSheet() {
+  $('#sheet').hidden = true;
+}
+
+function pickValue(select, value) {
+  if (select.value === value) return;
+  select.value = value;
+  syncChip();
+  select.dispatchEvent(new Event('change'));
+}
+
+function optionCard(select, onPick) {
+  const card = el('div', 'sheet-card');
+  card.setAttribute('role', 'listbox');
+  for (const opt of select.options) {
+    const row = el('button', 'sheet-row' + (opt.selected ? ' on' : ''));
+    row.type = 'button';
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', opt.selected ? 'true' : 'false');
+    const text = el('span', 'sheet-text');
+    text.appendChild(el('span', 'sheet-name', opt.textContent));
+    if (opt.title) text.appendChild(el('span', 'sheet-desc', opt.title));
+    row.appendChild(text);
+    row.appendChild(el('span', 'sheet-check', opt.selected ? '✓' : ''));
+    row.addEventListener('click', () => {
+      pickValue(select, opt.value);
+      onPick();
+    });
+    card.appendChild(row);
+  }
+  return card;
+}
+
+function navCard(kind) {
+  const select = $('#' + kind + '-sel');
+  const row = el('button', 'sheet-card sheet-link');
+  row.type = 'button';
+  row.appendChild(el('span', 'sheet-link-label', SHEET_TITLES[kind]));
+  row.appendChild(el('span', 'sheet-link-value', selectedName(select)));
+  const chev = el('span', 'sheet-link-chev');
+  chev.innerHTML = ICON_CHEVRON;
+  row.appendChild(chev);
+  row.addEventListener('click', () => openSheet(kind));
+  return row;
+}
+
+function agentChoices() {
+  const usable = (a) => !a.availability || a.availability.state === 'available';
+  const ordered = [];
+  for (const id of state.fallbackOrder) {
+    const hit = state.agents.get(id);
+    if (hit && usable(hit)) ordered.push(hit);
+  }
+  for (const agent of state.agents.values()) {
+    if (usable(agent) && !ordered.includes(agent)) ordered.push(agent);
+  }
+  return ordered;
+}
+
+function agentCard() {
+  const current = state.summary && state.summary.activeAgent;
+  const card = el('div', 'sheet-card');
+  card.setAttribute('role', 'listbox');
+  agentChoices().forEach((agent, index) => {
+    const on = agent.id === current;
+    const row = el('button', 'sheet-row' + (on ? ' on' : ''));
+    row.type = 'button';
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', on ? 'true' : 'false');
+    const text = el('span', 'sheet-text');
+    text.appendChild(el('span', 'sheet-name', agent.displayName || agent.id));
+    row.appendChild(text);
+    row.appendChild(el('span', 'sheet-badge', on ? 'Active' : 'Fallback #' + (index + 1)));
+    row.appendChild(el('span', 'sheet-check', on ? '✓' : ''));
+    row.addEventListener('click', () => {
+      closeSheet();
+      if (!on) switchAgent(agent.id);
+    });
+    card.appendChild(row);
+  });
+  return card;
+}
+
+async function switchAgent(agentId) {
+  const id = state.sessionId;
+  if (!id) return;
+  try {
+    await rpc('set_active_agent', { sessionId: id, agent: agentId });
+    if (state.sessionId !== id) return;
+    if (state.summary) state.summary.activeAgent = agentId;
+    renderHeader();
+    loadPickers();
+  } catch (err) {
+    if (!(err instanceof Unauthorized)) toast('Could not switch agent: ' + err.message);
+  }
+}
+
+function agentLink() {
+  const row = el('button', 'sheet-card sheet-link');
+  row.type = 'button';
+  row.appendChild(el('span', 'sheet-link-label', 'Agent'));
+  row.appendChild(el('span', 'sheet-link-value', agentName(state.summary && state.summary.activeAgent)));
+  const chev = el('span', 'sheet-link-chev');
+  chev.innerHTML = ICON_CHEVRON;
+  row.appendChild(chev);
+  row.addEventListener('click', () => openSheet('agent'));
+  return row;
+}
+
+function sheetUsable(kind) {
+  if (kind === 'agent') return agentChoices().length > 1;
+  const select = $('#' + kind + '-sel');
+  return Boolean(select && select.options.length);
+}
+
+function openSheet(view) {
+  sheetView = view || 'main';
+  const list = $('#sheet-list');
+  const nav = $('#sheet-nav');
+  list.textContent = '';
+  if (sheetView === 'main') {
+    const hasModel = sheetUsable('model');
+    $('#sheet-title').textContent = hasModel ? SHEET_TITLES.model : 'Options';
+    nav.innerHTML = ICON_CLOSE;
+    nav.setAttribute('aria-label', 'Close');
+    if (hasModel) list.appendChild(optionCard($('#model-sel'), closeSheet));
+    for (const kind of ['effort', 'mode']) {
+      if (sheetUsable(kind)) list.appendChild(navCard(kind));
+    }
+    if (sheetUsable('agent')) list.appendChild(agentLink());
+    if (!list.childNodes.length) return;
+  } else if (sheetView === 'agent') {
+    if (!sheetUsable('agent')) {
+      openSheet('main');
+      return;
+    }
+    $('#sheet-title').textContent = 'Agent';
+    nav.innerHTML = ICON_BACK;
+    nav.setAttribute('aria-label', 'Back');
+    list.appendChild(agentCard());
+  } else {
+    if (!sheetUsable(sheetView)) {
+      openSheet('main');
+      return;
+    }
+    $('#sheet-title').textContent = SHEET_TITLES[sheetView];
+    nav.innerHTML = ICON_BACK;
+    nav.setAttribute('aria-label', 'Back');
+    list.appendChild(optionCard($('#' + sheetView + '-sel'), () => openSheet('main')));
+  }
+  $('#sheet').hidden = false;
+}
+
+function findOption(options, id, categories) {
+  const list = options && Array.isArray(options.options) ? options.options : [];
+  const usable = (o) => Array.isArray(o.values) && o.values.length;
+  return list.find((o) => o.id === id && usable(o))
+    || list.find((o) => categories.includes(o.category) && usable(o))
+    || null;
+}
+
+function optionList(option) {
+  if (!option) return null;
+  return {
+    current: option.current || '',
+    available: option.values.map((v) => ({ id: v.value, name: v.name, description: v.description })),
+  };
+}
+
 let pickerToken = 0;
+const configIds = { model: null, effort: null };
 async function loadPickers() {
   const id = state.sessionId;
   if (!id) return;
   const token = ++pickerToken;
-  const [modes, models] = await Promise.all([
+  const [modes, models, config] = await Promise.all([
     rpcSoft('list_modes', { sessionId: id }, null),
     rpcSoft('list_models', { sessionId: id }, null),
-  ]).catch(() => [null, null]);
+    rpcSoft('list_config_options', { sessionId: id }, null),
+  ]).catch(() => [null, null, null]);
   if (token !== pickerToken || state.sessionId !== id) return;
+  const hasModels = Boolean(models && Array.isArray(models.available) && models.available.length);
+  const modelOption = hasModels ? null : findOption(config, 'model', ['model']);
+  const effortOption = findOption(config, 'effort', ['thought_level', 'effort']);
+  configIds.model = modelOption ? modelOption.id : null;
+  configIds.effort = effortOption ? effortOption.id : null;
   const a = fillPicker($('#mode-sel'), modes);
-  const b = fillPicker($('#model-sel'), models);
-  $('#pickers').hidden = !(a || b);
+  const b = fillPicker($('#model-sel'), hasModels ? models : optionList(modelOption));
+  const c = fillPicker($('#effort-sel'), optionList(effortOption));
+  syncChip();
+  $('#pickers').hidden = !(a || b || c || sheetUsable('agent'));
 }
 
 async function changeOption(kind, value) {
   if (!value || !state.sessionId) return;
-  const sel = kind === 'mode' ? $('#mode-sel') : $('#model-sel');
+  const sel = $('#' + kind + '-sel');
   sel.disabled = true;
   try {
+    const configId = configIds[kind];
     if (kind === 'mode') await rpc('set_mode', { sessionId: state.sessionId, modeId: value });
+    else if (configId) await rpc('set_config_option', { sessionId: state.sessionId, configId, value });
     else await rpc('set_model', { sessionId: state.sessionId, modelId: value });
   } catch (err) {
     if (!(err instanceof Unauthorized)) toast('Could not change ' + kind + ': ' + err.message);
@@ -1498,7 +1735,6 @@ function bindUi() {
       loadList().catch(() => undefined);
     }
   });
-  $('#reload').addEventListener('click', () => loadList().catch(() => undefined));
   $('#refresh').addEventListener('click', () => {
     if (state.sessionId) openSession(state.sessionId);
   });
@@ -1542,6 +1778,10 @@ function bindUi() {
   $('#stop').addEventListener('click', stopTurn);
   $('#mode-sel').addEventListener('change', (event) => changeOption('mode', event.target.value));
   $('#model-sel').addEventListener('change', (event) => changeOption('model', event.target.value));
+  $('#effort-sel').addEventListener('change', (event) => changeOption('effort', event.target.value));
+  $('#model-chip').addEventListener('click', () => openSheet('main'));
+  $('#sheet-nav').addEventListener('click', () => (sheetView === 'main' ? closeSheet() : openSheet('main')));
+  $('#sheet').querySelector('.sheet-backdrop').addEventListener('click', closeSheet);
   window.addEventListener('hashchange', () => {
     if (!navigating) state.stack = [];
     navigating = false;
@@ -1566,6 +1806,8 @@ function bindUi() {
 }
 
 async function boot() {
+  initSessions($('#view-list'), viewApi());
+  initSettings($('#view-settings'), viewApi());
   bindUi();
   setOffline(false);
   const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));

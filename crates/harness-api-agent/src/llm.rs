@@ -353,7 +353,7 @@ pub fn strip_reasoning(messages: &[Value]) -> Vec<Value> {
 }
 
 /// The text of a message's `content` (string, or the text parts of an array).
-fn content_text(content: Option<&Value>) -> Option<String> {
+pub fn content_text(content: Option<&Value>) -> Option<String> {
     match content? {
         Value::String(text) => Some(text.clone()),
         Value::Array(parts) => Some(
@@ -365,6 +365,97 @@ fn content_text(content: Option<&Value>) -> Option<String> {
         ),
         _ => None,
     }
+}
+
+const IMAGE_NOTE: &str = "[image attached, but this model cannot view images; say so instead of guessing its content]";
+const IMAGE_GONE: &str = "[earlier image removed from context]";
+const IMAGE_COST: usize = 1500;
+
+/// An OpenAI-style image part from base64 data.
+pub fn image_part(mime: &str, data: &str) -> Value {
+    json!({"type": "image_url", "image_url": {"url": format!("data:{mime};base64,{data}")}})
+}
+
+fn is_image(part: &Value) -> bool {
+    part.get("type").and_then(Value::as_str) == Some("image_url")
+}
+
+fn image_parts(message: &Value) -> impl Iterator<Item = &Value> {
+    message
+        .get("content")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|p| is_image(p))
+}
+
+pub fn has_images(messages: &[Value]) -> bool {
+    messages.iter().any(|m| image_parts(m).next().is_some())
+}
+
+/// Serialized size of a message for the history budget; an image counts as a small fixed cost.
+pub fn message_size(message: &Value) -> usize {
+    let data: usize = image_parts(message)
+        .map(|p| p["image_url"]["url"].as_str().map_or(0, str::len))
+        .sum();
+    let count = image_parts(message).count();
+    message.to_string().len().saturating_sub(data) + count * IMAGE_COST
+}
+
+fn replace_images(message: &mut Value, note: &str) {
+    let Some(parts) = message.get_mut("content").and_then(Value::as_array_mut) else {
+        return;
+    };
+    if !parts.iter().any(is_image) {
+        return;
+    }
+    let text = parts
+        .iter()
+        .map(|p| {
+            if is_image(p) {
+                note.to_owned()
+            } else {
+                p.get("text").and_then(Value::as_str).unwrap_or_default().to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    message["content"] = json!(text);
+}
+
+/// `messages` with every image replaced by a text note (for models that reject image input).
+pub fn strip_images(messages: &[Value]) -> Vec<Value> {
+    messages
+        .iter()
+        .map(|m| {
+            let mut m = m.clone();
+            replace_images(&mut m, IMAGE_NOTE);
+            m
+        })
+        .collect()
+}
+
+/// Keeps images only in the newest messages that carry them, up to `keep` images.
+pub fn prune_images(messages: &mut [Value], keep: usize) {
+    let mut seen = 0;
+    for message in messages.iter_mut().rev() {
+        let count = image_parts(message).count();
+        if count == 0 {
+            continue;
+        }
+        if seen >= keep {
+            replace_images(message, IMAGE_GONE);
+        }
+        seen += count;
+    }
+}
+
+fn image_rejection(status: u16, body: &str) -> bool {
+    if !matches!(status, 400 | 404 | 415 | 422) {
+        return false;
+    }
+    let body = body.to_ascii_lowercase();
+    ["image", "vision", "modal"].iter().any(|w| body.contains(w))
 }
 
 /// One text part carrying an Anthropic-compatible cache breakpoint.
@@ -433,6 +524,8 @@ pub async fn complete(
     // are dropped the same way (older reasoners reject `reasoning_content` in the input).
     let mut marked = agent.cache_control() && provider.prompt_cache;
     let mut echoing = agent.echo_reasoning();
+    let pictured = has_images(messages);
+    let mut seeing = agent.vision();
     let mut sends = 0_u8;
     let response = loop {
         sends += 1;
@@ -441,6 +534,11 @@ pub async fn complete(
             strip_reasoning(messages)
         } else {
             messages.to_vec()
+        };
+        let base = if pictured && !seeing {
+            strip_images(&base)
+        } else {
+            base
         };
         let payload = if marked {
             with_cache_breakpoints(&base)
@@ -452,7 +550,13 @@ pub async fn complete(
             Sent::Cancelled => {
                 return Ok(Completion { cancelled: true, ..Completion::default() })
             }
-            Sent::Status(400, _, _) if sends < 3 && (marked || (echoing && echoed)) => {
+            Sent::Status(status, _, ref text)
+                if pictured && seeing && sends < 5 && image_rejection(status, text) =>
+            {
+                agent.disable_vision();
+                seeing = false;
+            }
+            Sent::Status(400, _, _) if sends < 4 && (marked || (echoing && echoed)) => {
                 if marked {
                     agent.disable_cache_control();
                     marked = false;
@@ -460,6 +564,10 @@ pub async fn complete(
                     agent.disable_echo_reasoning();
                     echoing = false;
                 }
+            }
+            Sent::Status(400 | 415 | 422, _, _) if pictured && seeing && sends < 5 => {
+                agent.disable_vision();
+                seeing = false;
             }
             Sent::Status(status, after, text) => {
                 return Err(status_error(agent, status, after, &text))
@@ -608,5 +716,38 @@ mod tests {
         );
         assert_eq!(cache_tokens(&json!({"prompt_tokens": 3})), (0, 0));
     }
-}
 
+    #[test]
+    fn images_strip_to_plain_text() {
+        let m = vec![json!({"role": "user", "content": [
+            {"type": "text", "text": "look"}, image_part("image/png", "AAAA")]})];
+        assert!(has_images(&m));
+        let out = strip_images(&m);
+        assert!(!has_images(&out));
+        assert!(out[0]["content"].as_str().is_some_and(|c| c.starts_with("look") && c.contains("cannot view")));
+        assert!(has_images(&m));
+    }
+
+    #[test]
+    fn prune_keeps_newest_images() {
+        let img = |t: &str| json!({"role": "user", "content": [{"type": "text", "text": t}, image_part("image/png", "AAAA")]});
+        let mut m = vec![img("a"), img("b"), img("c")];
+        prune_images(&mut m, 2);
+        assert!(m[0]["content"].is_string());
+        assert!(m[1]["content"].is_array() && m[2]["content"].is_array());
+    }
+
+    #[test]
+    fn image_size_is_fixed_cost() {
+        let big = "A".repeat(500_000);
+        let m = json!({"role": "user", "content": [image_part("image/png", &big)]});
+        assert!(message_size(&m) < 5_000);
+    }
+
+    #[test]
+    fn rejection_needs_image_hint() {
+        assert!(image_rejection(400, "unknown variant `image_url`, expected `text`"));
+        assert!(!image_rejection(400, "cache_control is not supported"));
+        assert!(!image_rejection(500, "image"));
+    }
+}

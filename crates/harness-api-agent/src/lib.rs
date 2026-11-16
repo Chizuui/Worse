@@ -104,6 +104,7 @@ pub(crate) struct Agent {
     echo_reasoning: AtomicBool,
     /// Provider accepts `cache_control` breakpoints; cleared once one rejects them (HTTP 400).
     cache_control: AtomicBool,
+    vision: AtomicBool,
     /// Resolved system-prompt placement: 0 = not probed yet, 1 = `system` role, 2 = first user message.
     system_mode: std::sync::atomic::AtomicU8,
     /// Serializes the one-time probe so parallel sessions don't each send one.
@@ -167,6 +168,7 @@ async fn serve() -> std::process::ExitCode {
         async_tasks: AtomicBool::new(false),
         echo_reasoning: AtomicBool::new(true),
         cache_control: AtomicBool::new(true),
+        vision: AtomicBool::new(true),
         system_mode: std::sync::atomic::AtomicU8::new(0),
         system_probe: tokio::sync::Mutex::new(()),
     });
@@ -292,6 +294,14 @@ impl Agent {
         self.cache_control.store(false, Ordering::SeqCst);
     }
 
+    pub fn vision(&self) -> bool {
+        self.vision.load(Ordering::SeqCst)
+    }
+
+    pub fn disable_vision(&self) {
+        self.vision.store(false, Ordering::SeqCst);
+    }
+
     /// Whether the system prompt must go into the first user message (the provider ignores `system`).
     /// Probes the provider once per process (and remembers the answer in the state dir) when `auto`.
     pub async fn system_as_user(&self) -> bool {
@@ -382,7 +392,7 @@ impl Agent {
                 "protocolVersion": 1,
                 "agentCapabilities": {
                     "loadSession": true,
-                    "promptCapabilities": {"image": false, "audio": false, "embeddedContext": true},
+                    "promptCapabilities": {"image": true, "audio": false, "embeddedContext": true},
                     "mcpCapabilities": {"http": false, "sse": false}
                 },
                 "authMethods": [],
@@ -493,7 +503,7 @@ impl Agent {
         let Some(session) = self.session(&id) else {
             return Err(json!({"code": -32002, "message": format!("session {id} not found")}));
         };
-        let user = session::prompt_text(params.get("prompt"));
+        let user = session::prompt_content(params.get("prompt"));
         let token = CancellationToken::new();
         if let Ok(mut map) = self.cancels.lock() {
             map.insert(id.clone(), token.clone());

@@ -41,6 +41,7 @@ mod providers;
 pub mod quota;
 mod schedule;
 mod session;
+pub(crate) mod session_notes;
 pub mod setup;
 mod snapshot;
 pub mod store;
