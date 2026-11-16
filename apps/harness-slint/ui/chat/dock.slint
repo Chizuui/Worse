@@ -402,14 +402,22 @@ export component PickerMenu inherits HorizontalLayout {
     }
     if DockUi.picker-open == "model": MenuShell {
         width: 260px;
-        for o[i] in DockUi.models: OptionItem {
-            text: o.name;
-            hint: (i + 1) + "";
-            label: "model-option " + o.name;
-            checked: o.id == DockUi.model;
-            clicked => {
-                DockUi.pick-option("model", o.id);
-                DockUi.picker-open = "";
+        Flickable {
+            height: min(DockUi.models.length * 34px, 340px);
+            content-height: DockUi.models.length * 34px;
+            VerticalLayout {
+                width: parent.width;
+                spacing: 2px;
+                for o[i] in DockUi.models: OptionItem {
+                    text: o.name;
+                    hint: (i + 1) + "";
+                    label: "model-option " + o.name;
+                    checked: o.id == DockUi.model;
+                    clicked => {
+                        DockUi.pick-option("model", o.id);
+                        DockUi.picker-open = "";
+                    }
+                }
             }
         }
         if DockUi.efforts.length > 0: MenuRule { }

@@ -7,6 +7,7 @@ import { Icon, Icons, Button, IconButton, Divider, Dialog, Spinner } from "../co
 import { AgentsUi, AgentCard } from "globals.slint";
 import { Select, TextField, Switch } from "parts.slint";
 import { SetupUi } from "../setup.slint";
+import { AgentLogo, AgentMark } from "../components/agent_logo.slint";
 
 export struct FallbackRow {
     id: string,
@@ -254,6 +255,8 @@ component Glyph inherits Rectangle {
 }
 
 component Tile inherits Rectangle {
+    in property <string> logo;
+    in property <bool> dim;
     in property <string> initial;
     in property <color> tone;
     in property <color> ink: #FFFFFF;
@@ -262,9 +265,14 @@ component Tile inherits Rectangle {
     width: root.size;
     height: root.size;
     border-radius: 8px;
-    background: root.tone;
+    background: root.logo != "" ? transparent : root.tone;
     accessible-role: none;
-    Text {
+    if root.logo != "": AgentMark {
+        name: root.logo;
+        size: root.size;
+        opacity: root.dim ? 0.4 : 1;
+    }
+    if root.logo == "": Text {
         text: root.initial;
         font-size: root.font;
         font-weight: Theme.weight-semibold;
@@ -378,6 +386,7 @@ component AgentCardView inherits Rectangle {
             VerticalLayout {
                 alignment: center;
                 Tile {
+                    logo: AgentLogo.key(root.card.id) != "" ? AgentLogo.key(root.card.id) : AgentLogo.key(root.card.name);
                     initial: AgentsLook.initial-of(root.card.id);
                     tone: AgentsLook.color-of(root.card.id);
                     ink: AgentsLook.ink-of(root.card.id);
@@ -1305,6 +1314,7 @@ export component AgentsPage inherits VerticalLayout {
                             Tile {
                                 size: 26px;
                                 font: 10.9px;
+                                logo: AgentLogo.key(p.label);
                                 initial: AgentsLook.provider-initial(p.label);
                                 tone: AgentsLook.provider-color(p.label);
                                 ink: p.label.to-lowercase() == "openai" ? Theme.canvas : #FFFFFF;
@@ -1465,6 +1475,8 @@ export component AgentsPage inherits VerticalLayout {
                                     Tile {
                                         size: 22px;
                                         font: 9.24px;
+                                        logo: AgentLogo.key(a.id);
+                                        dim: a.state != 0;
                                         initial: AgentsLook.initial-of(a.id);
                                         tone: a.state == 0 ? AgentsLook.color-of(a.id) : Theme.border-hover;
                                         ink: a.state == 0 ? AgentsLook.ink-of(a.id) : #FFFFFF;

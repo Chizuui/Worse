@@ -492,6 +492,30 @@ impl FakeCore {
                     items: demo_subagents(session),
                 },
             );
+            let other = "fake-background-session".to_owned();
+            emit(
+                &self.ev,
+                Event::Fleet(vec![
+                    super::FleetSession {
+                        id: session.clone(),
+                        title: s.summary.title.clone(),
+                        prompt: "Split the hub into smaller modules and keep the tests green".into(),
+                        agent: s.sticky.clone(),
+                        running: s.run.is_some(),
+                        open: true,
+                        subagents: demo_subagents(session),
+                    },
+                    super::FleetSession {
+                        id: other.clone(),
+                        title: "Refactor billing module".into(),
+                        prompt: "Move invoice rounding into one helper".into(),
+                        agent: "codex".into(),
+                        running: true,
+                        open: false,
+                        subagents: demo_subagents(&other).into_iter().take(1).collect(),
+                    },
+                ]),
+            );
         }
     }
 

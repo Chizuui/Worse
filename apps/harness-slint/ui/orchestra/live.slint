@@ -1,11 +1,12 @@
-// Orchestra live view (design frame "Orchestra · live", FigCraft): the open session as the Orchestrator node on the
-// left, one node per subagent it delegated to (ChatUi.subagents-active, §9.8) joined by curved edges, a legend chip, zoom
+// Orchestra live view (design frame "Orchestra · live", FigCraft): every running session (plus the open one) as an
+// Orchestrator node, each with one node per active subagent it delegated to (ChatUi.fleet, §9.8) joined by curved edges, a legend chip, zoom
 // control and minimap on a pannable canvas, and a detail panel for the picked subagent (Message / Stop).
 // Not shown until the hub exposes them: claimed paths, token counts, progress %, the full live log and the queue.
 import { Theme } from "../theme/tokens.slint";
 import { Icon, Icons, IconButton } from "../components/controls.slint";
-import { ChatUi, SubagentRow } from "../chat/globals.slint";
+import { ChatUi, SubagentRow, FleetGroup } from "../chat/globals.slint";
 import { AgentTint } from "../panels/common.slint";
+import { AgentLogo, AgentMark } from "../components/agent_logo.slint";
 import { SettingsUi } from "../settings/globals.slint";
 
 export global OrchLiveUi {
@@ -63,10 +64,14 @@ component Avatar inherits Rectangle {
     width: root.size;
     height: root.size;
     border-radius: root.size / 2;
-    background: AgentTint.of(root.agent).with-alpha(0.18);
-    border-width: 1px;
+    background: AgentLogo.key(root.agent) != "" ? transparent : AgentTint.of(root.agent).with-alpha(0.18);
+    border-width: AgentLogo.key(root.agent) != "" ? 0px : 1px;
     border-color: AgentTint.of(root.agent).with-alpha(0.55);
-    Text {
+    if AgentLogo.key(root.agent) != "": AgentMark {
+        name: root.agent;
+        size: root.size;
+    }
+    if AgentLogo.key(root.agent) == "": Text {
         text: LiveStatus.initial(root.agent);
         font-size: root.size * 0.42;
         font-weight: Theme.weight-semibold;
@@ -238,6 +243,200 @@ component SubNode inherits Rectangle {
     }
 }
 
+component SessionGroup inherits Rectangle {
+    in property <FleetGroup> g;
+    in property <string> model-name;
+    in property <int> sel: -1;
+    callback picked(int);
+    callback open-session();
+    property <int> n: root.g.subagents.length;
+    property <length> node-h: 116px;
+    property <length> gap: 28px;
+    property <length> col-h: root.n * root.node-h + max(0, root.n - 1) * root.gap;
+    property <length> top: (root.height - root.col-h) / 2;
+    property <length> orch-y: (root.height - 196px) / 2;
+    property <length> sub-x: 460px;
+    height: root.g.height * 1px;
+    for r[i] in root.g.subagents: Path {
+        property <float> sx: 320;
+        property <float> sy: (root.orch-y + (root.n > 1 ? 40px + i * 116px / (root.n - 1) : 98px)) / 1px;
+        property <float> ex: root.sub-x / 1px;
+        property <float> ey: (root.top + i * (root.node-h + root.gap) + 58px) / 1px;
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        commands: "M " + self.sx + " " + self.sy + " C " + (self.sx + 80) + " " + self.sy + " " + (self.ex - 90) + " " + self.ey + " " + (self.ex - 6) + " " + self.ey;
+        stroke: i == root.sel ? Theme.accent-fg.with-alpha(0.9) : Theme.accent-fg.with-alpha(0.45);
+        stroke-width: i == root.sel ? 1.6px : 1.2px;
+        accessible-role: none;
+    }
+    for r[i] in root.g.subagents: Path {
+        x: root.sub-x - 8px;
+        y: root.top + i * (root.node-h + root.gap) + 58px - 4px;
+        width: 8px;
+        height: 8px;
+        viewbox-width: 8;
+        viewbox-height: 8;
+        commands: "M 0 0 L 8 4 L 0 8 Z";
+        fill: i == root.sel ? Theme.accent-fg : Theme.accent-fg.with-alpha(0.7);
+        accessible-role: none;
+    }
+    for r[i] in root.g.subagents: Rectangle {
+        x: 320px - 3px;
+        y: root.orch-y + (root.n > 1 ? 40px + i * 116px / (root.n - 1) : 98px) - 3px;
+        width: 6px;
+        height: 6px;
+        border-radius: 3px;
+        background: Theme.accent-fg.with-alpha(0.85);
+    }
+    Rectangle {
+        x: 0;
+        y: root.orch-y;
+        width: 320px;
+        height: 196px;
+        border-radius: 10px;
+        background: oa.has-hover ? #15171c : #121317;
+        border-width: root.g.open ? 1.5px : 1px;
+        border-color: root.g.open ? Theme.accent-fg.with-alpha(0.6) : #2A2D33;
+        accessible-role: button;
+        accessible-label: root.g.title;
+        accessible-description: root.g.prompt;
+        accessible-action-default => {
+            root.open-session();
+        }
+        oa := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                root.open-session();
+            }
+        }
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+            HorizontalLayout {
+                spacing: 8px;
+                Avatar {
+                    agent: root.g.agent;
+                    size: 26px;
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 1px;
+                    Text {
+                        text: root.g.title != "" ? root.g.title : @tr("Untitled session");
+                        font-size: 12px;
+                        font-weight: Theme.weight-semibold;
+                        color: Theme.foreground;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: (root.g.open ? @tr("Open") + " · " : "") + @tr("Orchestrator") + " · " + root.g.agent-name + (root.model-name != "" ? " · " + root.model-name : "");
+                        font-size: 10px;
+                        color: root.g.open ? Theme.accent-fg : #6B717C;
+                        overflow: elide;
+                    }
+                }
+                VerticalLayout {
+                    alignment: start;
+                    StatusPill {
+                        status: root.g.running || root.g.active > 0 ? 0 : 2;
+                    }
+                }
+            }
+            Rectangle {
+                vertical-stretch: 1;
+                border-radius: 6px;
+                background: #0E0F12;
+                border-width: 1px;
+                border-color: #1F2227;
+                VerticalLayout {
+                    padding: 8px;
+                    spacing: 4px;
+                    Caps {
+                        text: root.g.running ? @tr("PROCESSING") : @tr("LAST PROMPT");
+                        color: root.g.running ? #3DD68C : #5D636D;
+                    }
+                    Text {
+                        vertical-stretch: 1;
+                        text: root.g.prompt != "" ? root.g.prompt : @tr("No prompt yet");
+                        font-size: 11px;
+                        color: root.g.prompt != "" ? Theme.foreground-subtle : #6B717C;
+                        wrap: word-wrap;
+                        overflow: elide;
+                    }
+                }
+            }
+            HorizontalLayout {
+                Text {
+                    text: @tr("{0} of {1} subagents finished", root.g.total - root.g.active, root.g.total);
+                    font-size: 10px;
+                    color: #6B717C;
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                }
+                Text {
+                    text: @tr("{0} active", root.g.active);
+                    font-size: 10px;
+                    color: #6B717C;
+                }
+            }
+            Rectangle {
+                height: 4px;
+                border-radius: 2px;
+                background: #24272D;
+                Rectangle {
+                    x: 0;
+                    width: root.g.total == 0 ? 0px : parent.width * (root.g.total - root.g.active) / root.g.total;
+                    height: parent.height;
+                    border-radius: 2px;
+                    background: Theme.accent-fg;
+                }
+            }
+        }
+    }
+    for r[i] in root.g.subagents: SubNode {
+        x: root.sub-x;
+        y: root.top + i * (root.node-h + root.gap);
+        item: r;
+        selected: i == root.sel;
+        picked => {
+            root.picked(i);
+        }
+    }
+    if root.n == 0 && root.g.open: Rectangle {
+        x: root.sub-x;
+        y: root.orch-y + 48px;
+        width: 340px;
+        height: 100px;
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: #24272D;
+        background: #0F1013;
+        VerticalLayout {
+            padding: 16px;
+            spacing: 4px;
+            alignment: center;
+            Text {
+                text: root.g.total == 0 ? @tr("No subagents yet") : @tr("No active subagents");
+                font-size: 12px;
+                font-weight: Theme.weight-medium;
+                color: Theme.foreground-subtle;
+            }
+            Text {
+                text: root.g.total == 0
+                    ? @tr("When the orchestrator delegates part of a task, each subagent appears here live.")
+                    : @tr("All {0} subagents finished. Their results are in the chat; new delegations appear here live.", root.g.total);
+                font-size: 11px;
+                color: #6B717C;
+                wrap: word-wrap;
+            }
+        }
+    }
+}
+
 export component OrchestraLive inherits Rectangle {
     in property <string> session-title;
     in property <string> agent-id;
@@ -248,14 +447,12 @@ export component OrchestraLive inherits Rectangle {
     callback delegate();
     callback open-settings();
 
-    property <int> count: ChatUi.subagents-active.length;
-    // All subagents of the session, finished ones included (orchestrator footer).
-    property <int> total: ChatUi.subagents.length;
     property <int> max-conc: max(1, SettingsUi.get-int("orchestra.maxConcurrent", SettingsUi.rev));
-    property <int> sel: 0;
+    property <int> sel-g: 0;
+    property <int> sel-s: 0;
     property <bool> detail: true;
-    property <bool> has-sel: root.detail && root.sel >= 0 && root.sel < root.count;
-    property <SubagentRow> cur: ChatUi.subagents-active[max(0, root.sel)];
+    property <bool> has-sel: root.detail && root.sel-g >= 0 && root.sel-g < ChatUi.fleet.length && root.sel-s >= 0 && root.sel-s < ChatUi.fleet[max(0, root.sel-g)].subagents.length;
+    property <SubagentRow> cur: ChatUi.fleet[max(0, root.sel-g)].subagents[max(0, root.sel-s)];
     // Canvas view state.
     property <float> zoom: 1.0;
     property <length> pan-x: 0px;
@@ -273,7 +470,7 @@ export component OrchestraLive inherits Rectangle {
     // Elapsed clock while anything runs.
     Timer {
         interval: 1s;
-        running: ChatUi.subagents-running > 0;
+        running: ChatUi.fleet-running > 0;
         triggered => {
             ChatUi.subagent-action("tick", "");
         }
@@ -329,7 +526,7 @@ export component OrchestraLive inherits Rectangle {
                         }
                         rp := Text {
                             x: 19px;
-                            text: @tr("{0} / {1} running", ChatUi.subagents-running, root.max-conc);
+                            text: @tr("{0} / {1} running", ChatUi.fleet-running, root.max-conc);
                             font-size: 11px;
                             font-weight: Theme.weight-medium;
                             color: #3DD68C;
@@ -338,7 +535,7 @@ export component OrchestraLive inherits Rectangle {
                     }
                 }
                 Text {
-                    text: root.session-title != "" ? root.session-title : @tr("No session open");
+                    text: ChatUi.fleet-sessions == 0 ? @tr("No session running") : @tr("{0} sessions active", ChatUi.fleet-sessions);
                     font-size: 12px;
                     color: #6B717C;
                     vertical-alignment: center;
@@ -412,178 +609,34 @@ export component OrchestraLive inherits Rectangle {
                     }
                 }
                 world := Rectangle {
-                    // Layout: orchestrator at the left, subagent column at x = 370, centred vertically.
-                    property <length> node-h: 116px;
-                    property <length> gap: 28px;
-                    property <length> col-h: root.count * self.node-h + max(0, root.count - 1) * self.gap;
-                    property <length> top: max(70px, (self.height - self.col-h) / 2);
-                    property <length> orch-y: max(70px, self.height / 2 - 64px);
-                    property <length> orch-x: 38px;
-                    property <length> sub-x: 440px;
+                    property <length> top: max(70px, (self.height - ChatUi.fleet-height * 1px) / 2);
                     x: root.pan-x;
                     y: root.pan-y;
                     width: canvas.width;
-                    height: max(canvas.height, self.col-h + 140px);
+                    height: max(canvas.height, ChatUi.fleet-height * 1px + 140px);
                     transform-scale: root.zoom;
-                    // Edges (cubic curves from the orchestrator's right edge to each node's left edge).
-                    for r[i] in ChatUi.subagents-active: Path {
-                        property <float> sx: (world.orch-x + 266px) / 1px;
-                        property <float> sy: (world.orch-y + (root.count > 1 ? 28px + i * 72px / (root.count - 1) : 64px)) / 1px;
-                        property <float> ex: world.sub-x / 1px;
-                        property <float> ey: (world.top + i * (world.node-h + world.gap) + 58px) / 1px;
-                        x: 0;
-                        y: 0;
-                        width: world.width;
-                        height: world.height;
-                        viewbox-width: world.width / 1px;
-                        viewbox-height: world.height / 1px;
-                        commands: "M " + self.sx + " " + self.sy + " C " + (self.sx + 80) + " " + self.sy + " " + (self.ex - 90) + " " + self.ey + " " + (self.ex - 6) + " " + self.ey;
-                        stroke: i == root.sel && root.detail ? Theme.accent-fg.with-alpha(0.9) : Theme.accent-fg.with-alpha(0.45);
-                        stroke-width: i == root.sel && root.detail ? 1.6px : 1.2px;
-                        accessible-role: none;
-                    }
-                    // Arrowhead into each node (design: small filled triangle on the node's left edge).
-                    for r[i] in ChatUi.subagents-active: Path {
-                        x: world.sub-x - 8px;
-                        y: world.top + i * (world.node-h + world.gap) + 58px - 4px;
-                        width: 8px;
-                        height: 8px;
-                        viewbox-width: 8;
-                        viewbox-height: 8;
-                        commands: "M 0 0 L 8 4 L 0 8 Z";
-                        fill: i == root.sel && root.detail ? Theme.accent-fg : Theme.accent-fg.with-alpha(0.7);
-                        accessible-role: none;
-                    }
-                    // Port dot on the orchestrator's right edge for each edge.
-                    for r[i] in ChatUi.subagents-active: Rectangle {
-                        x: world.orch-x + 266px - 3px;
-                        y: world.orch-y + (root.count > 1 ? 28px + i * 72px / (root.count - 1) : 64px) - 3px;
-                        width: 6px;
-                        height: 6px;
-                        border-radius: 3px;
-                        background: Theme.accent-fg.with-alpha(0.85);
-                    }
-                    // Orchestrator node (design: 226x128, #121317, 1px #2A2D33, r10).
-                    Rectangle {
-                        x: world.orch-x;
-                        y: world.orch-y;
-                        width: 266px;
-                        height: 152px;
-                        border-radius: 10px;
-                        background: #121317;
-                        border-width: 1px;
-                        border-color: #2A2D33;
-                        VerticalLayout {
-                            padding: 12px;
-                            spacing: 8px;
-                            HorizontalLayout {
-                                spacing: 8px;
-                                Avatar {
-                                    agent: root.agent-id;
-                                    size: 26px;
-                                }
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 1px;
-                                    Text {
-                                        text: @tr("Orchestrator");
-                                        font-size: 12px;
-                                        font-weight: Theme.weight-semibold;
-                                        color: Theme.foreground;
-                                    }
-                                    Text {
-                                        text: root.agent-name + (root.model-name != "" ? " · " + root.model-name : "");
-                                        font-size: 10px;
-                                        color: #6B717C;
-                                        overflow: elide;
-                                    }
-                                }
-                                VerticalLayout {
-                                    alignment: start;
-                                    StatusPill {
-                                        status: root.session-running || ChatUi.subagents-running > 0 ? 0 : 2;
-                                    }
-                                }
-                            }
-                            Rectangle {
-                                height: 1px;
-                                background: #1F2227;
-                            }
-                            Text {
-                                text: root.session-title != "" ? root.session-title : @tr("Open a session to orchestrate.");
-                                font-size: 11px;
-                                color: Theme.foreground-subtle;
-                                wrap: word-wrap;
-                                overflow: elide;
-                                vertical-stretch: 1;
-                            }
-                            HorizontalLayout {
-                                Text {
-                                    text: @tr("{0} of {1} subagents finished", root.total - ChatUi.subagents-running, root.total);
-                                    font-size: 10px;
-                                    color: #6B717C;
-                                    horizontal-stretch: 1;
-                                    overflow: elide;
-                                }
-                                Text {
-                                    text: @tr("{0} active", ChatUi.subagents-running);
-                                    font-size: 10px;
-                                    color: #6B717C;
-                                }
-                            }
-                            // Share of subagents that finished (design: accent bar under the footer).
-                            Rectangle {
-                                height: 4px;
-                                border-radius: 2px;
-                                background: #24272D;
-                                Rectangle {
-                                    x: 0;
-                                    width: root.total == 0 ? 0px : parent.width * (root.total - ChatUi.subagents-running) / root.total;
-                                    height: parent.height;
-                                    border-radius: 2px;
-                                    background: Theme.accent-fg;
-                                }
-                            }
-                        }
-                    }
-                    for r[i] in ChatUi.subagents-active: SubNode {
-                        x: world.sub-x;
-                        y: world.top + i * (world.node-h + world.gap);
-                        item: r;
-                        selected: root.detail && i == root.sel;
-                        picked => {
-                            root.sel = i;
+                    for g[gi] in ChatUi.fleet: SessionGroup {
+                        x: 38px;
+                        y: world.top + g.y * 1px;
+                        width: world.width - 38px;
+                        g: g;
+                        model-name: g.open ? root.model-name : "";
+                        sel: root.detail && gi == root.sel-g ? root.sel-s : -1;
+                        picked(i) => {
+                            root.sel-g = gi;
+                            root.sel-s = i;
                             root.detail = true;
                         }
-                    }
-                    if root.count == 0: Rectangle {
-                        x: world.sub-x;
-                        y: world.orch-y + 14px;
-                        width: 340px;
-                        height: 100px;
-                        border-radius: 10px;
-                        border-width: 1px;
-                        border-color: #24272D;
-                        background: #0F1013;
-                        VerticalLayout {
-                            padding: 16px;
-                            spacing: 4px;
-                            alignment: center;
-                            Text {
-                                text: root.total == 0 ? @tr("No subagents yet") : @tr("No active subagents");
-                                font-size: 12px;
-                                font-weight: Theme.weight-medium;
-                                color: Theme.foreground-subtle;
-                            }
-                            Text {
-                                text: root.total == 0
-                                    ? @tr("When the orchestrator delegates part of a task, each subagent appears here live.")
-                                    : @tr("All {0} subagents finished. Their results are in the chat; new delegations appear here live.", root.total);
-                                font-size: 11px;
-                                color: #6B717C;
-                                wrap: word-wrap;
-                            }
+                        open-session => {
+                            ChatUi.subagent-action("open", g.id);
                         }
+                    }
+                    if ChatUi.fleet.length == 0: Text {
+                        x: 38px;
+                        y: world.top;
+                        text: @tr("No session is running. Open or start a session to see it here.");
+                        font-size: 12px;
+                        color: #6B717C;
                     }
                 }
                 // Legend chip (design: top-left, #121317, 1px #24272D, r8).
@@ -612,7 +665,7 @@ export component OrchestraLive inherits Rectangle {
                                 }
                             }
                             Text {
-                                text: @tr("{0} running", ChatUi.subagents-running - ChatUi.subagents-waiting);
+                                text: @tr("{0} running", ChatUi.fleet-running - ChatUi.fleet-waiting);
                                 font-size: 11px;
                                 color: #8A909A;
                                 vertical-alignment: center;
@@ -630,7 +683,7 @@ export component OrchestraLive inherits Rectangle {
                                 }
                             }
                             Text {
-                                text: @tr("{0} waiting", ChatUi.subagents-waiting);
+                                text: @tr("{0} waiting", ChatUi.fleet-waiting);
                                 font-size: 11px;
                                 color: #8A909A;
                                 vertical-alignment: center;
@@ -721,22 +774,29 @@ export component OrchestraLive inherits Rectangle {
                     border-color: #24272D;
                     clip: true;
                     property <float> k: 0.1;
-                    Rectangle {
+                    for g[gi] in ChatUi.fleet: Rectangle {
+                        property <float> k: 64 / max(1, ChatUi.fleet-height);
                         x: 10px;
-                        y: (parent.height - 26px) / 2;
-                        width: 24px;
-                        height: 26px;
-                        border-radius: 2px;
-                        background: #2A2D3A;
-                    }
-                    for r[i] in ChatUi.subagents-active: Rectangle {
-                        property <length> step: min(18px, 60px / max(1, root.count));
-                        x: 58px;
-                        y: (parent.height - root.count * self.step) / 2 + i * self.step;
-                        width: 32px;
-                        height: self.step - 3px;
-                        border-radius: 2px;
-                        background: i == root.sel && root.detail ? Theme.accent-fg.with-alpha(0.55) : #2F3446;
+                        y: 8px + g.y * self.k * 1px;
+                        width: 120px;
+                        height: max(3px, g.height * self.k * 1px);
+                        Rectangle {
+                            x: 0;
+                            y: (parent.height - self.height) / 2;
+                            width: 24px;
+                            height: max(3px, min(parent.height, 196 * parent.k * 1px));
+                            border-radius: 2px;
+                            background: g.open ? Theme.accent-fg.with-alpha(0.4) : #2A2D3A;
+                        }
+                        for r[i] in g.subagents: Rectangle {
+                            property <length> step: parent.height / max(1, g.active);
+                            x: 48px;
+                            y: i * self.step;
+                            width: 32px;
+                            height: max(2px, self.step - 2px);
+                            border-radius: 2px;
+                            background: gi == root.sel-g && i == root.sel-s && root.detail ? Theme.accent-fg.with-alpha(0.55) : #2F3446;
+                        }
                     }
                 }
             }

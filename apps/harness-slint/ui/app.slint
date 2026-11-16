@@ -14,7 +14,8 @@ import { SettingsShell, FallbackRow } from "settings/shell.slint";
 import { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow } from "settings/globals.slint";
 import { SelectOption, ConfirmDialog } from "settings/parts.slint";
 import { Labels } from "settings/labels.slint";
-import { ChatUi, MdLink, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, PlanBar, ChangeRow, PlanRow, GroupRow, ScheduleRow } from "chat/globals.slint";
+import { AgentLogo, AgentMark } from "components/agent_logo.slint";
+import { ChatUi, FleetGroup, MdLink, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, PlanBar, ChangeRow, PlanRow, GroupRow, ScheduleRow } from "chat/globals.slint";
 import { ToolCard, ThinkingRow, ChangesCard, StatusPanel, SubagentBar, TextDialog, SchedulesDialog } from "chat/turns.slint";
 import { OverviewPanel } from "panels/overview.slint";
 import { CommandCenter, ResultList } from "chat/palette.slint";
@@ -38,7 +39,7 @@ export { BoardUi, BoardCard, BoardColumn }
 export { OrchestraUi, OrchNode, OrchEdge, OrchLink, OrchAgent, OrchConn }
 export { InboxUi, InboxSourceRow, InboxTicketRow, InboxTriggerRow, InboxNotice }
 export { SetupUi, SetupRow }
-export { ChatUi, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, PlanBar, ChangeRow, PlanRow, GroupRow, ScheduleRow, WhiteboardUi, WbStroke, DockUi, OptionRow, GitUi, BranchRow, GraphRow }
+export { ChatUi, FleetGroup, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, PlanBar, ChangeRow, PlanRow, GroupRow, ScheduleRow, WhiteboardUi, WbStroke, DockUi, OptionRow, GitUi, BranchRow, GraphRow }
 export { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow, SelectOption, FallbackRow, Labels }
 
 // Title bar drag handle: a plain press starts the move (Rust drags the window and still detects
@@ -191,12 +192,7 @@ export struct QueueRow {
 // Agent identity colour (design tokens) from an agent display name or id; mixed / unknown → accent.
 global AgentTint {
     pure public function of(name: string) -> color {
-        if name.to-lowercase() == "claude code" || name.to-lowercase() == "claude" || name == "claude-code" { return Theme.agent-claude; }
-        if name.to-lowercase() == "codex" { return Theme.agent-codex; }
-        if name.to-lowercase() == "deepseek" { return Theme.agent-deepseek; }
-        if name.to-lowercase() == "antigravity" || name.to-lowercase() == "agy" { return Theme.agent-agy; }
-        if name.to-lowercase() == "gemini" { return Theme.agent-gemini; }
-        Theme.accent-fg
+        AgentLogo.tint(AgentLogo.key(name))
     }
 }
 
@@ -206,10 +202,14 @@ component AgentTile inherits Rectangle {
     width: 20px;
     height: 20px;
     border-radius: 5px;
-    background: AgentTint.of(root.name);
+    background: AgentLogo.key(root.name) != "" ? transparent : AgentTint.of(root.name);
     property <string> lower: root.name.to-lowercase();
-    property <string> known: self.lower == "claude code" || self.lower == "claude" ? "C" : self.lower == "codex" ? "X" : self.lower == "deepseek" ? "D" : self.lower == "antigravity" || self.lower == "agy" ? "A" : self.lower == "gemini" ? "G" : "";
-    if root.known != "" || root.name == "": Text {
+    if AgentLogo.key(root.name) != "": AgentMark {
+        name: root.name;
+        size: root.width;
+    }
+    property <string> known: AgentLogo.key(root.name) != "" ? "" : self.lower == "claude code" || self.lower == "claude" ? "C" : self.lower == "codex" ? "X" : self.lower == "deepseek" ? "D" : self.lower == "antigravity" || self.lower == "agy" ? "A" : self.lower == "gemini" ? "G" : "";
+    if (root.known != "" || root.name == "") && AgentLogo.key(root.name) == "": Text {
         text: root.known != "" ? root.known : "H";
         font-size: 11px;
         font-weight: 700;
@@ -219,7 +219,7 @@ component AgentTile inherits Rectangle {
         accessible-role: none;
     }
     // Unknown agent: first letter only (Slint has no substring; clip the upper-cased name).
-    if root.known == "" && root.name != "": Rectangle {
+    if root.known == "" && root.name != "" && AgentLogo.key(root.name) == "": Rectangle {
         x: 6px;
         width: 9px;
         clip: true;
@@ -928,17 +928,6 @@ component Sidebar inherits Rectangle {
             SectionLabel {
                 text: @tr("Sessions");
                 horizontal-stretch: 1;
-            }
-            IconButton {
-                icon: ChatUi.by-project ? Icons.clock : Icons.folder;
-                label: ChatUi.by-project ? @tr("Group sessions by time") : @tr("Group sessions by project");
-                active: ChatUi.by-project;
-                size: Theme.control-sm;
-                icon-size: Theme.icon-xs;
-                clicked => {
-                    ChatUi.by-project = !ChatUi.by-project;
-                    ChatUi.group-action("view", "");
-                }
             }
             IconButton {
                 icon: Icons.plus;
@@ -2375,7 +2364,12 @@ component Composer inherits VerticalLayout {
                         padding-left: 10px;
                         padding-right: 8px;
                         spacing: 7px;
-                        Rectangle {
+                        if AgentLogo.key(root.sticky-name) != "": AgentMark {
+                            y: (parent.height - self.height) / 2;
+                            name: root.sticky-name;
+                            size: 16px;
+                        }
+                        if AgentLogo.key(root.sticky-name) == "": Rectangle {
                             y: (parent.height - self.height) / 2;
                             width: 7px;
                             height: 7px;
@@ -4038,7 +4032,15 @@ export component AppWindow inherits Window {
                                         root.cancel-queued(id);
                                     }
                                 }
-                                if DockUi.picker-open != "" && !root.perm-visible: PickerMenu { }
+                                if DockUi.picker-open != "" && !root.perm-visible: Rectangle {
+                                    height: 0px;
+                                    pm := PickerMenu {
+                                        x: 0;
+                                        y: -self.preferred-height - 4px;
+                                        width: parent.width;
+                                        height: self.preferred-height;
+                                    }
+                                }
                                 if root.picker-open: AgentPicker {
                                     agents: root.agents;
                                     sticky: root.sticky-agent;

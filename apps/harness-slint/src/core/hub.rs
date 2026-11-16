@@ -178,6 +178,7 @@ struct Adapter {
     view: Option<View>,
     permissions: HashMap<u64, PendingPermission>,
     next_request: u64,
+    fleet: super::fleet::Fleet,
 }
 
 fn emit(ev: &mpsc::UnboundedSender<Event>, event: Event) {
@@ -535,6 +536,7 @@ pub async fn run(
         view: None,
         permissions: HashMap::new(),
         next_request: 1,
+        fleet: super::fleet::Fleet::default(),
     };
     adapter.startup().await;
     loop {
@@ -744,7 +746,9 @@ impl Adapter {
                 for s in &list {
                     self.sticky.insert(s.id.clone(), s.active_agent.0.clone());
                 }
+                self.fleet.set_sessions(&list);
                 self.emit(Event::Sessions(list.iter().map(summary).collect()));
+                self.emit(Event::Fleet(self.fleet.snapshot()));
             }
             Err(error) => self.report("sessions", &error),
         }
@@ -1507,6 +1511,15 @@ impl Adapter {
             entries: detail.plan,
         });
         view.subagents.clone_from(&detail.subagents);
+        let prompt = detail
+            .turns
+            .iter()
+            .rev()
+            .find(|t| !detail.queue.contains(&t.id) && !t.user_text.is_empty())
+            .map_or("", |t| t.user_text.as_str());
+        self.fleet.set_open(&id, &detail.subagents, prompt);
+        self.fleet.set_running(&id, running);
+        self.emit(Event::Fleet(self.fleet.snapshot()));
         self.emit(Event::Subagents {
             session: id.clone(),
             items: detail.subagents,
@@ -1605,6 +1618,9 @@ impl Adapter {
     }
 
     async fn on_event(&mut self, event: HubEvent) {
+        if self.fleet.on_event(&event) {
+            self.emit(Event::Fleet(self.fleet.snapshot()));
+        }
         match &event.kind {
             EventKind::SessionCreated { .. }
             | EventKind::SessionUpdated { .. }

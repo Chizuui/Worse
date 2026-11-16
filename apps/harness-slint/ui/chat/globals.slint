@@ -96,6 +96,21 @@ export struct SubagentRow {
     agent-name: string,
 }
 
+export struct FleetGroup {
+    id: string,
+    title: string,
+    prompt: string,
+    agent: string,
+    agent-name: string,
+    running: bool,
+    open: bool,
+    y: int,
+    height: int,
+    total: int,
+    active: int,
+    subagents: [SubagentRow],
+}
+
 // One background task of the open session (§9.17). running: the process lives; started-s / finished-s are unix
 // seconds (finished-s 0 = still running).
 export struct BackgroundTaskRow {
@@ -165,6 +180,11 @@ export global ChatUi {
     in property <int> subagents-waiting;
     // Only the active ones (running / needs approval): the Orchestra live canvas hides finished subagents.
     in property <[SubagentRow]> subagents-active;
+    in property <[FleetGroup]> fleet;
+    in property <int> fleet-running;
+    in property <int> fleet-waiting;
+    in property <int> fleet-sessions;
+    in property <int> fleet-height;
     // ---- background tasks (§9.17) ----
     in property <[BackgroundTaskRow]> background-tasks;
     in property <int> background-tasks-running;
@@ -230,7 +250,7 @@ export global ChatUi {
     // "new" | "rename" | "color:<c>" | "delete" | "up" | "down" | "toggle" on a group id; "view" re-renders.
     callback group-action(string, string);
     // Sidebar shows the ungrouped sessions as a projects tree instead of timeline sections (UI-local).
-    in-out property <bool> by-project;
+    in-out property <bool> by-project: true;
     // Drag a session onto a group (group id) or out of every group ("").
     callback drop-session(string, string);
     // ---- permission ----

@@ -123,11 +123,11 @@ fn now_ms() -> i64 {
 }
 
 /// Seconds since the epoch, for the elapsed times of the subagent panel (relative to `ChatUi.now-s`).
-fn now_s() -> i32 {
+pub(super) fn now_s() -> i32 {
     i32::try_from(now_ms() / 1000).unwrap_or(i32::MAX)
 }
 
-fn subagent_row(s: &SubagentView) -> SubagentRow {
+pub(super) fn subagent_row(s: &SubagentView) -> SubagentRow {
     let status = match s.status {
         SubagentStatus::Running => 0,
         SubagentStatus::NeedsApproval => 1,
@@ -375,6 +375,20 @@ impl UiState {
         done: impl FnOnce(&mut UiState, T) + 'static,
     ) {
         self.request(|reply| Command::Chat(make(reply)), done);
+    }
+
+    fn chat_call_quiet<T: 'static>(
+        &self,
+        make: impl FnOnce(Reply<T>) -> ChatCall,
+        done: impl FnOnce(&mut UiState, T) + 'static,
+    ) {
+        let (reply, answer) = tokio::sync::oneshot::channel();
+        self.send(Command::Chat(make(reply)));
+        let _ = slint::spawn_local(async move {
+            if let Ok(Ok(value)) = answer.await {
+                with_state(|s| done(s, value));
+            }
+        });
     }
 
     /// Session of an action: the given id, or the open session when it is empty.
@@ -798,7 +812,7 @@ impl UiState {
             return;
         };
         let asked = session.clone();
-        self.chat_call(
+        self.chat_call_quiet(
             |reply| ChatCall::PlanFiles {
                 session,
                 item,

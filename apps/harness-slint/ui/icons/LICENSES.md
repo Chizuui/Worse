@@ -8,6 +8,10 @@
 - `files/`: copied from ZCode `packages/desktop/src/renderer/public/material-icons` (Material Icon Theme by Philipp Kief,
   MIT License, https://github.com/material-extensions/vscode-material-icon-theme).
 
+- `agents/`: brand marks of Anthropic Claude, OpenAI Codex, Google Gemini, Google Antigravity and DeepSeek, from LobeHub
+  Icons (`@lobehub/icons-static-svg`, MIT License, https://github.com/lobehub/lobe-icons). The marks are trademarks of their
+  owners and are used only to identify each agent.
+
 SOURCES.txt lists the upstream icon name behind every generated file.
 
 ## MIT License (Hugeicons, Phosphor, Material Icon Theme)

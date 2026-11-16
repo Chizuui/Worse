@@ -154,3 +154,9 @@ tile/network.svg <- solar:structure-bold-duotone
 tile/robot.svg <- solar:ghost-smile-bold-duotone
 tile/clipboard.svg <- solar:clipboard-list-bold-duotone
 tile/compass.svg <- solar:compass-big-bold-duotone
+agents/claude.svg <- @lobehub/icons-static-svg:claude-color
+agents/codex.svg <- @lobehub/icons-static-svg:codex-color
+agents/gemini.svg <- @lobehub/icons-static-svg:gemini-color
+agents/deepseek.svg <- @lobehub/icons-static-svg:deepseek-color
+agents/antigravity.svg <- @lobehub/icons-static-svg:antigravity-color
+agents/openai.svg <- @lobehub/icons-static-svg:openai (fill set to white)

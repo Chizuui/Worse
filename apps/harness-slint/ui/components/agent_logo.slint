@@ -1,0 +1,52 @@
+import { Theme } from "../theme/tokens.slint";
+
+export global AgentLogo {
+    pure public function key(name: string) -> string {
+        if name.to-lowercase().starts-with("claude") || name.to-lowercase() == "anthropic" { return "claude"; }
+        if name.to-lowercase().starts-with("codex") { return "codex"; }
+        if name.to-lowercase().starts-with("openai") { return "openai"; }
+        if name.to-lowercase().starts-with("agy") || name.to-lowercase().starts-with("antigravity") { return "antigravity"; }
+        if name.to-lowercase().starts-with("gemini") { return "gemini"; }
+        if name.to-lowercase().starts-with("deepseek") || name.to-lowercase().starts-with("api-deepseek") || name.to-lowercase() == "harness" { return "deepseek"; }
+        return "";
+    }
+    pure public function image(key: string) -> image {
+        if key == "claude" { return @image-url("../icons/agents/claude.svg"); }
+        if key == "codex" { return @image-url("../icons/agents/codex.svg"); }
+        if key == "openai" { return @image-url("../icons/agents/openai.svg"); }
+        if key == "antigravity" { return @image-url("../icons/agents/antigravity.svg"); }
+        if key == "gemini" { return @image-url("../icons/agents/gemini.svg"); }
+        return @image-url("../icons/agents/deepseek.svg");
+    }
+    pure public function tint(key: string) -> color {
+        if key == "claude" { return Theme.agent-claude; }
+        if key == "codex" || key == "openai" { return Theme.agent-codex; }
+        if key == "antigravity" { return Theme.agent-agy; }
+        if key == "gemini" { return Theme.agent-gemini; }
+        if key == "deepseek" { return Theme.agent-deepseek; }
+        return Theme.accent-fg;
+    }
+}
+
+export component AgentMark inherits Rectangle {
+    in property <string> name;
+    in property <length> size: 20px;
+    property <string> key: AgentLogo.key(root.name);
+    width: root.size;
+    height: root.size;
+    border-radius: root.size * 0.26;
+    background: root.key == "codex" ? transparent : #17181C;
+    border-width: root.key == "codex" ? 0px : 1px;
+    border-color: #2A2D33;
+    clip: true;
+    accessible-role: none;
+    Image {
+        x: root.key == "codex" ? 0px : root.size * 0.17;
+        y: root.key == "codex" ? 0px : root.size * 0.17;
+        width: root.key == "codex" ? root.size : root.size * 0.66;
+        height: self.width;
+        source: AgentLogo.image(root.key);
+        image-fit: contain;
+        accessible-role: none;
+    }
+}

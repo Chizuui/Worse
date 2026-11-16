@@ -1,5 +1,6 @@
 // Small building blocks shared by agent A's panels (tokens and shared controls come from agent B).
 import { Theme } from "../theme/tokens.slint";
+import { AgentLogo } from "../components/agent_logo.slint";
 
 // Panel toolbar row (ZCode panel header: 36px, title left, actions right, bottom border).
 export component PanelBar inherits Rectangle {
@@ -16,12 +17,7 @@ export component PanelBar inherits Rectangle {
 // Redesign helpers (FigCraft frames 01/05/06): agent colours, status pills, 4px progress tracks, caps headers.
 export global AgentTint {
     public pure function of(name: string) -> color {
-        if name.to-lowercase() == "claude code" || name.to-lowercase() == "claude" || name.to-lowercase() == "claude-code" { return Theme.agent-claude; }
-        if name.to-lowercase() == "codex" { return Theme.agent-codex; }
-        if name.to-lowercase() == "deepseek" || name.to-lowercase() == "deepseek (api)" { return Theme.agent-deepseek; }
-        if name.to-lowercase() == "antigravity" || name.to-lowercase() == "agy" { return Theme.agent-agy; }
-        if name.to-lowercase() == "gemini" { return Theme.agent-gemini; }
-        return Theme.accent-fg;
+        AgentLogo.tint(AgentLogo.key(name))
     }
 }
 

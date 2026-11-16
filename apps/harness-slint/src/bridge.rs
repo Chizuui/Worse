@@ -26,6 +26,7 @@ use harness_core_api::{ContextItem, PermissionOptionKind};
 
 mod board;
 mod dock;
+mod fleet;
 mod turns;
 
 struct UiState {
@@ -750,6 +751,7 @@ impl UiState {
                     self.subagents(&items);
                 }
             }
+            Event::Fleet(list) => self.fleet(&list),
             Event::BackgroundTasks { session, tasks } => {
                 if self.is_active(&session) {
                     self.background_tasks(&tasks);

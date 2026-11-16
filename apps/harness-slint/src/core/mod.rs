@@ -6,8 +6,11 @@
 //! [`fake`] is an in-process scripted core for UI work without agent binaries (`HARNESS_UI_CORE=fake`).
 
 pub mod fake;
+mod fleet;
 pub mod hub;
 mod prefs;
+
+pub use fleet::FleetSession;
 
 use std::path::PathBuf;
 
@@ -650,6 +653,7 @@ pub enum Event {
         session: SessionId,
         items: Vec<api::SubagentView>,
     },
+    Fleet(Vec<FleetSession>),
     /// Background tasks of the session (§9.17), newest first; replace semantics. Also sent right after
     /// `SessionOpened`.
     BackgroundTasks {
