@@ -1013,6 +1013,17 @@ component Sidebar inherits Rectangle {
                                 vertical-alignment: center;
                                 accessible-role: none;
                             }
+                            IconButton {
+                                y: (parent.height - self.height) / 2;
+                                icon: Icons.plus;
+                                label: "New session in " + s.header-label;
+                                size: Theme.control-sm;
+                                icon-size: Theme.icon-xs;
+                                opacity: pha.has-hover ? 1 : 0.55;
+                                clicked => {
+                                    ChatUi.group-action("new-session", s.header-color);
+                                }
+                            }
                         }
                     }
                     if s.header != "" && s.header != "group" && s.header != "project": HorizontalLayout {

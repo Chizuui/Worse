@@ -1247,6 +1247,12 @@ impl UiState {
     }
 
     fn group_action(&mut self, action: &str, id: &str) {
+        if action == "new-session" {
+            if !id.is_empty() {
+                self.new_session(false, Some(std::path::PathBuf::from(id)));
+            }
+            return;
+        }
         let name = self
             .turn
             .groups
