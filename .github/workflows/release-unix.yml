@@ -8,6 +8,10 @@ on:
       tag:
         description: "Existing release tag to build and attach to (e.g. v0.1.2)"
         required: true
+      platforms:
+        description: "linux, macos or all"
+        required: false
+        default: all
 
 permissions:
   contents: write
@@ -17,7 +21,8 @@ env:
 
 jobs:
   linux:
-    runs-on: ubuntu-22.04
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platforms != 'macos' }}
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,6 +67,7 @@ jobs:
         run: gh release upload "$TAG" dist/Worse-Harness-linux-x64.tar.gz --clobber --repo "$GITHUB_REPOSITORY"
 
   macos:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platforms != 'linux' }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
