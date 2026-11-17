@@ -100,6 +100,9 @@ export struct SubagentRow {
     finished-s: int,
     // Display name of `agent` ("DeepSeek"), for the Orchestra live view.
     agent-name: string,
+    // What it did just before `activity`, newest first (at most three), and how many steps so far.
+    trail: [string],
+    steps: int,
 }
 
 export struct FleetGroup {

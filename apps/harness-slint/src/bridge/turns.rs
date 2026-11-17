@@ -5,7 +5,8 @@
 //! Every reply of a `ChatCall` arrives on a tokio oneshot and is applied in a later `with_state` turn
 //! (`slint::spawn_local`), never inside the borrow that sent it.
 
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
@@ -148,7 +149,63 @@ pub(super) fn subagent_row(s: &SubagentView) -> SubagentRow {
         // 0 = still running: the panel measures against `now-s`.
         finished_s: s.finished_at.map_or(0, secs),
         agent_name: sv(s.agent.as_str()),
+        trail: ModelRc::default(),
+        steps: 0,
     }
+}
+
+/// What a subagent did, kept by the UI for the team strip: the core only reports the current activity.
+#[derive(Default)]
+struct Trail {
+    /// The activity reported last (still shown as "now" while it runs).
+    last: String,
+    /// The ones before it, newest first.
+    before: VecDeque<String>,
+    steps: u32,
+}
+
+/// Steps kept per subagent besides the current one.
+const TRAIL_STEPS: usize = 3;
+
+thread_local! {
+    static TRAILS: RefCell<HashMap<String, Trail>> = RefCell::default();
+}
+
+impl Trail {
+    /// Records `activity` when it is a new step. Returns the steps to show before the current one: when the
+    /// subagent reports no activity (it is thinking), the last finished step leads that list.
+    fn note(&mut self, activity: &str) -> Vec<String> {
+        if !activity.is_empty() && activity != self.last {
+            if !self.last.is_empty() {
+                self.before.push_front(std::mem::take(&mut self.last));
+                self.before.truncate(TRAIL_STEPS);
+            }
+            activity.clone_into(&mut self.last);
+            self.steps += 1;
+        }
+        let lead = (activity.is_empty() && !self.last.is_empty()).then(|| self.last.clone());
+        lead.into_iter()
+            .chain(self.before.iter().cloned())
+            .take(TRAIL_STEPS)
+            .collect()
+    }
+}
+
+/// Team-strip facts of the subagents in `items` (trail, step count), in the same order. Subagents that left
+/// the list are forgotten.
+fn trails(items: &[SubagentView]) -> Vec<(Vec<String>, u32)> {
+    TRAILS.with(|cell| {
+        let mut map = cell.borrow_mut();
+        map.retain(|id, _| items.iter().any(|s| s.session_id.as_str() == id));
+        items
+            .iter()
+            .map(|s| {
+                let trail = map.entry(s.session_id.as_str().to_owned()).or_default();
+                let shown = trail.note(&s.activity);
+                (shown, trail.steps)
+            })
+            .collect()
+    })
 }
 
 fn background_row(t: &BackgroundTask) -> BackgroundTaskRow {
@@ -612,8 +669,13 @@ impl UiState {
         ui.set_subagents_waiting(i32::try_from(waiting).unwrap_or(i32::MAX));
         let rows: Vec<SubagentRow> = items
             .iter()
-            .map(|s| SubagentRow {
+            .zip(trails(items))
+            .map(|(s, (trail, steps))| SubagentRow {
                 agent_name: sv(&self.agent_name(s.agent.as_str())),
+                trail: ModelRc::new(VecModel::from(
+                    trail.iter().map(|t| sv(t)).collect::<Vec<SharedString>>(),
+                )),
+                steps: i32::try_from(steps).unwrap_or(i32::MAX),
                 ..subagent_row(s)
             })
             .collect();
@@ -1611,4 +1673,24 @@ pub(super) fn wire(window: &crate::ui::AppWindow) {
         });
         pinned
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Trail;
+
+    #[test]
+    fn trail_keeps_the_steps_before_the_current_one() {
+        let mut trail = Trail::default();
+        assert!(trail.note("Read a.rs").is_empty());
+        assert!(trail.note("Read a.rs").is_empty(), "the same step reported twice counts once");
+        assert_eq!(trail.note("Grep x"), vec!["Read a.rs"]);
+        assert_eq!(trail.note("Edit a.rs"), vec!["Grep x", "Read a.rs"]);
+        assert_eq!(trail.steps, 3);
+        // Thinking (no activity): the last finished step leads.
+        assert_eq!(trail.note(""), vec!["Edit a.rs", "Grep x", "Read a.rs"]);
+        assert_eq!(trail.note("cargo test"), vec!["Edit a.rs", "Grep x", "Read a.rs"]);
+        assert_eq!(trail.note("Read b.rs"), vec!["cargo test", "Edit a.rs", "Grep x"]);
+        assert_eq!(trail.steps, 5);
+    }
 }

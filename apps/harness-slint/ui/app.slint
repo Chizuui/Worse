@@ -34,7 +34,7 @@ import { SelectOption, ConfirmDialog } from "settings/parts.slint";
 import { Labels } from "settings/labels.slint";
 import { AgentLogo, AgentMark } from "components/agent_logo.slint";
 import { ChatUi, ChatImage, FleetGroup, MdLink, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, PlanBar, ChangeRow, PlanRow, GroupRow, ScheduleRow } from "chat/globals.slint";
-import { ToolCard, ImageStrip, ThinkingRow, ChangesCard, StatusPanel, SubagentBar, TextDialog, SchedulesDialog } from "chat/turns.slint";
+import { ToolCard, ImageStrip, ThinkingRow, ChangesCard, StatusPanel, SubagentBar, TeamStrip, TextDialog, SchedulesDialog } from "chat/turns.slint";
 import { OverviewPanel } from "panels/overview.slint";
 import { CommandCenter, ResultList } from "chat/palette.slint";
 import { WhiteboardUi, WhiteboardDialog, WbStroke } from "chat/whiteboard.slint";
@@ -4277,6 +4277,12 @@ export component AppWindow inherits Window {
                                         run(i) => {
                                             ChatUi.mention-pick(i);
                                         }
+                                    }
+                                }
+                                // The team at work: the subagents this session delegated to and what each is doing.
+                                if ChatUi.subagents-active.length > 0 && ChatUi.parent-id == "": TeamStrip {
+                                    orchestra => {
+                                        OrchLiveUi.open = true;
                                     }
                                 }
                                 if root.running && !root.perm-visible: WorkingLine { }
