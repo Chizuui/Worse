@@ -1,0 +1,42 @@
+name: build-windows
+
+# Builds the Windows executable on a Windows runner and keeps it as a workflow artifact
+# (Actions tab > the run > Artifacts > Worse-Harness-windows-x64). Runs when asked for, and on every
+# push to the branch that carries the redesign.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["liquid-glass-ui"]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: rustup update stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build -p harness-slint --release --bins
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $dir = "dist/Worse-Harness-windows-x64"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item target/release/harness-slint.exe "$dir/worse-harness.exe"
+          foreach ($file in "LICENSE", "NOTICE") {
+            if (Test-Path $file) { Copy-Item $file $dir }
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Worse-Harness-windows-x64
+          path: dist/Worse-Harness-windows-x64
+          if-no-files-found: error
