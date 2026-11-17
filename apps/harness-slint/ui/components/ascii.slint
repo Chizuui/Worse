@@ -63,3 +63,28 @@ export component GlyphAnim inherits Text {
         }
     }
 }
+
+// One of the "thinking" animations (AsciiArt.think[index]) in a box of fixed size, so the text beside it
+// does not shift as frames change. `clocked`: step on the shared busy clock (chat); otherwise it runs its
+// own timer (Settings previews, where no agent is working).
+export component ThinkGlyph inherits Rectangle {
+    in property <int> index;
+    in property <bool> clocked: true;
+    in property <brush> ink: Theme.foreground-subtle;
+    in property <float> scale: 1;
+    property <int> i: max(0, min(root.index, AsciiArt.think.length - 1));
+    property <length> size: (AsciiArt.think-lines[root.i] > 1 ? 9px : 11px) * root.scale;
+    width: AsciiArt.think-cells[root.i] * root.size * 0.6;
+    height: AsciiArt.think-lines[root.i] * root.size * 1.32;
+    accessible-role: none;
+    GlyphAnim {
+        x: 0;
+        y: 0;
+        frames: AsciiArt.think[root.i];
+        divider: root.clocked ? AsciiArt.think-divider[root.i] : 0;
+        interval: 90ms * AsciiArt.think-divider[root.i];
+        busy: true;
+        font-size: root.size;
+        color: root.ink;
+    }
+}

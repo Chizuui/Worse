@@ -9,6 +9,7 @@ import { TextField, TextArea, Switch } from "../settings/parts.slint";
 import { AgentTint, Pill, ProgressTrack, CapsHeader } from "../panels/common.slint";
 import { ChatUi, ChatImage, ToolPart, ChangeRow, PlanRow, ScheduleRow, SubagentRow } from "globals.slint";
 import { LiveUi } from "../panels/live.slint";
+import { ArtClock } from "../components/ascii.slint";
 
 // Row of small image previews; a click opens the file in the OS viewer.
 export component ImageStrip inherits HorizontalLayout {
@@ -344,7 +345,8 @@ export component ThinkingRow inherits VerticalLayout {
                 font-size: Theme.ui-base;
                 font-weight: Theme.weight-medium;
                 color: Theme.foreground-subtle;
-                opacity: root.active ? 0.6 + 0.4 * abs(sin(animation-tick() / 1ms * 0.18deg)) : 1;
+                // Same 2 s breathing as before, stepped by the shared busy clock (90 ms) instead of every frame.
+                opacity: root.active && !Theme.reduce-motion ? 0.6 + 0.4 * abs(sin(ArtClock.busy-tick * 16.2deg)) : 1;
                 vertical-alignment: center;
                 accessible-role: none;
             }

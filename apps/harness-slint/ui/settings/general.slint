@@ -2,6 +2,8 @@
 // Designed cards come first in design order; settings the design does not show (terminal, network, conversation,
 // archive, storage, window & code) follow under "ADVANCED" so no feature is lost.
 import { Theme } from "../theme/tokens.slint";
+import { Look } from "../theme/look.slint";
+import { ThinkGlyph, AsciiArt } from "../components/ascii.slint";
 import { Button } from "../components/controls.slint";
 import { SettingsUi } from "globals.slint";
 import { PageHeader, Group, SettingRow, Switch, TextField, Stepper, Select, SetButton, Pill, SegmentedControl, CapsLabel, Dot } from "parts.slint";
@@ -582,6 +584,63 @@ component Swatch inherits Rectangle {
     }
 }
 
+// One "thinking" animation, playing, as a pickable tile.
+component ThinkTile inherits Rectangle {
+    in property <string> title;
+    // Index into AsciiArt.think; -1 = shuffle (the tile walks through all of them).
+    in property <int> index;
+    in property <bool> selected;
+    callback picked;
+    property <int> walk;
+    horizontal-stretch: 1;
+    min-width: 64px;
+    height: 66px;
+    border-radius: 10px;
+    background: tta.has-hover ? Theme.surface-hover : Theme.surface;
+    border-width: 1px;
+    border-color: root.selected ? Theme.accent-fg : (tta.has-hover ? Theme.border-hover : Theme.border);
+    animate border-color, background { duration: Theme.dur-hover; }
+    accessible-role: radio-button;
+    accessible-label: root.title;
+    accessible-checked: root.selected;
+    accessible-action-default => {
+        root.picked();
+    }
+    Timer {
+        interval: 1.6s;
+        running: root.index < 0 && !Theme.reduce-motion;
+        triggered => {
+            root.walk = mod(root.walk + 1, AsciiArt.think.length);
+        }
+    }
+    Rectangle {
+        y: 8px;
+        height: 30px;
+        ThinkGlyph {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            index: root.index < 0 ? root.walk : root.index;
+            clocked: false;
+            ink: root.selected ? Theme.foreground : Theme.foreground-subtle;
+        }
+    }
+    Text {
+        y: parent.height - self.height - 9px;
+        width: parent.width;
+        text: root.title;
+        font-size: Theme.ui-xs + 1px;
+        color: root.selected ? Theme.foreground : Theme.foreground-subtle;
+        horizontal-alignment: center;
+        overflow: elide;
+    }
+    tta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.picked();
+        }
+    }
+}
+
 export component AppearancePage inherits VerticalLayout {
     in property <bool> stacked;
     property <string> accent: SettingsUi.get-string("appearance.accentColor", SettingsUi.rev);
@@ -716,6 +775,64 @@ export component AppearancePage inherits VerticalLayout {
             key: "appearance.showTokenUsage";
             title: @tr("Show token usage in sidebar");
             description: @tr("A small ring next to each session shows context use.");
+        }
+    }
+    // Card · While the agent works
+    Group {
+        title: @tr("While the agent works");
+        note: @tr("Unicode animation beside the status line");
+        think-box := VerticalLayout {
+            padding: 16px;
+            spacing: 8px;
+            property <string> pick: SettingsUi.get-string("appearance.thinkingStyle", SettingsUi.rev);
+            HorizontalLayout {
+                spacing: 8px;
+                for t in [
+                    { id: "scan", title: @tr("Scan"), index: 0 },
+                    { id: "bars", title: @tr("Bars"), index: 1 },
+                    { id: "pulse", title: @tr("Pulse"), index: 2 },
+                    { id: "quads", title: @tr("Quads"), index: 3 },
+                    { id: "charge", title: @tr("Charge"), index: 4 },
+                ]: ThinkTile {
+                    title: t.title;
+                    index: t.index;
+                    selected: think-box.pick == t.id || (think-box.pick == "" && t.id == "scan");
+                    picked => {
+                        SettingsUi.set-string("appearance.thinkingStyle", t.id);
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                for t in [
+                    { id: "moon", title: @tr("Moon"), index: 5 },
+                    { id: "cipher", title: @tr("Cipher"), index: 6 },
+                    { id: "chevrons", title: @tr("Chevrons"), index: 7 },
+                    { id: "bunny", title: @tr("Bunny"), index: 8 },
+                    { id: "shuffle", title: @tr("Shuffle"), index: -1 },
+                ]: ThinkTile {
+                    title: t.title;
+                    index: t.index;
+                    selected: think-box.pick == t.id;
+                    picked => {
+                        SettingsUi.set-string("appearance.thinkingStyle", t.id);
+                    }
+                }
+            }
+        }
+        SettingRow {
+            stacked: root.stacked;
+            pad-y: 10px;
+            title: @tr("Status words");
+            description: @tr("Plain says \"Thinking…\"; Playful rotates through a few bunny-flavoured lines.");
+            SegmentedControl {
+                label: @tr("Status words");
+                options: [{ id: "plain", label: @tr("Plain") }, { id: "playful", label: @tr("Playful") }];
+                current: SettingsUi.get-string("appearance.statusWords", SettingsUi.rev);
+                select(id) => {
+                    SettingsUi.set-string("appearance.statusWords", id);
+                }
+            }
         }
     }
     // Card · Preview

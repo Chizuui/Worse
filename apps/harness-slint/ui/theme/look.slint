@@ -1,0 +1,13 @@
+// The user's look choices beyond the colour tokens (Settings › Appearance). Rust writes them from
+// settings.json (src/settings); components read them.
+import { AsciiArt } from "../brand/ascii_art.slint";
+
+export global Look {
+    // "Thinking" animation: an id of AsciiArt.think-ids, or "shuffle" (a different one every turn).
+    in-out property <string> thinking: "scan";
+    // Words beside it: "plain" ("Thinking…") or "playful" (a rotating set).
+    in-out property <string> words: "plain";
+    // Counts turns (AppWindow bumps it when an agent starts working); drives "shuffle".
+    in-out property <int> turn;
+    out property <int> think-now: self.thinking == "shuffle" ? mod(self.turn, AsciiArt.think.length) : AsciiArt.think-index(self.thinking);
+}

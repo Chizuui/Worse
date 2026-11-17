@@ -235,6 +235,11 @@ pub struct AppearanceSettings {
     pub reduce_motion: bool,
     /// Context-use ring next to each session in the sidebar.
     pub show_token_usage: bool,
+    /// Unicode animation beside "Thinking…": "scan" | "bars" | "pulse" | "quads" | "charge" | "moon" |
+    /// "cipher" | "chevrons" | "bunny" | "shuffle" (a different one every turn).
+    pub thinking_style: String,
+    /// Words beside it: "plain" ("Thinking…") | "playful" (a rotating set).
+    pub status_words: String,
 }
 
 impl Default for AppearanceSettings {
@@ -254,6 +259,8 @@ impl Default for AppearanceSettings {
             density: "comfortable".into(),
             reduce_motion: false,
             show_token_usage: true,
+            thinking_style: "scan".into(),
+            status_words: "plain".into(),
         }
     }
 }

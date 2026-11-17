@@ -15,8 +15,10 @@ import "fonts/InstrumentSerif-Italic.ttf";
 import "fonts/JetBrainsMono-Regular.ttf";
 import { Theme } from "theme/tokens.slint";
 import { MidnightBackdrop, DitherField } from "theme/backdrop.slint";
-import { GlyphAnim, AsciiArt, ArtClock } from "components/ascii.slint";
+import { GlyphAnim, ThinkGlyph, AsciiArt, ArtClock } from "components/ascii.slint";
 export { ArtClock }
+import { Look } from "theme/look.slint";
+export { Look }
 import { Icon, Icons, IconsFill, Glass, Spinner, Button, IconButton, Tag, Divider, Card, MenuShell, MenuItem, TabBar, TabItem, SectionLabel, StatusDot, Segmented, SegmentOption } from "components/controls.slint";
 import { FileIcons } from "components/icons.slint";
 
@@ -1841,12 +1843,15 @@ component EmptyState inherits VerticalLayout {
 
 component WorkingLine inherits Rectangle {
     property <int> secs;
+    // "playful" words change every few seconds and start somewhere else each turn.
+    property <[string]> playful: [@tr("Thinking…"), @tr("Sniffing around…"), @tr("Digging in…"), @tr("Hopping through the code…"), @tr("Nibbling on it…"), @tr("Following the trail…"), @tr("Ears up…"), @tr("Burrowing deeper…")];
+    property <string> label: Look.words == "playful" ? root.playful[mod(floor(root.secs / 4) + Look.turn, root.playful.length)] : @tr("Thinking…");
     // Same 2.4 s breathing as before (20 steps of 120 ms), now stepped by the shared busy clock (90 ms), so
     // the glow, the scan and the tool spinner change in the same redraw.
     property <float> glow: 0.55 + 0.45 * sin(ArtClock.busy-tick * 13.5deg);
     height: 26px;
     accessible-role: text;
-    accessible-label: "Thinking, " + root.secs + " seconds";
+    accessible-label: root.label + " " + root.secs + " seconds";
     Timer {
         interval: 1s;
         running: true;
@@ -1857,18 +1862,13 @@ component WorkingLine inherits Rectangle {
     HorizontalLayout {
         padding-left: 6px;
         spacing: 10px;
-        // Unicode scan: a shade ramp (░▒▓█▓▒░) sweeping through eight cells.
-        GlyphAnim {
+        // The unicode animation picked in Settings › Appearance (default: a shade ramp sweeping eight cells).
+        ThinkGlyph {
             y: (parent.height - self.height) / 2;
-            frames: AsciiArt.scan;
-            divider: 1;
-            busy: true;
-            font-size: 11px;
-            color: Theme.foreground-subtle;
-            vertical-alignment: center;
+            index: Look.think-now;
         }
         Text {
-            text: "Thinking…";
+            text: root.label;
             font-size: Theme.ui-caption;
             color: Theme.foreground-subtle;
             opacity: root.glow;
@@ -3223,6 +3223,13 @@ export component AppWindow inherits Window {
         running: root.busy-on-screen;
         triggered => {
             ArtClock.busy-tick = mod(ArtClock.busy-tick + 1, 1000000);
+        }
+    }
+    // Every turn counts (the "shuffle" thinking animation and the playful words start elsewhere each turn).
+    property <bool> run-watch: root.running;
+    changed run-watch => {
+        if root.run-watch {
+            Look.turn = mod(Look.turn + 1, 1000000);
         }
     }
     // A file chip / change peek in the chat asks for the Live view (Rust bumps LiveUi.open-tick).
