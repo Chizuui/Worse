@@ -138,6 +138,13 @@ impl Hub {
                             AuthPresence::Absent
                         }
                     }
+                    // A Command Code key (providers.rs): the key in its environment is its login.
+                    _ if spec.env.iter().any(|(k, v)| {
+                        k == crate::providers::ENV_COMMAND_CODE_KEY && !v.trim().is_empty()
+                    }) =>
+                    {
+                        AuthPresence::Present
+                    }
                     (Some(kind), Some(paths)) => {
                         presence(self.ctx.config.auth_probe.0.probe(kind, paths).await)
                     }

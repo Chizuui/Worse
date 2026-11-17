@@ -111,6 +111,8 @@ impl Env {
         HubConfig {
             home: self.home.clone(),
             default_fallback_order: agents.iter().map(|a| a.id.clone()).collect(),
+            key_pools: Vec::new(),
+            rotate_keys: true,
             agents,
             agent_idle_timeout: IDLE,
             helpers: harness_agent_hub::helpers::HelperLaunch::Separate {

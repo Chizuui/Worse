@@ -30,6 +30,7 @@ async fn add_phase(env: &Env, home: &Path) -> R<()> {
             base_url: " http://127.0.0.1:9/v1/chat/completions/ ".into(),
             model: "mock-model".into(),
             api_key: KEY.into(),
+            kind: String::new(),
         })
         .await
         .map_err(|e| format!("add_provider: {e}"))?;
@@ -48,6 +49,7 @@ async fn add_phase(env: &Env, home: &Path) -> R<()> {
                     base_url: url.into(),
                     model: model.into(),
                     api_key: String::new(),
+                    kind: String::new(),
                 })
                 .await
                 .is_err(),

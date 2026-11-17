@@ -282,6 +282,8 @@ export struct ProviderRow {
     has-key: bool,
     // false until Harness restarts
     loaded: bool,
+    // "" = OpenAI-compatible endpoint, "command-code" = one API key of the Command Code CLI
+    kind: string,
 }
 
 export global AgentsUi {
@@ -291,6 +293,9 @@ export global AgentsUi {
     in-out property <string> provider-url;
     in-out property <string> provider-model;
     in-out property <string> provider-key;
+    // "" = OpenAI-compatible endpoint; "command-code" = API keys of the Command Code CLI (provider-key then
+    // holds one key per line, and the endpoint and model are not used).
+    in-out property <string> provider-kind;
     in property <string> provider-error;
     in-out property <bool> provider-open;
     callback add-provider();

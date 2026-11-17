@@ -32,6 +32,13 @@ pub struct HubConfig {
     pub agents: Vec<AgentSpec>,
     /// Failover order used until the user sets one.
     pub default_fallback_order: Vec<AgentId>,
+    /// Agents that stand for the same service with different API keys (`providers.rs`). A new session asked
+    /// for a member takes the members in turn (round robin). Filled when `providers.json` is applied.
+    pub key_pools: Vec<Vec<AgentId>>,
+    /// Round robin over `key_pools` (off: every session keeps the agent it asked for; failover still walks the
+    /// keys). `from_env`: on unless `HARNESS_KEY_ROTATION=off`; `providers.json` `"rotation": "off"` also
+    /// turns it off.
+    pub rotate_keys: bool,
     /// Idle period before an agent process is stopped.
     pub agent_idle_timeout: Duration,
     /// How helper processes (memory / delegate MCP servers, API provider agent) are launched (§9.9).
@@ -116,6 +123,9 @@ impl HubConfig {
             home,
             agents,
             default_fallback_order,
+            key_pools: Vec::new(),
+            rotate_keys: !std::env::var("HARNESS_KEY_ROTATION")
+                .is_ok_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "off" | "0" | "false")),
             agent_idle_timeout,
             helpers,
             event_capacity: 4096,

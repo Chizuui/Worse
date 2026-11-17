@@ -318,6 +318,10 @@ pub struct AddProvider {
     pub base_url: String,
     pub model: String,
     pub api_key: String,
+    /// What the key is for: `""` = an OpenAI-compatible endpoint (`base_url` + `model`), `"command-code"` =
+    /// one API key of the Command Code CLI (`base_url` and `model` are not used).
+    #[serde(default)]
+    pub kind: String,
 }
 
 impl std::fmt::Debug for AddProvider {
@@ -327,6 +331,7 @@ impl std::fmt::Debug for AddProvider {
             .field("base_url", &self.base_url)
             .field("model", &self.model)
             .field("api_key", &"<redacted>")
+            .field("kind", &self.kind)
             .finish()
     }
 }
@@ -366,4 +371,7 @@ pub struct ProviderInfo {
     pub has_key: bool,
     /// True when the running hub has this provider as an agent (false until the next start).
     pub loaded: bool,
+    /// `""` = OpenAI-compatible endpoint, `"command-code"` = a Command Code CLI key (see [`AddProvider`]).
+    #[serde(default)]
+    pub kind: String,
 }

@@ -160,3 +160,4 @@ agents/gemini.svg <- @lobehub/icons-static-svg:gemini-color
 agents/deepseek.svg <- @lobehub/icons-static-svg:deepseek-color
 agents/antigravity.svg <- @lobehub/icons-static-svg:antigravity-color
 agents/openai.svg <- @lobehub/icons-static-svg:openai (fill set to white)
+agents/commandcode.png <- https://commandcode.ai/favicon/2024/android-chrome-192x192.png (unchanged)

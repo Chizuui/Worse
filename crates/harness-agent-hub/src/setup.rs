@@ -49,6 +49,11 @@ pub const KNOWN_CLIS: &[KnownCli] = &[
         cli: "agy",
         package: None,
     },
+    KnownCli {
+        program: "command-code",
+        cli: "command-code",
+        package: None,
+    },
 ];
 
 /// Env override of the npm command (gates use a fake npm).

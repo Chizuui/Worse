@@ -7,6 +7,7 @@ export global AgentLogo {
         if name.to-lowercase().starts-with("openai") { return "openai"; }
         if name.to-lowercase().starts-with("agy") || name.to-lowercase().starts-with("antigravity") { return "antigravity"; }
         if name.to-lowercase().starts-with("gemini") { return "gemini"; }
+        if name.to-lowercase().starts-with("command-code") || name.to-lowercase().starts-with("command code") || name.to-lowercase().starts-with("commandcode") { return "commandcode"; }
         if name.to-lowercase().starts-with("deepseek") || name.to-lowercase().starts-with("api-deepseek") || name.to-lowercase() == "harness" { return "deepseek"; }
         return "";
     }
@@ -16,6 +17,7 @@ export global AgentLogo {
         if key == "openai" { return @image-url("../icons/agents/openai.svg"); }
         if key == "antigravity" { return @image-url("../icons/agents/antigravity.svg"); }
         if key == "gemini" { return @image-url("../icons/agents/gemini.svg"); }
+        if key == "commandcode" { return @image-url("../icons/agents/commandcode.png"); }
         return @image-url("../icons/agents/deepseek.svg");
     }
     pure public function tint(key: string) -> color {
@@ -23,6 +25,7 @@ export global AgentLogo {
         if key == "codex" || key == "openai" { return Theme.agent-codex; }
         if key == "antigravity" { return Theme.agent-agy; }
         if key == "gemini" { return Theme.agent-gemini; }
+        if key == "commandcode" { return Theme.dark ? #e9e9ec : #1a1b1d; }
         if key == "deepseek" { return Theme.agent-deepseek; }
         return Theme.accent-fg;
     }
@@ -35,15 +38,17 @@ export component AgentMark inherits Rectangle {
     width: root.size;
     height: root.size;
     border-radius: root.size * 0.26;
-    background: root.key == "codex" ? transparent : #17181C;
-    border-width: root.key == "codex" ? 0px : 1px;
+    // The Codex and Command Code marks bring their own tile: they are drawn edge to edge.
+    property <bool> bleed: root.key == "codex" || root.key == "commandcode";
+    background: root.bleed ? transparent : #17181C;
+    border-width: root.bleed ? 0px : 1px;
     border-color: #2A2D33;
     clip: true;
     accessible-role: none;
     Image {
-        x: root.key == "codex" ? 0px : root.size * 0.17;
-        y: root.key == "codex" ? 0px : root.size * 0.17;
-        width: root.key == "codex" ? root.size : root.size * 0.66;
+        x: root.bleed ? 0px : root.size * 0.17;
+        y: root.bleed ? 0px : root.size * 0.17;
+        width: root.bleed ? root.size : root.size * 0.66;
         height: self.width;
         source: AgentLogo.image(root.key);
         image-fit: contain;

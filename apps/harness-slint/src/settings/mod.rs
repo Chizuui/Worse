@@ -1508,6 +1508,18 @@ pub fn patch_setting(path: &str, value: Value) {
     with_state(|s| s.patch(path, value));
 }
 
+/// API keys pasted into the Command Code dialog: one per line (commas and semicolons also separate), blanks
+/// and repeats dropped, order kept.
+fn command_code_keys(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for key in text.split(['\n', '\r', ',', ';']).map(str::trim).filter(|k| !k.is_empty()) {
+        if !out.iter().any(|k| k == key) {
+            out.push(key.to_owned());
+        }
+    }
+    out
+}
+
 /// The last settings snapshot mirrored from the store (UI thread only).
 pub fn current() -> Option<Arc<Settings>> {
     let mut out = None;
@@ -1623,6 +1635,7 @@ pub fn providers(result: Result<Vec<api::ProviderInfo>, String>) {
                 endpoint: p.base_url.clone().into(),
                 has_key: p.has_key,
                 loaded: p.loaded,
+                kind: p.kind.clone().into(),
             })
             .collect();
         ui.set_providers(model(rows));
@@ -1962,20 +1975,45 @@ fn wire(window: &AppWindow) {
         });
     });
     agents.on_add_provider(|| {
-        let mut request = None;
+        let mut requests = Vec::new();
         with_state(|s| {
             let ui = s.window.global::<AgentsUi>();
-            let candidate = api::AddProvider {
-                label: ui.get_provider_label().trim().to_owned(),
-                base_url: ui.get_provider_url().trim().to_owned(),
-                model: ui.get_provider_model().trim().to_owned(),
-                api_key: ui.get_provider_key().trim().to_owned(),
-            };
-            if candidate.label.is_empty()
-                || candidate.base_url.is_empty()
-                || candidate.model.is_empty()
-            {
-                return;
+            let label = ui.get_provider_label().trim().to_owned();
+            let kind = ui.get_provider_kind().trim().to_owned();
+            if kind == "command-code" {
+                // One entry per key (one per line): each key becomes its own Command Code agent, and
+                // sessions take them in turn.
+                let keys = command_code_keys(&ui.get_provider_key());
+                if label.is_empty() || keys.is_empty() {
+                    return;
+                }
+                let many = keys.len() > 1;
+                requests = keys
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, api_key)| api::AddProvider {
+                        label: if many { format!("{label} {}", i + 1) } else { label.clone() },
+                        base_url: String::new(),
+                        model: String::new(),
+                        api_key,
+                        kind: kind.clone(),
+                    })
+                    .collect();
+            } else {
+                let candidate = api::AddProvider {
+                    label,
+                    base_url: ui.get_provider_url().trim().to_owned(),
+                    model: ui.get_provider_model().trim().to_owned(),
+                    api_key: ui.get_provider_key().trim().to_owned(),
+                    kind: String::new(),
+                };
+                if candidate.label.is_empty()
+                    || candidate.base_url.is_empty()
+                    || candidate.model.is_empty()
+                {
+                    return;
+                }
+                requests.push(candidate);
             }
             // 提交后立即清空输入框，密钥不在界面里停留。
             for clear in [
@@ -1983,13 +2021,13 @@ fn wire(window: &AppWindow) {
                 AgentsUi::set_provider_url,
                 AgentsUi::set_provider_model,
                 AgentsUi::set_provider_key,
+                AgentsUi::set_provider_kind,
             ] {
                 clear(&ui, SharedString::new());
             }
             ui.set_provider_open(false);
-            request = Some(candidate);
         });
-        if let Some(request) = request {
+        for request in requests {
             crate::bridge::send(crate::core::Command::Providers(
                 crate::core::ProvidersCall::Add(request),
             ));

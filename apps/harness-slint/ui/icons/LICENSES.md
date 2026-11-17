@@ -11,6 +11,9 @@
 - `agents/`: brand marks of Anthropic Claude, OpenAI Codex, Google Gemini, Google Antigravity and DeepSeek, from LobeHub
   Icons (`@lobehub/icons-static-svg`, MIT License, https://github.com/lobehub/lobe-icons). The marks are trademarks of their
   owners and are used only to identify each agent.
+- `agents/commandcode.png`: the Command Code app icon as served by https://commandcode.ai
+  (`/favicon/2024/android-chrome-192x192.png`). It is the mark of Command Code, not covered by this repository's license,
+  and is used only to identify the Command Code agent.
 
 SOURCES.txt lists the upstream icon name behind every generated file.
 

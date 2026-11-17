@@ -76,7 +76,7 @@ impl AgentSpec {
     }
 }
 
-/// Built-in agents in default failover order: Claude Code, Codex, agy.
+/// Built-in agents in default failover order: Claude Code, Codex, agy, Command Code.
 #[must_use]
 pub fn builtin_agents() -> Vec<AgentSpec> {
     vec![
@@ -113,8 +113,23 @@ pub fn builtin_agents() -> Vec<AgentSpec> {
             transport: Transport::Acp,
             dialect: ErrorDialect::Agy,
         },
+        AgentSpec {
+            id: AgentId::new(COMMAND_CODE),
+            display_name: "Command Code".into(),
+            // The CLI speaks ACP itself (`command-code acp`, checked with 1.89.2). The npm package also
+            // installs `cmd`, but that name is the Windows shell, so the long name is used everywhere.
+            program: "command-code".into(),
+            args: vec!["acp".into()],
+            env: Vec::new(),
+            install_hint: "install Command Code: npm i -g command-code, then sign in with `command-code login`, or add API keys under Settings › Agents › API providers".into(),
+            transport: Transport::Acp,
+            dialect: ErrorDialect::Generic,
+        },
     ]
 }
+
+/// Agent id of the built-in Command Code agent (the one that uses the CLI's own login).
+pub const COMMAND_CODE: &str = "command-code";
 
 /// Finds an executable: absolute/relative paths as-is, bare names on PATH (with PATHEXT on Windows).
 #[must_use]

@@ -5,7 +5,7 @@
 import { Theme } from "../theme/tokens.slint";
 import { Icon, Icons, Button, IconButton, Divider, Dialog, Spinner } from "../components/controls.slint";
 import { AgentsUi, AgentCard } from "globals.slint";
-import { Select, TextField, Switch } from "parts.slint";
+import { Select, TextField, TextArea, Switch } from "parts.slint";
 import { SetupUi } from "../setup.slint";
 import { AgentLogo, AgentMark } from "../components/agent_logo.slint";
 
@@ -829,11 +829,14 @@ component LabeledField inherits VerticalLayout {
 export component ProviderDialog inherits Dialog {
     // The Hermes preset was picked: show how to connect it.
     property <bool> hermes: false;
+    // The Command Code preset: a name and one key per line, no endpoint or model.
+    property <bool> command-code: AgentsUi.provider-kind == "command-code";
     title: @tr("Add custom provider");
     close-label: @tr("Close");
     dialog-width: 520px;
     close => {
         AgentsUi.provider-open = false;
+        AgentsUi.provider-kind = "";
     }
     VerticalLayout {
         spacing: 14px;
@@ -857,12 +860,32 @@ export component ProviderDialog inherits Dialog {
                 h: 26px;
                 pad: 10px;
                 clicked => {
+                    AgentsUi.provider-kind = "";
                     AgentsUi.provider-label = "Hermes";
                     AgentsUi.provider-url = "http://127.0.0.1:8642/v1";
                     AgentsUi.provider-model = "hermes-agent";
                     root.hermes = true;
                 }
             }
+            DButton {
+                text: "Command Code keys";
+                h: 26px;
+                pad: 10px;
+                primary: root.command-code;
+                clicked => {
+                    AgentsUi.provider-kind = "command-code";
+                    AgentsUi.provider-label = "Key";
+                    AgentsUi.provider-url = "";
+                    AgentsUi.provider-model = "";
+                    root.hermes = false;
+                }
+            }
+        }
+        if root.command-code: Text {
+            text: "Paste one or more Command Code API keys (create them in Command Code Studio). Each key becomes its own Command Code agent. New sessions and delegated subagents take the keys in turn (round robin), and a key that reaches its usage limit is skipped until it resets. Needs the Command Code CLI: npm i -g command-code.";
+            font-size: 11px;
+            color: Theme.foreground-subtle;
+            wrap: word-wrap;
         }
         if root.hermes: Text {
             text: "Start the gateway with `hermes gateway` (its API server needs API_SERVER_KEY, 16+ characters) and paste that key below. Hermes runs its own tools on the gateway's host; Harness shows its replies, tool progress and approval requests, and other agents can delegate to it.";
@@ -872,6 +895,7 @@ export component ProviderDialog inherits Dialog {
         }
         LabeledField {
             title: "Name";
+            hint: root.command-code ? "several keys are numbered: Key 1, Key 2, …" : "";
             TextField {
                 height: 34px;
                 text <=> AgentsUi.provider-label;
@@ -879,7 +903,17 @@ export component ProviderDialog inherits Dialog {
                 label: "Provider name";
             }
         }
-        LabeledField {
+        if root.command-code: LabeledField {
+            title: "API keys";
+            hint: "one per line; stored in Harness's data folder, never shown again";
+            TextArea {
+                min-height: 96px;
+                max-height: 96px;
+                text <=> AgentsUi.provider-key;
+                label: "Command Code API keys";
+            }
+        }
+        if !root.command-code: LabeledField {
             title: "Base URL";
             hint: "must end with /v1";
             TextField {
@@ -889,7 +923,7 @@ export component ProviderDialog inherits Dialog {
                 label: "Base URL";
             }
         }
-        LabeledField {
+        if !root.command-code: LabeledField {
             title: "API key";
             hint: "stored in Harness's data folder, never shown again";
             TextField {
@@ -900,7 +934,7 @@ export component ProviderDialog inherits Dialog {
                 password: true;
             }
         }
-        LabeledField {
+        if !root.command-code: LabeledField {
             title: "Model";
             hint: root.hermes ? "the gateway's model name (hermes-agent unless a profile renames it)" : "must support tool (function) calling";
             TextField {
@@ -938,14 +972,15 @@ export component ProviderDialog inherits Dialog {
                 pad: 12px;
                 clicked => {
                     AgentsUi.provider-open = false;
+                    AgentsUi.provider-kind = "";
                 }
             }
             DButton {
-                text: "Save provider";
+                text: root.command-code ? "Save keys" : "Save provider";
                 h: 30px;
                 pad: 12px;
                 primary: true;
-                enabled: AgentsUi.provider-label != "" && AgentsUi.provider-url != "" && AgentsUi.provider-model != "";
+                enabled: AgentsUi.provider-label != "" && (root.command-code ? AgentsUi.provider-key != "" : AgentsUi.provider-url != "" && AgentsUi.provider-model != "");
                 clicked => {
                     AgentsUi.add-provider();
                 }
@@ -1344,7 +1379,7 @@ export component AgentsPage inherits VerticalLayout {
                             Tile {
                                 size: 26px;
                                 font: 10.9px;
-                                logo: AgentLogo.key(p.label);
+                                logo: p.kind == "command-code" ? "commandcode" : AgentLogo.key(p.label);
                                 initial: AgentsLook.provider-initial(p.label);
                                 tone: AgentsLook.provider-color(p.label);
                                 ink: p.label.to-lowercase() == "openai" ? Theme.canvas : #FFFFFF;
@@ -1378,7 +1413,7 @@ export component AgentsPage inherits VerticalLayout {
                                 VerticalLayout {
                                     alignment: center;
                                     Pill {
-                                        text: "OpenAI-compatible";
+                                        text: p.kind == "command-code" ? "Command Code key" : "OpenAI-compatible";
                                         size: 9px;
                                         pad-v: 1px;
                                         pad-h: 6px;
@@ -1386,7 +1421,7 @@ export component AgentsPage inherits VerticalLayout {
                                 }
                             }
                             Text {
-                                text: p.model;
+                                text: p.kind == "command-code" ? "Takes turns with the other Command Code keys (round robin)" : p.model;
                                 font-size: 10.5px;
                                 color: Theme.icon-subtlest;
                                 overflow: elide;
@@ -1396,7 +1431,7 @@ export component AgentsPage inherits VerticalLayout {
                             horizontal-stretch: 1;
                             spacing: 8px;
                             Text {
-                                text: p.endpoint;
+                                text: p.kind == "command-code" ? "command-code acp" : p.endpoint;
                                 font-size: 10px;
                                 color: Theme.icon-subtlest;
                                 vertical-alignment: center;

@@ -65,9 +65,37 @@ pub(crate) struct HubCtx {
     pub(crate) machine: crate::machine::Machine,
     pub(crate) routers: crate::inbox::Routers,
     pub(crate) agy: crate::agy_ops::AgyState,
+    /// Next member of each key pool (`config.key_pools`) for the round robin over API keys.
+    rotation: Mutex<HashMap<usize, usize>>,
 }
 
 impl HubCtx {
+    /// The agent a new session asked for `agent` gets. A member of a key pool (several API keys of one
+    /// service, see `providers.rs`) is replaced by the pool's next member that is installed and not at its
+    /// usage limit, so sessions take the keys in turn. Anything else, or a pool with nobody usable, stays.
+    pub(crate) fn rotated(&self, agent: AgentId) -> AgentId {
+        if !self.config.rotate_keys {
+            return agent;
+        }
+        let Some((index, pool)) = crate::providers::pool_of(&self.config.key_pools, &agent) else {
+            return agent;
+        };
+        let Ok(mut next) = self.rotation.lock() else {
+            return agent;
+        };
+        let start = next.get(&index).copied().unwrap_or(0);
+        let picked = (0..pool.len())
+            .map(|offset| (start + offset) % pool.len())
+            .find(|i| self.is_installed(&pool[*i]) && self.quota.is_usable(&pool[*i]));
+        match picked {
+            Some(i) => {
+                next.insert(index, (i + 1) % pool.len());
+                pool[i].clone()
+            }
+            None => agent,
+        }
+    }
+
     pub(crate) fn display_name(&self, agent: &AgentId) -> String {
         self.specs
             .get(agent)
@@ -414,6 +442,7 @@ impl Hub {
             machine,
             routers: crate::inbox::Routers::default(),
             agy: crate::agy_ops::AgyState::default(),
+            rotation: Mutex::new(HashMap::new()),
         });
         let hub = Arc::new_cyclic(|me| Self {
             ctx,
@@ -644,16 +673,20 @@ impl Hub {
         .map_err(|e| ApiError::InvalidArgument(e.to_string()))?;
         let agent = match request.agent {
             Some(agent) => {
+                // Several API keys of one service: sessions take them in turn. The rotation only picks
+                // members that are installed, so the availability check comes after it.
+                let agent = self.ctx.rotated(agent);
                 self.ctx.require_available(&agent)?;
                 agent
             }
-            None => self
-                .ctx
-                .fallback_order()
-                .into_iter()
-                .find(|a| self.ctx.is_installed(a) && self.ctx.quota.is_usable(a))
-                .or_else(|| self.ctx.fallback_order().into_iter().next())
-                .ok_or_else(|| ApiError::AgentUnavailable("no agents configured".into()))?,
+            None => self.ctx.rotated(
+                self.ctx
+                    .fallback_order()
+                    .into_iter()
+                    .find(|a| self.ctx.is_installed(a) && self.ctx.quota.is_usable(a))
+                    .or_else(|| self.ctx.fallback_order().into_iter().next())
+                    .ok_or_else(|| ApiError::AgentUnavailable("no agents configured".into()))?,
+            ),
         };
         let now = now_ms();
         let child = parent.as_ref().map(|p| {
