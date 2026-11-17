@@ -1,8 +1,10 @@
 name: build-windows
 
 # Builds the Windows executable on a Windows runner and keeps it as a workflow artifact
-# (Actions tab > the run > Artifacts > Worse-Harness-windows-x64). Runs when asked for, and on every
-# push to the branch that carries the redesign.
+# (Actions tab > the run > Artifacts > Worse-Harness-windows-x64). The download is a zip with
+# Worse-Harness.exe at its root, which is the release asset the in-app updater looks for
+# (apps/harness-slint/src/release_update.rs). Runs when asked for, and on every push to the branch
+# that carries the redesign.
 on:
   workflow_dispatch:
   push:
@@ -30,7 +32,7 @@ jobs:
         run: |
           $dir = "dist/Worse-Harness-windows-x64"
           New-Item -ItemType Directory -Force $dir | Out-Null
-          Copy-Item target/release/harness-slint.exe "$dir/worse-harness.exe"
+          Copy-Item target/release/harness-slint.exe "$dir/Worse-Harness.exe"
           foreach ($file in "LICENSE", "NOTICE") {
             if (Test-Path $file) { Copy-Item $file $dir }
           }

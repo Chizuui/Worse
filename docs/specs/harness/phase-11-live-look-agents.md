@@ -240,13 +240,26 @@ Verified by running the real app under a virtual X server:
   agent reports tokens, the estimate when it does not, and nothing with the setting off.
 - Unit tests: `live::`, `wallpaper::`, `machine_view::`, `computer_mcp::`, `speed::`, `bridge::turns::`,
   `harness-api-agent hermes::`, `harness-agent-hub providers::`.
+- The Windows build: cross-compiled from Linux (`cargo xwin build --release --target x86_64-pc-windows-msvc
+  -p harness-slint --bins`; cargo-xwin 0.23.1 with clang-cl and lld-link 18) and run under Wine 9.0 with CPU
+  rendering: start through the shadow copy, the Appearance and Agents pages, a wallpaper picked in the Windows
+  file dialog, and one turn against the stand-in Hermes gateway (the app's own `--api-agent` process, tool
+  rows, an approval, the tok/s label).
 
 Not verified:
 
-- Anything on Windows or macOS. All runs were on Linux under Xvfb with CPU rendering.
-- GPU rendering (`general.gpuRendering`): the switch selects the renderer that was the default before; no GPU
-  was available to run it.
+- Real Windows, and anything on macOS. The Windows build ran under Wine only (above); the Linux runs were
+  under Xvfb with CPU rendering.
+- GPU rendering (`general.gpuRendering`), Direct3D on Windows included: the switch selects the renderer that
+  was the default before; no GPU was available to run it.
 - A real Hermes gateway and a real Command Code key (`COMMAND_CODE_API_KEY` in ACP mode follows the CLI's
   documentation of its headless login).
-- The file picker for the wallpaper (the settings write behind it is the same one the tests use).
+- The wallpaper file picker on Linux (GTK). The Windows dialog was driven under Wine; the settings write behind
+  both is the same one the tests use.
 - New interface strings are English only; the Chinese translation falls back to English for them.
+
+Found on the way, in a dependency and not changed here: the frame throttle of Slint 1.18.1
+(`i-slint-backend-winit`, `frame_throttle.rs`) divides by the monitor's refresh rate. A display that reports
+0 Hz makes the app panic at its first redraw. Wine on Xvfb reports 0 Hz and hit it; a Wine virtual desktop
+reports 60 Hz and runs. Windows documents 0 and 1 as "hardware default" values of `dmDisplayFrequency`, so a
+real display can report them too.
