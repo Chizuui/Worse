@@ -282,6 +282,15 @@ impl UiState {
     }
 
     fn push_item(&mut self, id: ItemId, item: &Item) {
+        if matches!(
+            item,
+            Item::User {
+                background: false,
+                ..
+            }
+        ) {
+            crate::live::new_turn(&self.window);
+        }
         self.note_item(id, item);
         let row = self.chat_item(id, item);
         self.rows.insert(id, self.chat.row_count());
@@ -377,6 +386,7 @@ impl UiState {
             depth: 0,
         }));
         crate::chat::set_workspace(&path);
+        crate::live::set_workspace(&path);
         crate::panels::set_workspace(path);
     }
 
@@ -754,6 +764,10 @@ impl UiState {
                         raw_input.as_deref(),
                         raw_output.as_deref(),
                     );
+                    // Only a running turn moves the Live view (opening a session replays every tool call).
+                    if self.window.get_running() {
+                        crate::live::touch(&self.window, kind.as_deref(), &content, &locations);
+                    }
                 }
             }
             Event::Thought { session, text } => {
@@ -1024,6 +1038,8 @@ pub fn install(
     window.global::<Theme>().set_mono_font(mono.into());
     // Agent A's panels ask the side pane to switch tabs (a git change row opens the Diff tab).
     let weak = window.as_weak();
+    crate::live::install(window);
+    crate::live::set_workspace(workspace);
     window.global::<PanelNav>().on_open_tab(move |id| {
         if let Some(window) = weak.upgrade() {
             window.set_side_tab(id);

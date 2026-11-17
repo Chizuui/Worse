@@ -8,6 +8,7 @@ import { Icon, Icons, IconsFill, Spinner, Button, IconButton, Tag, Divider, Dial
 import { TextField, TextArea, Switch } from "../settings/parts.slint";
 import { AgentTint, Pill, ProgressTrack, CapsHeader } from "../panels/common.slint";
 import { ChatUi, ChatImage, ToolPart, ChangeRow, PlanRow, ScheduleRow, SubagentRow } from "globals.slint";
+import { LiveUi } from "../panels/live.slint";
 
 // Row of small image previews; a click opens the file in the OS viewer.
 export component ImageStrip inherits HorizontalLayout {
@@ -59,6 +60,11 @@ export component ToolCard inherits VerticalLayout {
     in property <bool> hit;
     in property <[ChatImage]> images;
     in property <int> images-more;
+    // First changed lines of an edit (shown while collapsed), and the file / line range the tool touched.
+    in property <[ToolPart]> peek;
+    in property <string> file;
+    in property <int> file-line;
+    in property <string> range;
     property <string> status-text: root.status == 0 ? @tr("Running") : root.status == 1 ? @tr("Awaiting permission") : root.status == 2 ? @tr("Done") : root.status == 3 ? @tr("Denied") : @tr("Failed");
     property <string> tone: root.status == 2 ? "success" : root.status == 1 ? "progress" : root.status == 0 ? "neutral" : root.status == 3 ? "warning" : "destructive";
     property <length> content-width: 400px;
@@ -117,6 +123,33 @@ export component ToolCard inherits VerticalLayout {
                 accessible-role: none;
                 animate color { duration: Theme.dur-hover; easing: ease-out-quint; }
             }
+            // Line range chip: opens the file in the Live view at that line.
+            if root.file != "" && root.range != "": Rectangle {
+                y: (parent.height - self.height) / 2;
+                height: 20px;
+                width: range-t.preferred-width + 12px;
+                border-radius: Theme.radius-sm;
+                background: rta.has-hover ? Theme.surface-hover : Theme.tag;
+                accessible-role: button;
+                accessible-label: @tr("Show {0} in Live", root.range);
+                accessible-action-default => {
+                    LiveUi.open(root.file, root.file-line);
+                }
+                range-t := Text {
+                    text: root.range;
+                    font-family: Theme.art-font;
+                    font-size: 10px;
+                    color: rta.has-hover ? Theme.foreground : Theme.foreground-subtle;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+                rta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        LiveUi.open(root.file, root.file-line);
+                    }
+                }
+            }
             if root.status == 1 || root.status == 3: Tag {
                 y: (parent.height - self.height) / 2;
                 text: root.status-text;
@@ -157,6 +190,54 @@ export component ToolCard inherits VerticalLayout {
         images: root.images;
         more: root.images-more;
         padding-left: 12px;
+    }
+    // Collapsed edit: the first changed lines, so a change can be seen without opening the row. Click opens it in
+    // the Live view.
+    if !root.expanded && root.peek.length > 0: Rectangle {
+        property <length> line-h: Theme.code-size * 1.5;
+        height: root.peek.length * self.line-h + 12px;
+        border-radius: Theme.radius-md;
+        background: pka.has-hover ? Theme.surface-hover : Theme.surface;
+        border-width: 1px;
+        border-color: Theme.border;
+        clip: true;
+        accessible-role: AccessibleRole.button;
+        accessible-label: @tr("Show the change in Live");
+        accessible-action-default => {
+            LiveUi.open(root.file, root.file-line);
+        }
+        animate background { duration: Theme.dur-hover; easing: ease-out-quint; }
+        for p[i] in root.peek: Rectangle {
+            x: 0;
+            y: 6px + i * parent.line-h;
+            height: parent.line-h;
+            background: p.kind == 2 ? Theme.diff-added-surface : p.kind == 3 ? Theme.diff-removed-surface : transparent;
+            Text {
+                x: 10px;
+                width: 12px;
+                text: p.kind == 2 ? "+" : p.kind == 3 ? "−" : "…";
+                font-family: Theme.mono-font;
+                font-size: Theme.code-size;
+                color: p.kind == 2 ? Theme.diff-added : p.kind == 3 ? Theme.diff-removed : Theme.foreground-subtlest;
+                vertical-alignment: center;
+            }
+            Text {
+                x: 26px;
+                width: parent.width - 34px;
+                text: p.text;
+                font-family: Theme.mono-font;
+                font-size: Theme.code-size;
+                color: p.kind == 6 ? Theme.foreground-subtlest : Theme.foreground;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+        pka := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                LiveUi.open(root.file, root.file-line);
+            }
+        }
     }
     if root.expanded && root.parts.length > 0: Rectangle {
         property <bool> shown: false;

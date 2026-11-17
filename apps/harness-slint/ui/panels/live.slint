@@ -1,0 +1,286 @@
+// Live code view: follows the file the agent is reading or editing (the "Live" tab of the Side Pane).
+// Data: LiveUi (filled by src/live.rs). Rust renders only while this panel is on screen (`LiveUi.active`), so a
+// hidden Live tab costs one remembered path, not a file read.
+import { ListView } from "std-widgets.slint";
+import { Theme } from "../theme/tokens.slint";
+import { Icon, Icons, IconButton } from "../components/controls.slint";
+
+// mark: 0 plain, 1 read by the agent, 2 written by the agent, 3 about to change (edit not applied yet).
+export struct LiveLine {
+    no: int,
+    text: string,
+    code-light: styled-text,
+    code-dark: styled-text,
+    highlighted: bool,
+    mark: int,
+}
+
+export struct LiveFile {
+    path: string,
+    name: string,
+    current: bool,
+}
+
+export global LiveUi {
+    // The Live tab is on screen (set by the Side Pane); Rust renders only then.
+    in-out property <bool> active;
+    // Follow the agent: every tool that reads or edits a file moves the view there.
+    in-out property <bool> follow: true;
+    in property <string> path;
+    in property <string> name;
+    // "read" | "edit" | "pending" | "open" | "" (nothing yet).
+    in property <string> action;
+    in property <string> note;
+    in property <[LiveLine]> lines;
+    // Index (into `lines`) the view scrolls to; `epoch` changes on every new view so the highlight flashes.
+    in property <int> focus;
+    in property <int> epoch;
+    // Longest shown line, in character cells (the list scrolls sideways instead of wrapping code).
+    in property <int> cols;
+    // Files the agent touched in the current turn, oldest first.
+    in property <[LiveFile]> trail;
+    // Bumped by Rust when the view should come to the front (a file chip was clicked in the chat).
+    in property <int> open-tick;
+    callback open(string, int);
+    callback set-follow(bool);
+    // The Live panel appeared: Rust renders the current target.
+    callback refresh();
+}
+
+component LiveRow inherits Rectangle {
+    in property <LiveLine> line;
+    in property <bool> hot;
+    in property <length> gutter;
+    // Width given to the code text: wide enough for the longest line, so nothing wraps.
+    in property <length> text-w;
+    clip: true;
+    property <color> tint: root.line.mark == 2 ? Theme.success : root.line.mark == 3 ? Theme.warning : Theme.accent-fg;
+    background: root.line.mark == 0 ? transparent : root.tint.with-alpha(root.hot ? 0.22 : 0.07);
+    animate background { duration: root.hot ? 120ms : 1400ms; easing: ease-out-quint; }
+    accessible-role: none;
+    if root.line.mark != 0: Rectangle {
+        x: 0;
+        width: 2px;
+        background: root.tint.with-alpha(root.hot ? 1 : 0.6);
+        animate background { duration: root.hot ? 120ms : 1400ms; easing: ease-out-quint; }
+    }
+    Text {
+        x: 0;
+        width: root.gutter - 10px;
+        text: root.line.no;
+        font-family: Theme.mono-font;
+        font-size: Theme.code-size - 1px;
+        color: root.line.mark == 0 ? Theme.foreground-subtlest : root.tint;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+    if root.line.highlighted: StyledText {
+        x: root.gutter;
+        width: root.text-w;
+        y: (root.height - Theme.code-size * 1.3) / 2;
+        text: Theme.dark ? root.line.code-dark : root.line.code-light;
+        default-font-family: Theme.mono-font;
+        default-font-size: Theme.code-size;
+        default-color: Theme.foreground;
+    }
+    if !root.line.highlighted: Text {
+        x: root.gutter;
+        width: root.text-w;
+        text: root.line.text;
+        font-family: Theme.mono-font;
+        font-size: Theme.code-size;
+        color: Theme.foreground;
+        vertical-alignment: center;
+        wrap: no-wrap;
+    }
+}
+
+export component LivePanel inherits Rectangle {
+    property <length> row-h: Theme.code-size * 1.55;
+    property <length> gutter: 48px;
+    // Mono advance is about 0.6 em in the system code faces; 0.62 keeps a little slack.
+    property <length> text-w: max(120px, (LiveUi.cols + 2) * Theme.code-size * 0.62);
+    // The highlight is strong for a moment after each new view, then settles (one short animation, no timer
+    // left running).
+    property <bool> hot: false;
+    property <int> seen-epoch: -1;
+    changed epoch => {
+        root.flash();
+    }
+    property <int> epoch: LiveUi.epoch;
+    function flash() {
+        root.hot = true;
+        settle.running = true;
+        // Rust only renders a new view when following or when the user asked for a file, so every new
+        // view brings its focus line into sight.
+        list.content-y = -max(0px, LiveUi.focus * root.row-h - list.visible-height / 3);
+        list.content-x = 0px;
+    }
+    init => {
+        LiveUi.active = true;
+        LiveUi.refresh();
+        root.flash();
+    }
+    settle := Timer {
+        interval: 900ms;
+        running: false;
+        triggered => {
+            root.hot = false;
+            self.running = false;
+        }
+    }
+    VerticalLayout {
+        // Header: what the agent is doing, the file, follow / pause.
+        HorizontalLayout {
+            height: 40px;
+            padding-left: 12px;
+            padding-right: 8px;
+            spacing: 8px;
+            Rectangle {
+                y: (parent.height - self.height) / 2;
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: LiveUi.action == "edit" ? Theme.success : LiveUi.action == "pending" ? Theme.warning : LiveUi.action == "read" ? Theme.accent-fg : Theme.icon-subtlest;
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                Text {
+                    text: LiveUi.path == "" ? @tr("Waiting for the agent to open a file") : LiveUi.name;
+                    font-size: Theme.ui-caption;
+                    font-weight: Theme.weight-semibold;
+                    color: Theme.foreground;
+                    overflow: elide;
+                }
+                if LiveUi.path != "": Text {
+                    text: (LiveUi.action == "edit" ? @tr("Edited") : LiveUi.action == "pending" ? @tr("About to change") : LiveUi.action == "read" ? @tr("Reading") : @tr("Opened")) + (LiveUi.note != "" ? " · " + LiveUi.note : "");
+                    font-size: Theme.ui-xs + 1px;
+                    color: Theme.foreground-subtlest;
+                    overflow: elide;
+                }
+            }
+            Rectangle {
+                y: (parent.height - self.height) / 2;
+                height: 26px;
+                width: follow-row.preferred-width;
+                border-radius: Theme.radius-sm;
+                background: fta.has-hover ? Theme.surface-hover : Theme.surface;
+                border-width: 1px;
+                border-color: Theme.border;
+                accessible-role: button;
+                accessible-label: LiveUi.follow ? @tr("Pause following") : @tr("Follow the agent");
+                accessible-action-default => {
+                    LiveUi.set-follow(!LiveUi.follow);
+                }
+                follow-row := HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 9px;
+                    spacing: 5px;
+                    Icon {
+                        y: (parent.height - self.height) / 2;
+                        source: LiveUi.follow ? Icons.pause : Icons.play;
+                        size: 12px;
+                        tint: Theme.icon-subtle;
+                    }
+                    Text {
+                        text: LiveUi.follow ? @tr("Following") : @tr("Paused");
+                        font-size: Theme.ui-xs + 1px;
+                        color: Theme.foreground-subtle;
+                        vertical-alignment: center;
+                    }
+                }
+                fta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        LiveUi.set-follow(!LiveUi.follow);
+                    }
+                }
+            }
+        }
+        // Trail: the files this turn touched, oldest first; click to look at one.
+        if LiveUi.trail.length > 1: HorizontalLayout {
+            height: 26px;
+            padding-left: 12px;
+            padding-right: 12px;
+            spacing: 2px;
+            alignment: start;
+            for f[i] in LiveUi.trail: HorizontalLayout {
+                spacing: 2px;
+                if i > 0: Text {
+                    text: "→";
+                    font-size: Theme.ui-xs + 1px;
+                    color: Theme.foreground-subtlest;
+                    vertical-alignment: center;
+                }
+                Rectangle {
+                    height: 20px;
+                    width: crumb.preferred-width + 10px;
+                    border-radius: Theme.radius-sm;
+                    background: f.current ? Theme.raised : cta.has-hover ? Theme.hover : transparent;
+                    accessible-role: button;
+                    accessible-label: f.path;
+                    accessible-action-default => {
+                        LiveUi.open(f.path, 0);
+                    }
+                    crumb := Text {
+                        text: f.name;
+                        font-family: Theme.art-font;
+                        font-size: Theme.ui-xs + 1px;
+                        color: f.current ? Theme.foreground : Theme.foreground-subtle;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    cta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            LiveUi.open(f.path, 0);
+                        }
+                    }
+                }
+            }
+        }
+        Rectangle {
+            height: 1px;
+            background: Theme.section-line;
+        }
+        if LiveUi.lines.length == 0: VerticalLayout {
+            vertical-stretch: 1;
+            alignment: center;
+            padding: 24px;
+            spacing: 8px;
+            Text {
+                text: "( -.o)";
+                font-family: Theme.art-font;
+                font-size: 14px;
+                color: Theme.foreground-subtlest;
+                horizontal-alignment: center;
+            }
+            Text {
+                text: @tr("When the agent reads or changes a file, it shows up here.");
+                font-size: Theme.ui-sm;
+                color: Theme.foreground-subtlest;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+        }
+        list := ListView {
+            vertical-stretch: LiveUi.lines.length == 0 ? 0 : 1;
+            visible: LiveUi.lines.length > 0;
+            scrolled => {
+                // The user scrolled the code: stop moving the view under them.
+                if LiveUi.follow {
+                    LiveUi.set-follow(false);
+                }
+            }
+            for line in LiveUi.lines: LiveRow {
+                height: root.row-h;
+                width: max(list.visible-width, root.gutter + root.text-w + 8px);
+                line: line;
+                hot: root.hot;
+                gutter: root.gutter;
+                text-w: root.text-w;
+            }
+        }
+    }
+}

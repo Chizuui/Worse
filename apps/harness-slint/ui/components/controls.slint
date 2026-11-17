@@ -522,8 +522,9 @@ export struct SegmentOption {
 component SegmentChip inherits Rectangle {
     in property <string> text;
     in property <bool> selected;
+    in property <length> pad: 20px;
     callback activate;
-    width: ot.preferred-width + 20px;
+    width: ot.preferred-width + root.pad;
     border-radius: Theme.radius-sm;
     background: root.selected ? Theme.raised : (ta.has-hover ? Theme.hover : transparent);
     drop-shadow-blur: 0px;
@@ -560,6 +561,8 @@ component SegmentChip inherits Rectangle {
 export component Segmented inherits Rectangle {
     in property <[SegmentOption]> options;
     in property <string> current;
+    // Horizontal padding inside each chip (narrow hosts such as the Side Pane use less).
+    in property <length> chip-pad: 20px;
     callback select(string);
     height: 31px;
     preferred-width: seg.preferred-width;
@@ -572,6 +575,7 @@ export component Segmented inherits Rectangle {
         padding: 3px;
         spacing: 2px;
         for o in root.options: SegmentChip {
+            pad: root.chip-pad;
             text: o.label;
             selected: o.id == root.current;
             activate => {

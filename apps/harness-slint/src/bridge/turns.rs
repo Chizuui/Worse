@@ -242,6 +242,20 @@ fn diff_parts(out: &mut Vec<ToolPart>, old: Option<&str>, new: &str) {
     }
 }
 
+/// Lines shown under a collapsed edit row.
+const PEEK_LINES: usize = 6;
+
+/// The first changed lines of a tool card (removed / added rows of its diffs), for the collapsed row; "…" when
+/// there are more.
+fn peek_parts(parts: &[ToolPart]) -> Vec<ToolPart> {
+    let changed: Vec<&ToolPart> = parts.iter().filter(|p| p.kind == 2 || p.kind == 3).collect();
+    let mut out: Vec<ToolPart> = changed.iter().take(PEEK_LINES).map(|p| (*p).clone()).collect();
+    if changed.len() > PEEK_LINES {
+        out.push(part(6, &format!("{} more lines", changed.len() - PEEK_LINES)));
+    }
+    out
+}
+
 /// `ToolPart` rows of an expanded tool card. Section labels carry an id ("input" / "output") translated in Slint.
 fn tool_parts(
     content: &[ToolContent],
@@ -404,6 +418,7 @@ impl UiState {
 
     /// A session was opened or left: drops the live thinking row, plan, usage and change plans.
     pub(super) fn reset_turn_view(&mut self) {
+        crate::live::clear(&self.window);
         self.turn.thought = None;
         self.turn.thought_rows.clear();
         self.turn.next_thought = -2;
@@ -545,9 +560,15 @@ impl UiState {
         raw_output: Option<&str>,
     ) {
         let parts = tool_parts(content, locations, raw_input, raw_output);
+        let peek = peek_parts(&parts);
+        let file = crate::live::row_file(kind, content, locations);
         self.update_row(id, |row| {
             row.tool_kind = sv(kind.unwrap_or_default());
             row.parts = ModelRc::new(VecModel::from(parts));
+            row.peek = ModelRc::new(VecModel::from(peek));
+            row.file = sv(&file.path);
+            row.file_line = file.line;
+            row.range = sv(&file.range);
         });
     }
 

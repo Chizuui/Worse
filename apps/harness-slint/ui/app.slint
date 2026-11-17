@@ -22,6 +22,8 @@ import { FileIcons } from "components/icons.slint";
 
 export { Theme }
 import { PanelHost, PanelTabs } from "panels/panels.slint";
+import { LiveUi, LiveLine, LiveFile } from "panels/live.slint";
+export { LiveUi, LiveLine, LiveFile }
 // Agent A's panel globals are reachable from Rust through this re-export.
 export * from "panels/globals.slint";
 import { SettingsShell, FallbackRow } from "settings/shell.slint";
@@ -147,6 +149,12 @@ export struct ChatItem {
     change-note: string,
     images: [ChatImage],
     images-more: int,
+    // Tool rows: the first changed lines of an edit (shown under the collapsed row), and the file the tool read or
+    // changed with its line range ("L120–180"), which opens the Live view there.
+    peek: [ToolPart],
+    file: string,
+    file-line: int,
+    range: string,
 }
 
 // header: on the first row of a section: "pinned", a timeline group id ("today", "yesterday", "week", "month",
@@ -771,6 +779,10 @@ component ChatRow inherits VerticalLayout {
         hit: root.hit;
         images: root.item.images;
         images-more: root.item.images-more;
+        peek: root.item.peek;
+        file: root.item.file;
+        file-line: root.item.file-line;
+        range: root.item.range;
     }
     // Thinking (live agent thought): collapsed line, expands to the text.
     if root.item.kind == 5: ThinkingRow {
@@ -2928,6 +2940,13 @@ component SidePane inherits Rectangle {
     in-out property <bool> wide;
     callback toggle(int);
     callback close();
+    // Rust renders the Live view only while it is on screen.
+    init => {
+        LiveUi.active = root.tab == "live";
+    }
+    changed tab => {
+        LiveUi.active = root.tab == "live";
+    }
     // Floating glass pane beside the transcript.
     background: Theme.panel;
     border-radius: Theme.radius-2xl;
@@ -2969,7 +2988,9 @@ component SidePane inherits Rectangle {
                     { id: "git", label: "Git" },
                     { id: "terminal", label: "Terminal" },
                     { id: "files", label: "Files" },
+                    { id: "live", label: "Live" },
                 ];
+                chip-pad: 12px;
                 current: root.tab;
                 select(id) => {
                     root.tab = id;
@@ -3202,6 +3223,15 @@ export component AppWindow inherits Window {
         running: root.busy-on-screen;
         triggered => {
             ArtClock.busy-tick = mod(ArtClock.busy-tick + 1, 1000000);
+        }
+    }
+    // A file chip / change peek in the chat asks for the Live view (Rust bumps LiveUi.open-tick).
+    property <int> live-open: LiveUi.open-tick;
+    changed live-open => {
+        root.files-open = true;
+        root.side-tab = "live";
+        if root.narrow {
+            root.drawer-open = false;
         }
     }
     property <bool> stick-bottom: true;
@@ -4310,7 +4340,7 @@ export component AppWindow inherits Window {
                 }
                 if root.files-open && !root.narrow: SidePane {
                     property <length> main-w: root.win-w - (root.show-sidebar ? root.sidebar-w + Theme.frame-gap : 0px) - Theme.frame-gap * 2;
-                    width: self.wide ? max(Theme.side-pane-width, self.main-w * 0.7) : root.side-tab == "diff" ? max(Theme.side-pane-width, self.main-w * 0.5) : Theme.side-pane-width;
+                    width: self.wide ? max(Theme.side-pane-width, self.main-w * 0.7) : root.side-tab == "diff" ? max(Theme.side-pane-width, self.main-w * 0.5) : root.side-tab == "live" ? max(Theme.side-pane-width, self.main-w * 0.4) : Theme.side-pane-width;
                     tab <=> root.side-tab;
                     files: root.files;
                     workspace: root.workspace;
