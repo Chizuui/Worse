@@ -444,15 +444,16 @@ fn note_only(note: &str) -> View {
     }
 }
 
-/// 1-based line where `block` starts in `file` (first line matched exactly, the rest in order).
+/// 1-based line where `block` first appears in `file`, all of its lines in order. A block of blank lines
+/// only matches nothing (it would match almost anywhere).
 fn find_block(file: &[&str], block: &str) -> Option<usize> {
     let want: Vec<&str> = block.lines().collect();
-    let first = want.iter().position(|l| !l.trim().is_empty())?;
-    let n = want.len();
-    (0..file.len()).find_map(|i| {
-        let start = i.checked_sub(first)?;
-        (start + n <= file.len() && file[start..start + n] == want[..]).then_some(start + 1)
-    })
+    if want.iter().all(|l| l.trim().is_empty()) {
+        return None;
+    }
+    file.windows(want.len())
+        .position(|w| w == want.as_slice())
+        .map(|i| i + 1)
 }
 
 fn line_row(no: usize, text: &str, lang: &str, mark: i32) -> LiveLine {
@@ -553,8 +554,9 @@ mod tests {
     fn find_block_matches_whole_block() {
         let file = ["fn a() {", "    x();", "}", "fn b() {", "    x();", "}"];
         assert_eq!(find_block(&file, "fn b() {\n    x();"), Some(4));
-        assert_eq!(find_block(&file, "\n    x();\n}"), Some(1));
+        assert_eq!(find_block(&file, "    x();\n}"), Some(2));
         assert_eq!(find_block(&file, "missing"), None);
+        assert_eq!(find_block(&file, "\n\n"), None);
     }
 
     #[test]
