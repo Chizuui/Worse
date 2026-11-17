@@ -827,6 +827,8 @@ component LabeledField inherits VerticalLayout {
 
 // "Add custom provider" modal (design frame 03 Modal: 520 wide, fields with 11px labels + 10px hints).
 export component ProviderDialog inherits Dialog {
+    // The Hermes preset was picked: show how to connect it.
+    property <bool> hermes: false;
     title: @tr("Add custom provider");
     close-label: @tr("Close");
     dialog-width: 520px;
@@ -836,9 +838,36 @@ export component ProviderDialog inherits Dialog {
     VerticalLayout {
         spacing: 14px;
         Text {
-            text: "Any OpenAI-compatible endpoint: OpenAI, Azure, Ollama, LM Studio, LiteLLM.";
+            text: "Any OpenAI-compatible endpoint: OpenAI, Azure, Ollama, LM Studio, LiteLLM. A Hermes gateway also works: it is recognised and used as a remote agent.";
             font-size: 11.5px;
             color: Theme.muted;
+            wrap: word-wrap;
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            Text {
+                text: "Preset";
+                font-size: 11px;
+                color: Theme.muted;
+                vertical-alignment: center;
+            }
+            DButton {
+                text: "Hermes gateway";
+                h: 26px;
+                pad: 10px;
+                clicked => {
+                    AgentsUi.provider-label = "Hermes";
+                    AgentsUi.provider-url = "http://127.0.0.1:8642/v1";
+                    AgentsUi.provider-model = "hermes-agent";
+                    root.hermes = true;
+                }
+            }
+        }
+        if root.hermes: Text {
+            text: "Start the gateway with `hermes gateway` (its API server needs API_SERVER_KEY, 16+ characters) and paste that key below. Hermes runs its own tools on the gateway's host; Harness shows its replies, tool progress and approval requests, and other agents can delegate to it.";
+            font-size: 11px;
+            color: Theme.foreground-subtle;
             wrap: word-wrap;
         }
         LabeledField {
@@ -873,7 +902,7 @@ export component ProviderDialog inherits Dialog {
         }
         LabeledField {
             title: "Model";
-            hint: "must support tool (function) calling";
+            hint: root.hermes ? "the gateway's model name (hermes-agent unless a profile renames it)" : "must support tool (function) calling";
             TextField {
                 height: 34px;
                 text <=> AgentsUi.provider-model;

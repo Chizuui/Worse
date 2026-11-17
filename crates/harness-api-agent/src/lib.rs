@@ -6,6 +6,7 @@
 //! The API key is only ever put into the `Authorization` header; it is never logged or echoed.
 
 mod background;
+mod hermes;
 mod llm;
 mod mcp;
 mod project_docs;
@@ -37,6 +38,17 @@ pub(crate) struct Provider {
     pub prompt_cache: bool,
     /// Where the system prompt goes (`HARNESS_PROVIDER_SYSTEM_ROLE`: `system`, `user`, or `auto` = probe once).
     pub system_role: SystemRole,
+    /// What the endpoint is (`HARNESS_PROVIDER_KIND`: `hermes`, `openai`, or `auto` = ask it once).
+    pub kind: Kind,
+}
+
+/// What answers at the provider's endpoint: a model API, or a Hermes gateway (a whole agent that runs its
+/// own tools; see `hermes.rs`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Kind {
+    Auto,
+    OpenAi,
+    Hermes,
 }
 
 /// How the provider receives Harness's system prompt. Some OpenAI-compatible proxies drop or replace the
@@ -81,6 +93,11 @@ impl Provider {
                 "user" => SystemRole::User,
                 _ => SystemRole::Auto,
             },
+            kind: match var("HARNESS_PROVIDER_KIND").to_ascii_lowercase().as_str() {
+                "hermes" => Kind::Hermes,
+                "openai" => Kind::OpenAi,
+                _ => Kind::Auto,
+            },
         }
     }
 }
@@ -109,6 +126,8 @@ pub(crate) struct Agent {
     system_mode: std::sync::atomic::AtomicU8,
     /// Serializes the one-time probe so parallel sessions don't each send one.
     system_probe: tokio::sync::Mutex<()>,
+    /// Whether the endpoint is a Hermes gateway: 0 = not asked yet, 1 = no, 2 = yes.
+    pub(crate) gateway_mode: std::sync::atomic::AtomicU8,
 }
 
 /// Runs the agent on stdio until stdin closes. Entry point of the `harness-api-agent` binary and of
@@ -171,6 +190,7 @@ async fn serve() -> std::process::ExitCode {
         vision: AtomicBool::new(true),
         system_mode: std::sync::atomic::AtomicU8::new(0),
         system_probe: tokio::sync::Mutex::new(()),
+        gateway_mode: std::sync::atomic::AtomicU8::new(0),
     });
     let mut lines = BufReader::new(tokio::io::stdin()).lines();
     while let Ok(Some(line)) = lines.next_line().await {
@@ -428,6 +448,10 @@ impl Agent {
                 .unwrap_or_default(),
         );
         let mut result = self.advertisement(&session.mode);
+        if hermes::is_gateway(self).await {
+            // A gateway decides approvals by its own rules: Harness's modes do not apply.
+            result["modes"] = json!({"currentModeId": "default", "availableModes": []});
+        }
         session
             .persist(self.provider.state_dir.as_deref(), &id)
             .await;
@@ -462,6 +486,7 @@ impl Agent {
             out
         };
         let (transcript, mode) = loaded;
+        let gateway = hermes::is_gateway(self).await;
         // ACP: replay the conversation as updates before answering.
         for (user, text) in transcript {
             let kind = if user {
@@ -474,7 +499,11 @@ impl Agent {
                 &json!({"sessionUpdate": kind, "content": {"type": "text", "text": text}}),
             );
         }
-        Ok(self.advertisement(&mode))
+        let mut result = self.advertisement(&mode);
+        if gateway {
+            result["modes"] = json!({"currentModeId": "default", "availableModes": []});
+        }
+        Ok(result)
     }
 
     async fn set_mode(&self, params: &Value) -> Reply {
@@ -509,7 +538,11 @@ impl Agent {
             map.insert(id.clone(), token.clone());
         }
         let mut s = session.lock().await;
-        let result = session::run_turn(self, &id, &mut s, user, &token).await;
+        let result = if hermes::is_gateway(self).await {
+            hermes::run_turn(self, &id, &mut s, user, &token).await
+        } else {
+            session::run_turn(self, &id, &mut s, user, &token).await
+        };
         s.persist(self.provider.state_dir.as_deref(), &id).await;
         drop(s);
         if let Ok(mut map) = self.cancels.lock() {
