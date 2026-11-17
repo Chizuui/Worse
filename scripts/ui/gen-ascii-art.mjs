@@ -192,6 +192,136 @@ function fieldFrames(cols, rows, frames, mirror, seed) {
   return out;
 }
 
+// ---- 3b. other backdrop fields ----------------------------------------------------------------------------
+// Same grid as the dither field (46 columns, the 32 nearest the window edge are emitted; bands of 18 rows),
+// picked in Settings › Appearance › Background. Every style thins out towards the content column.
+const FIELD_COLS = 46;
+const FIELD_KEEP = 32;
+const BAND_ROWS = 18;
+// Column 0 is the window edge on both sides; `emit` mirrors the right side and trims / pads like fieldBands.
+function emitBand(grid, mirror) {
+  return grid
+    .map((row) => {
+      const line = mirror ? [...row].reverse().join("") : row.join("");
+      return mirror ? line.slice(FIELD_COLS - FIELD_KEEP) : line.slice(0, FIELD_KEEP).replace(/\s+$/, "") || " ";
+    })
+    .join("\n");
+}
+const blankGrid = (rows) => Array.from({ length: rows }, () => Array.from({ length: FIELD_COLS }, () => " "));
+// Density 1 at the window edge, 0 at the content edge (squared, like the dither field).
+const edgeWeight = (col) => {
+  const e = 1 - col / (FIELD_COLS - 1);
+  return 0.2 + 0.8 * e * e;
+};
+
+// Rain: glyph streaks falling two rows a frame. The pattern repeats every 36 rows (two bands, A and B, stacked
+// alternately) and every 18 frames, so the loop has no seam. Returns [half][frame].
+function rainBands(mirror, seed) {
+  const period = BAND_ROWS * 2;
+  const frames = period / 2;
+  const trail = ["#", "%", "*", "*", ":", ":", ".", "."];
+  const drops = [];
+  for (let c = 0; c < FIELD_COLS; c += 1) {
+    const n = hash(c, 1, seed) < edgeWeight(c) * 0.9 ? (hash(c, 2, seed) < edgeWeight(c) * 0.5 ? 2 : 1) : 0;
+    for (let k = 0; k < n; k += 1) {
+      drops.push({ c, phase: Math.floor(hash(c, 3 + k, seed) * period), len: 4 + Math.floor(hash(c, 9 + k, seed) * 5) });
+    }
+  }
+  const out = [[], []];
+  for (let f = 0; f < frames; f += 1) {
+    const grid = blankGrid(period);
+    for (const d of drops) {
+      const head = (d.phase + f * 2) % period;
+      for (let t = 0; t < d.len; t += 1) {
+        const r = (((head - t) % period) + period) % period;
+        grid[r][d.c] = trail[Math.min(trail.length - 1, Math.floor((t / d.len) * trail.length))];
+      }
+    }
+    out[0].push(emitBand(grid.slice(0, BAND_ROWS), mirror));
+    out[1].push(emitBand(grid.slice(BAND_ROWS), mirror));
+  }
+  return out;
+}
+
+// Stars: fixed points that swell and fade, each on its own phase. Returns [band][frame], six different bands.
+function starBands(bands, frames, mirror, seed) {
+  const glyphs = [" ", ".", "·", "+", "*", "+", "·", "."];
+  const out = [];
+  for (let b = 0; b < bands; b += 1) {
+    const list = [];
+    for (let f = 0; f < frames; f += 1) {
+      const grid = blankGrid(BAND_ROWS);
+      for (let r = 0; r < BAND_ROWS; r += 1) {
+        for (let c = 0; c < FIELD_COLS; c += 1) {
+          if (hash(c, r + b * BAND_ROWS, seed) > edgeWeight(c) * 0.16) continue;
+          const phase = Math.floor(hash(c + 7, r + b * BAND_ROWS, seed + 3) * glyphs.length);
+          // A third of the stars stay lit; the rest go dark for part of the loop.
+          const steady = hash(c + 13, r + b * BAND_ROWS, seed + 5) < 0.34;
+          const g = glyphs[(phase + f) % glyphs.length];
+          grid[r][c] = steady && g === " " ? "." : g;
+        }
+      }
+      list.push(emitBand(grid, mirror));
+    }
+    out.push(list);
+  }
+  return out;
+}
+
+// Circuit: wires running down the field with small sideways jogs, and a pulse travelling along each. Wires are
+// drawn once; only the pulses move, fading in and out so the 24-frame loop has no jump. Repeats every 36 rows.
+// Returns [half][frame].
+function circuitBands(mirror, seed) {
+  const period = BAND_ROWS * 2;
+  const frames = 24;
+  const wires = [];
+  const taken = new Set();
+  for (let c = 1; c < FIELD_COLS - 3; c += 3) {
+    if (hash(c, 31, seed) > edgeWeight(c) * 1.05) continue;
+    // Path of (row, col, glyph); a jog right is undone by a jog left half a period later.
+    const path = [];
+    const jogAt = 3 + Math.floor(hash(c, 32, seed) * 12);
+    const back = jogAt + BAND_ROWS;
+    const k = 1 + Math.floor(hash(c, 33, seed) * 2);
+    let col = c;
+    for (let r = 0; r < period; r += 1) {
+      if (r === jogAt) {
+        path.push([r, col, "╰"]);
+        for (let i = 1; i < k; i += 1) path.push([r, col + i, "─"]);
+        col += k;
+        path.push([r, col, "╮"]);
+      } else if (r === back) {
+        path.push([r, col, "╯"]);
+        for (let i = 1; i < k; i += 1) path.push([r, col - i, "─"]);
+        col -= k;
+        path.push([r, col, "╭"]);
+      } else {
+        path.push([r, col, hash(c, 40 + r, seed) < 0.06 ? "┼" : "│"]);
+      }
+    }
+    if (path.some(([r, cc]) => taken.has(`${r}:${cc}`))) continue;
+    path.forEach(([r, cc]) => taken.add(`${r}:${cc}`));
+    wires.push({ path, phase: Math.floor(hash(c, 34, seed) * path.length), gap: hash(c, 35, seed) < 0.3 });
+  }
+  const life = ["·", "•", "●", "●", "●", "●", "•", "·"];
+  const out = [[], []];
+  for (let f = 0; f < frames; f += 1) {
+    const grid = blankGrid(period);
+    for (const w of wires) {
+      w.path.forEach(([r, c, g]) => {
+        grid[r][c] = g;
+      });
+      // One pulse per wire, alive for the whole loop; its glyph swells at the start and shrinks at the end.
+      const at = (w.phase + f * 2) % w.path.length;
+      const [r, c] = w.path[at];
+      grid[r][c] = life[Math.min(life.length - 1, Math.floor((f / frames) * life.length))];
+    }
+    out[0].push(emitBand(grid.slice(0, BAND_ROWS), mirror));
+    out[1].push(emitBand(grid.slice(BAND_ROWS), mirror));
+  }
+  return out;
+}
+
 // ---- 4. spinners ------------------------------------------------------------------------------------------
 const spinner = ["▖", "▘", "▝", "▗"];
 const scan = Array.from({ length: 12 }, (_, f) => {
@@ -326,6 +456,14 @@ export global AsciiArt {
     // Dither field, [band][frame]: 6 bands of 18 rows; 32 visible columns of a 46-column field.
     out property <[[string]]> field-left: ${slintArray2(fieldBands(46, 32, 108, 6, 6, false, 3))};
     out property <[[string]]> field-right: ${slintArray2(fieldBands(46, 32, 108, 6, 6, true, 19))};
+    // Other backdrop fields. rain / circuit: [half][frame], two 18-row bands stacked alternately;
+    // stars: [band][frame], six bands.
+    out property <[[string]]> rain-left: ${slintArray2(rainBands(false, 41))};
+    out property <[[string]]> rain-right: ${slintArray2(rainBands(true, 59))};
+    out property <[[string]]> stars-left: ${slintArray2(starBands(6, 8, false, 23))};
+    out property <[[string]]> stars-right: ${slintArray2(starBands(6, 8, true, 37))};
+    out property <[[string]]> circuit-left: ${slintArray2(circuitBands(false, 71))};
+    out property <[[string]]> circuit-right: ${slintArray2(circuitBands(true, 83))};
     out property <[string]> spinner: ${slintArray(spinner)};
     out property <[string]> scan: ${slintArray(scan)};
     out property <[string]> bars: ${slintArray(bars)};

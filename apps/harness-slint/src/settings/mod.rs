@@ -486,6 +486,7 @@ impl State {
         let look = self.window.global::<crate::ui::Look>();
         look.set_thinking(settings.appearance.thinking_style.as_str().into());
         look.set_words(settings.appearance.status_words.as_str().into());
+        crate::wallpaper::apply(&self.window, &settings.appearance);
         sync_launch_at_startup(settings.general.launch_at_startup);
         let bundle = bundle_for(settings.general.language);
         if slint::select_bundled_translation(bundle).is_err() {

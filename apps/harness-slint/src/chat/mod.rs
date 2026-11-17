@@ -1552,6 +1552,9 @@ fn install_drop(window: &AppWindow) {
             WindowEvent::Occluded(occluded) => set_visible(!occluded),
             // Windows reports a minimized window as a 0x0 resize.
             WindowEvent::Resized(size) => set_visible(size.width > 0 && size.height > 0),
+            // Some window systems report "occluded" wrongly (X11 without a window manager does at startup).
+            // A window that has the focus or the pointer is on screen.
+            WindowEvent::Focused(true) | WindowEvent::CursorEntered { .. } => set_visible(true),
             _ => {}
         }
         EventResult::Propagate

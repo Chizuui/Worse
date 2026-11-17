@@ -3,10 +3,10 @@
 // archive, storage, window & code) follow under "ADVANCED" so no feature is lost.
 import { Theme } from "../theme/tokens.slint";
 import { Look } from "../theme/look.slint";
-import { ThinkGlyph, AsciiArt } from "../components/ascii.slint";
+import { ThinkGlyph, GlyphAnim, AsciiArt } from "../components/ascii.slint";
 import { Button } from "../components/controls.slint";
 import { SettingsUi } from "globals.slint";
-import { PageHeader, Group, SettingRow, Switch, TextField, Stepper, Select, SetButton, Pill, SegmentedControl, CapsLabel, Dot } from "parts.slint";
+import { PageHeader, Group, SettingRow, Switch, TextField, Stepper, RangeSlider, Select, SetButton, Pill, SegmentedControl, CapsLabel, Dot } from "parts.slint";
 
 // Boolean row bound to one settings.json path.
 component BoolRow inherits SettingRow {
@@ -641,6 +641,61 @@ component ThinkTile inherits Rectangle {
     }
 }
 
+// One unicode backdrop field, moving, as a pickable tile.
+component FieldTile inherits Rectangle {
+    in property <string> title;
+    in property <string> id;
+    in property <bool> selected;
+    callback picked;
+    horizontal-stretch: 1;
+    min-width: 64px;
+    height: 80px;
+    border-radius: 10px;
+    background: fta.has-hover ? Theme.surface-hover : Theme.surface;
+    border-width: 1px;
+    border-color: root.selected ? Theme.accent-fg : (fta.has-hover ? Theme.border-hover : Theme.border);
+    animate border-color, background { duration: Theme.dur-hover; }
+    accessible-role: radio-button;
+    accessible-label: root.title;
+    accessible-checked: root.selected;
+    accessible-action-default => {
+        root.picked();
+    }
+    Rectangle {
+        x: 8px;
+        y: 8px;
+        width: parent.width - 16px;
+        height: 42px;
+        border-radius: 6px;
+        background: Theme.canvas;
+        clip: true;
+        if root.id != "none": GlyphAnim {
+            x: 5px;
+            y: -3px;
+            frames: root.id == "rain" ? AsciiArt.rain-left[0] : root.id == "stars" ? AsciiArt.stars-left[0] : root.id == "circuit" ? AsciiArt.circuit-left[0] : AsciiArt.field-left[0];
+            interval: root.id == "rain" ? 130ms : root.id == "circuit" ? 195ms : root.id == "stars" ? 325ms : 455ms;
+            font-size: 8px;
+            letter-spacing: 5px;
+            color: Theme.foreground.with-alpha(root.selected ? 0.6 : 0.4);
+        }
+    }
+    Text {
+        y: parent.height - self.height - 9px;
+        width: parent.width;
+        text: root.title;
+        font-size: Theme.ui-xs + 1px;
+        color: root.selected ? Theme.foreground : Theme.foreground-subtle;
+        horizontal-alignment: center;
+        overflow: elide;
+    }
+    fta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.picked();
+        }
+    }
+}
+
 export component AppearancePage inherits VerticalLayout {
     in property <bool> stacked;
     property <string> accent: SettingsUi.get-string("appearance.accentColor", SettingsUi.rev);
@@ -831,6 +886,107 @@ export component AppearancePage inherits VerticalLayout {
                 current: SettingsUi.get-string("appearance.statusWords", SettingsUi.rev);
                 select(id) => {
                     SettingsUi.set-string("appearance.statusWords", id);
+                }
+            }
+        }
+    }
+    // Card · Background
+    Group {
+        title: @tr("Background");
+        note: @tr("Unicode field, wallpaper, blur and dim");
+        field-box := VerticalLayout {
+            padding: 16px;
+            spacing: 8px;
+            property <string> pick: SettingsUi.get-string("appearance.backdropField", SettingsUi.rev);
+            HorizontalLayout {
+                spacing: 8px;
+                for t in [
+                    { id: "dither", title: @tr("Dither") },
+                    { id: "rain", title: @tr("Rain") },
+                    { id: "stars", title: @tr("Stars") },
+                    { id: "circuit", title: @tr("Circuit") },
+                    { id: "none", title: @tr("None") },
+                ]: FieldTile {
+                    title: t.title;
+                    id: t.id;
+                    selected: field-box.pick == t.id || (field-box.pick == "" && t.id == "dither");
+                    picked => {
+                        SettingsUi.set-string("appearance.backdropField", t.id);
+                    }
+                }
+            }
+        }
+        SettingRow {
+            stacked: root.stacked;
+            wide: true;
+            pad-y: 10px;
+            title: @tr("Motion");
+            description: @tr("When the field moves. Always keeps it moving during chats and uses more CPU.");
+            SegmentedControl {
+                label: @tr("Motion");
+                options: [{ id: "home", label: @tr("Home only") }, { id: "always", label: @tr("Always") }, { id: "off", label: @tr("Off") }];
+                current: SettingsUi.get-string("appearance.backdropMotion", SettingsUi.rev);
+                select(id) => {
+                    SettingsUi.set-string("appearance.backdropMotion", id);
+                }
+            }
+        }
+        SettingRow {
+            stacked: root.stacked;
+            wide: true;
+            pad-y: 10px;
+            title: @tr("Wallpaper");
+            description: Look.wallpaper-note == "loading" ? @tr("Loading…") : Look.wallpaper-note != "" ? @tr("Could not load: {}", Look.wallpaper-note) : Look.wallpaper-name != "" ? Look.wallpaper-name : @tr("A picture or an animated GIF / WebP behind the whole window.");
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                if Look.wallpaper-name != "": SetButton {
+                    text: @tr("Remove");
+                    variant: "ghost";
+                    clicked => {
+                        Look.clear-wallpaper();
+                    }
+                }
+                SetButton {
+                    text: @tr("Choose image…");
+                    clicked => {
+                        Look.pick-wallpaper();
+                    }
+                }
+            }
+        }
+        SettingRow {
+            stacked: root.stacked;
+            wide: true;
+            pad-y: 10px;
+            title: @tr("Blur");
+            description: @tr("Softens the wallpaper. Glass panels always show a frosted copy of it.");
+            RangeSlider {
+                label: @tr("Blur");
+                value: SettingsUi.get-int("appearance.wallpaperBlur", SettingsUi.rev);
+                maximum: 40;
+                suffix: "px";
+                changed-value(v) => {
+                    SettingsUi.set-int("appearance.wallpaperBlur", v);
+                }
+            }
+        }
+        SettingRow {
+            stacked: root.stacked;
+            wide: true;
+            pad-y: 10px;
+            title: @tr("Dim");
+            description: @tr("How much of the theme colour covers the wallpaper: darker in dark mode, lighter in light mode.");
+            RangeSlider {
+                label: @tr("Dim");
+                value: SettingsUi.get-int("appearance.wallpaperDim", SettingsUi.rev);
+                maximum: 95;
+                suffix: "%";
+                moved(v) => {
+                    Look.dim = v / 100;
+                }
+                changed-value(v) => {
+                    SettingsUi.set-int("appearance.wallpaperDim", v);
                 }
             }
         }

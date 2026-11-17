@@ -1,6 +1,8 @@
 import { Theme } from "../theme/tokens.slint";
 import { Icons, IconsFill, Tiles } from "icons.slint";
 import { GlyphAnim, AsciiArt } from "ascii.slint";
+import { Look } from "../theme/look.slint";
+import { Frost } from "../theme/backdrop.slint";
 
 export { Icons, IconsFill, Tiles }
 
@@ -61,6 +63,11 @@ export component Glass inherits Rectangle {
     drop-shadow-blur: root.shadow ? Theme.glass-shadow-blur : 0px;
     drop-shadow-offset-y: root.shadow ? Theme.glass-shadow-y : 0px;
     drop-shadow-color: root.shadow ? Theme.glass-shadow : transparent;
+    // Over a wallpaper the pane shows a frosted copy of it instead of its flat fill.
+    if Look.has-wallpaper && root.level != "card": Frost {
+        radius: root.radius;
+        veil: root.level == "strong" ? 0.3 : 0.18;
+    }
     if root.highlight: Rectangle {
         border-radius: root.radius;
         inner-shadow-blur: Theme.glass-inner-blur;

@@ -1,18 +1,85 @@
 import { Theme } from "tokens.slint";
+import { Look } from "look.slint";
 import { GlyphAnim, AsciiArt } from "../components/ascii.slint";
 
-// Window backdrop: flat near-black (or paper). No colour fields and no gradients, so the dither field and
-// the glass panes can fade into it without a seam.
+// Window backdrop: flat near-black (or paper). No colour fields and no gradients, so the unicode field and
+// the glass panes can fade into it without a seam. With a wallpaper (Settings › Appearance › Background) the
+// image lies on the canvas under a veil of the canvas colour (`Look.dim`).
 export component MidnightBackdrop inherits Rectangle {
+    // Settings and dialogs keep a plain canvas.
+    in property <bool> plain: false;
     background: Theme.canvas;
     clip: true;
+    if Look.has-wallpaper && !root.plain: Image {
+        width: 100%;
+        height: 100%;
+        source: Look.wallpaper;
+        image-fit: cover;
+        accessible-role: none;
+    }
+    if Look.has-wallpaper && !root.plain: Rectangle {
+        background: Theme.canvas.with-alpha(Look.dim);
+        accessible-role: none;
+    }
     @children
 }
 
-// Dither field: columns of glyphs (# % * :) hugging the left and right edges and fading towards the middle.
-// `reach` is how far each side comes in; `lively` cycles the frames slowly (used on the empty chat only).
-// Each side is six stacked bands of 18 rows: bands below the window are culled and never laid out, and
-// while still each side is cached as one layer.
+// Frosted glass for a panel over the wallpaper: the heavily blurred copy, drawn exactly where the window
+// shows the wallpaper, under a veil. Only instantiated while a wallpaper is set; the panel keeps its own
+// rim, glow and shadow.
+export component Frost inherits Rectangle {
+    in property <length> radius;
+    // Extra veil on top of the wallpaper's own dim, so text on the panel stays readable.
+    in property <float> veil: 0.18;
+    border-radius: root.radius;
+    clip: true;
+    accessible-role: none;
+    Image {
+        x: -root.absolute-position.x;
+        y: -root.absolute-position.y;
+        width: Look.win-w;
+        height: Look.win-h;
+        source: Look.frost;
+        image-fit: cover;
+        accessible-role: none;
+    }
+    Rectangle {
+        background: Theme.canvas.with-alpha(min(0.94, Look.dim + root.veil));
+        accessible-role: none;
+    }
+}
+
+// One side of the unicode field: six stacked bands of 18 rows. Bands below the window are culled and never
+// laid out, and while still the side is cached as one layer.
+component FieldSide inherits Rectangle {
+    in property <bool> mirror;
+    in property <bool> lively;
+    in property <brush> ink;
+    in property <length> line;
+    // Frames per band: [band][frame] for six different bands, or two bands stacked alternately (`halves`).
+    in property <[[string]]> bands;
+    in property <bool> halves;
+    in property <int> divider: 7;
+    clip: true;
+    cache-rendering-hint: !root.lively;
+    for b in 6: GlyphAnim {
+        x: root.mirror ? parent.width - self.width : 0;
+        y: b * 18 * root.line;
+        frames: root.bands[root.halves ? mod(b, 2) : b];
+        playing: root.lively;
+        divider: root.divider;
+        font-size: 9px;
+        letter-spacing: 8px;
+        color: root.ink;
+        horizontal-alignment: root.mirror ? right : left;
+    }
+    @children
+}
+
+// Unicode field: columns of glyphs hugging the left and right edges and fading towards the middle.
+// `reach` is how far each side comes in; `lively` cycles the frames. The style comes from Look.field:
+// dither (# % * :, slow shimmer), rain (falling streaks), stars (twinkling points), circuit (wires with
+// travelling pulses).
 export component DitherField inherits Rectangle {
     in property <length> reach: 220px;
     in property <bool> lively: false;
@@ -21,48 +88,43 @@ export component DitherField inherits Rectangle {
     // Line height of the 9px art face (JetBrains Mono: ascent 1020 + descent 300 per 1000 units), so the
     // bands sit exactly where the rows of one block would. A layout would round each band to whole pixels.
     property <length> line: 9px * 1.32;
+    property <string> style: Look.field;
+    property <bool> halves: root.style == "rain" || root.style == "circuit";
+    // Rain falls quickly; the others drift.
+    property <int> divider: root.style == "rain" ? 2 : root.style == "circuit" ? 3 : root.style == "stars" ? 5 : 7;
+    // Over a wallpaper the glyphs fade by their own ink (a gradient), not by painting the canvas over them.
+    property <bool> over-image: Look.has-wallpaper;
+    property <color> strong: Theme.foreground.with-alpha(Theme.dark ? 0.26 : 0.3);
     clip: true;
-    if root.reach > 40px: Rectangle {
+    if root.reach > 40px && root.style != "none": FieldSide {
         x: 0;
         width: root.reach;
-        clip: true;
-        cache-rendering-hint: !root.lively;
-        for band[b] in AsciiArt.field-left: GlyphAnim {
-            x: 0;
-            y: b * 18 * root.line;
-            frames: band;
-            playing: root.lively;
-            divider: 7;
-            font-size: 9px;
-            letter-spacing: 8px;
-            color: root.ink;
-        }
-        Rectangle {
+        lively: root.lively;
+        line: root.line;
+        ink: root.over-image ? @linear-gradient(90deg, root.strong 0%, root.strong 35%, root.strong.with-alpha(0) 100%) : root.ink;
+        bands: root.style == "rain" ? AsciiArt.rain-left : root.style == "stars" ? AsciiArt.stars-left : root.style == "circuit" ? AsciiArt.circuit-left : AsciiArt.field-left;
+        halves: root.halves;
+        divider: root.divider;
+        if !root.over-image: Rectangle {
             background: @linear-gradient(90deg, root.fade.with-alpha(0) 0%, root.fade.with-alpha(0) 35%, root.fade 100%);
         }
     }
-    if root.reach > 40px: Rectangle {
+    if root.reach > 40px && root.style != "none": FieldSide {
         x: root.width - self.width;
         width: root.reach;
-        clip: true;
-        cache-rendering-hint: !root.lively;
-        for band[b] in AsciiArt.field-right: GlyphAnim {
-            x: parent.width - self.width;
-            y: b * 18 * root.line;
-            frames: band;
-            playing: root.lively;
-            divider: 7;
-            font-size: 9px;
-            letter-spacing: 8px;
-            color: root.ink;
-            horizontal-alignment: right;
-        }
-        Rectangle {
+        mirror: true;
+        lively: root.lively;
+        line: root.line;
+        ink: root.over-image ? @linear-gradient(90deg, root.strong.with-alpha(0) 0%, root.strong 65%, root.strong 100%) : root.ink;
+        bands: root.style == "rain" ? AsciiArt.rain-right : root.style == "stars" ? AsciiArt.stars-right : root.style == "circuit" ? AsciiArt.circuit-right : AsciiArt.field-right;
+        halves: root.halves;
+        divider: root.divider;
+        if !root.over-image: Rectangle {
             background: @linear-gradient(90deg, root.fade 0%, root.fade.with-alpha(0) 65%, root.fade.with-alpha(0) 100%);
         }
     }
     // Fade out towards the bottom so the columns never end on a hard line.
-    Rectangle {
+    if !root.over-image && root.style != "none": Rectangle {
         y: root.height - self.height;
         height: min(root.height, 180px);
         background: @linear-gradient(180deg, root.fade.with-alpha(0) 0%, root.fade 100%);

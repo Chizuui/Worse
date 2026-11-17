@@ -1039,6 +1039,7 @@ pub fn install(
     // Agent A's panels ask the side pane to switch tabs (a git change row opens the Diff tab).
     let weak = window.as_weak();
     crate::live::install(window);
+    crate::wallpaper::install(window);
     crate::live::set_workspace(workspace);
     window.global::<PanelNav>().on_open_tab(move |id| {
         if let Some(window) = weak.upgrade() {

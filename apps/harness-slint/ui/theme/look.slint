@@ -1,5 +1,5 @@
 // The user's look choices beyond the colour tokens (Settings › Appearance). Rust writes them from
-// settings.json (src/settings); components read them.
+// settings.json (src/settings, src/wallpaper.rs); components read them.
 import { AsciiArt } from "../brand/ascii_art.slint";
 
 export global Look {
@@ -10,4 +10,25 @@ export global Look {
     // Counts turns (AppWindow bumps it when an agent starts working); drives "shuffle".
     in-out property <int> turn;
     out property <int> think-now: self.thinking == "shuffle" ? mod(self.turn, AsciiArt.think.length) : AsciiArt.think-index(self.thinking);
+
+    // ---- backdrop ----
+    // Unicode field at the window edges: "dither" | "rain" | "stars" | "circuit" | "none".
+    in-out property <string> field: "dither";
+    // When the field moves: "home" (empty chat only) | "always" | "off".
+    in-out property <string> field-motion: "home";
+    // Wallpaper behind everything (a still image, or the current frame of an animated one), already blurred
+    // as configured. `frost` is a much blurrier copy that glass panels show, so they read as frosted glass.
+    in property <image> wallpaper;
+    in property <image> frost;
+    in property <bool> has-wallpaper;
+    // 0..1: how much of the canvas colour lies over the wallpaper (darkens in dark mode, lightens in light).
+    in-out property <float> dim: 0.55;
+    // File name shown in Settings; `wallpaper-note` is the load state ("", "loading", or an error text).
+    in property <string> wallpaper-name;
+    in property <string> wallpaper-note;
+    // Window size (AppWindow writes it): frosted panels draw the copy where the window shows the wallpaper.
+    in-out property <length> win-w;
+    in-out property <length> win-h;
+    callback pick-wallpaper();
+    callback clear-wallpaper();
 }

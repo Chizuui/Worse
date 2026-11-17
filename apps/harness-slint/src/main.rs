@@ -15,6 +15,7 @@ mod gitui;
 mod highlight;
 mod import;
 mod live;
+mod wallpaper;
 mod inbox;
 mod live_update;
 mod markdown;

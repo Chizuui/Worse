@@ -14,7 +14,7 @@ import "fonts/Syne-Bold.ttf";
 import "fonts/InstrumentSerif-Italic.ttf";
 import "fonts/JetBrainsMono-Regular.ttf";
 import { Theme } from "theme/tokens.slint";
-import { MidnightBackdrop, DitherField } from "theme/backdrop.slint";
+import { MidnightBackdrop, DitherField, Frost } from "theme/backdrop.slint";
 import { GlyphAnim, ThinkGlyph, AsciiArt, ArtClock } from "components/ascii.slint";
 export { ArtClock }
 import { Look } from "theme/look.slint";
@@ -2956,6 +2956,9 @@ component SidePane inherits Rectangle {
     drop-shadow-offset-y: Theme.glass-shadow-y;
     drop-shadow-color: Theme.glass-shadow;
     clip: true;
+    if Look.has-wallpaper: Frost {
+        radius: parent.border-radius;
+    }
     Rectangle {
         border-radius: parent.border-radius;
         inner-shadow-blur: Theme.glass-inner-blur;
@@ -3203,11 +3206,19 @@ export component AppWindow inherits Window {
     changed width => {
         self.narrow = self.width < 720px;
         self.win-w = self.width;
+        Look.win-w = self.width;
         self.window-action("sync");
+    }
+    changed height => {
+        Look.win-h = self.height;
+    }
+    init => {
+        Look.win-w = self.width;
+        Look.win-h = self.height;
     }
     // The one timer behind the hero glyph art (empty chat wordmark, bunny and dither field, the napping bunny
     // in an empty session list): runs only while one of them is on screen and the window is visible.
-    property <bool> art-on-screen: !Theme.reduce-motion && ArtClock.visible && (root.chat.length == 0 || root.sessions.length == 0);
+    property <bool> art-on-screen: !Theme.reduce-motion && ArtClock.visible && (root.chat.length == 0 || root.sessions.length == 0 || (Look.field-motion == "always" && Look.field != "none"));
     art-clock := Timer {
         interval: ArtClock.period;
         running: root.art-on-screen;
@@ -4012,7 +4023,7 @@ export component AppWindow inherits Window {
                     horizontal-stretch: 1;
                     clip: true;
                     DitherField {
-                        lively: root.chat.length == 0 && !root.settings-open;
+                        lively: Look.field-motion != "off" && (root.chat.length == 0 || Look.field-motion == "always") && !root.settings-open;
                         reach: root.chat.length == 0 ? clamp((parent.width - 600px) / 2, 0px, 420px) : clamp((parent.width - Theme.chat-max-width) / 2 - 12px, 0px, 300px);
                     }
                     // 与 narrow 相同：内容列宽度用 changed 回调写入普通属性，避免宽度→内边距→布局的绑定环。
@@ -5070,7 +5081,9 @@ export component AppWindow inherits Window {
                 Rectangle {
                     border-radius: parent.border-radius;
                     clip: true;
-                    MidnightBackdrop { }
+                    MidnightBackdrop {
+                        plain: true;
+                    }
                     SettingsShell {
             init => {
                 SettingsUi.open-page(SettingsUi.page);

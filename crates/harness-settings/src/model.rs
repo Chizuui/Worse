@@ -240,6 +240,16 @@ pub struct AppearanceSettings {
     pub thinking_style: String,
     /// Words beside it: "plain" ("Thinking…") | "playful" (a rotating set).
     pub status_words: String,
+    /// Unicode field at the window edges: "dither" | "rain" | "stars" | "circuit" | "none".
+    pub backdrop_field: String,
+    /// When the field moves: "home" (empty chat only) | "always" | "off".
+    pub backdrop_motion: String,
+    /// Wallpaper behind the window: path of an image or an animated GIF / WebP ("" = none).
+    pub wallpaper_path: String,
+    /// Blur of the wallpaper, 0..=40 (pixels of a 1440 px wide window).
+    pub wallpaper_blur: u16,
+    /// How much of the canvas colour lies over the wallpaper, percent 0..=95.
+    pub wallpaper_dim: u16,
 }
 
 impl Default for AppearanceSettings {
@@ -261,6 +271,11 @@ impl Default for AppearanceSettings {
             show_token_usage: true,
             thinking_style: "scan".into(),
             status_words: "plain".into(),
+            backdrop_field: "dither".into(),
+            backdrop_motion: "home".into(),
+            wallpaper_path: String::new(),
+            wallpaper_blur: 8,
+            wallpaper_dim: 55,
         }
     }
 }
