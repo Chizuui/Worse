@@ -678,6 +678,9 @@ pub enum Event {
         session: SessionId,
         worktree: Option<api::WorktreeInfo>,
         cost: Option<api::SessionCost>,
+        /// Output tokens the agent reported for the session's last turn, when that turn has finished and the
+        /// agent reports token counts (generation speed, `speed.rs`).
+        tokens: Option<u64>,
     },
     /// Context meter; also sent right after `SessionOpened` when known.
     Usage {

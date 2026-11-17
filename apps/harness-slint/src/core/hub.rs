@@ -1545,6 +1545,8 @@ impl Adapter {
             session: id.clone(),
             worktree: detail.summary.worktree.clone(),
             cost: detail.cost.clone(),
+            // Opening a session: no turn has just ended.
+            tokens: None,
         });
         if let Some(usage) = detail.context_usage {
             self.emit(Event::Usage { session: id, usage });
@@ -1712,10 +1714,18 @@ impl Adapter {
             .open_session(api::SessionId::new(session.to_owned()))
             .await
         {
+            let tokens = detail
+                .turns
+                .last()
+                .filter(|turn| turn.finished_at.is_some())
+                .and_then(|turn| turn.usage.as_ref())
+                .map(|usage| usage.output)
+                .filter(|output| *output > 0);
             self.emit(Event::SessionMeta {
                 session: session.to_owned(),
                 worktree: detail.summary.worktree,
                 cost: detail.cost,
+                tokens,
             });
         }
     }

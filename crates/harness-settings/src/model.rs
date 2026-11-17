@@ -245,6 +245,8 @@ pub struct AppearanceSettings {
     pub thinking_style: String,
     /// Words beside it: "plain" ("Thinking…") | "playful" (a rotating set).
     pub status_words: String,
+    /// Generation speed ("tok/s") beside the working line and under each finished answer.
+    pub show_token_speed: bool,
     /// Unicode field at the window edges: "dither" | "rain" | "stars" | "circuit" | "none".
     pub backdrop_field: String,
     /// When the field moves: "home" (empty chat only) | "always" | "off".
@@ -276,6 +278,7 @@ impl Default for AppearanceSettings {
             show_token_usage: true,
             thinking_style: "scan".into(),
             status_words: "plain".into(),
+            show_token_speed: true,
             backdrop_field: "dither".into(),
             backdrop_motion: "home".into(),
             wallpaper_path: String::new(),

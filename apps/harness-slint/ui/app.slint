@@ -159,6 +159,8 @@ export struct ChatItem {
     file: string,
     file-line: int,
     range: string,
+    // Assistant message: generation speed of its turn ("41 tok/s · 85 tokens", or "≈ 38 tok/s" when estimated).
+    speed: string,
 }
 
 // header: on the first row of a section: "pinned", a timeline group id ("today", "yesterday", "week", "month",
@@ -767,6 +769,16 @@ component ChatRow inherits VerticalLayout {
                         clicked => {
                             ChatUi.turn-action("fork", root.item.id);
                         }
+                    }
+                    // Generation speed of the turn (Settings › Appearance).
+                    if ChatUi.show-speed && root.item.speed != "": Text {
+                        text: "  " + root.item.speed;
+                        font-family: Theme.art-font;
+                        font-size: 10px;
+                        color: Theme.foreground-subtlest;
+                        vertical-alignment: center;
+                        accessible-role: text;
+                        accessible-label: root.item.speed;
                     }
                 }
             }
@@ -1859,6 +1871,7 @@ component WorkingLine inherits Rectangle {
         running: true;
         triggered => {
             root.secs += 1;
+            ChatUi.speed-tick();
         }
     }
     HorizontalLayout {
@@ -1880,6 +1893,14 @@ component WorkingLine inherits Rectangle {
             text: root.secs < 60 ? root.secs + "s" : floor(root.secs / 60) + "m " + mod(root.secs, 60) + "s";
             font-size: Theme.ui-sm;
             color: Theme.muted;
+            vertical-alignment: center;
+        }
+        // Generation speed while text arrives (an estimate; the exact figure lands under the answer).
+        if ChatUi.show-speed && ChatUi.speed != "": Text {
+            text: ChatUi.speed;
+            font-family: Theme.art-font;
+            font-size: 10px;
+            color: Theme.foreground-subtlest;
             vertical-alignment: center;
         }
         Rectangle {

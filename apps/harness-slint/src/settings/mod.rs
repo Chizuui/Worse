@@ -498,6 +498,9 @@ impl State {
         self.window
             .global::<crate::ui::ChatUi>()
             .set_auto_compact(settings.general.auto_compact);
+        self.window
+            .global::<crate::ui::ChatUi>()
+            .set_show_speed(settings.appearance.show_token_speed);
         slint::Timer::single_shot(
             std::time::Duration::ZERO,
             crate::bridge::refresh_usage_parts,

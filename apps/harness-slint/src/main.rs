@@ -16,6 +16,7 @@ mod highlight;
 mod import;
 mod live;
 mod machine_view;
+mod speed;
 mod wallpaper;
 mod inbox;
 mod live_update;

@@ -632,6 +632,7 @@ impl UiState {
             }
             Event::TextDelta { session, id, text } => {
                 if self.is_active(&session) {
+                    crate::speed::text(&self.window, Some(id), text.chars().count());
                     self.append_text(id, &text);
                 }
             }
@@ -643,6 +644,11 @@ impl UiState {
                 if self.is_active(&session) {
                     self.update_row(id, |row| row.status = turn_status(status));
                     self.turn_ended(id);
+                    // Generation speed of the turn, estimated from its text; an exact count may follow
+                    // with the session meta.
+                    if let Some((row, label)) = crate::speed::finish(&self.window) {
+                        self.update_row(row, |r| r.speed = label.as_str().into());
+                    }
                 }
             }
             Event::ToolUpdated {
@@ -724,6 +730,10 @@ impl UiState {
             }
             Event::Running { session, running } => {
                 if self.is_active(&session) {
+                    // A turn starts: its generation speed is counted from zero.
+                    if running && !self.window.get_running() {
+                        crate::speed::start(&self.window);
+                    }
                     self.window.set_running(running);
                     // 新回合开始：上一次失败的横幅过时了。
                     if running {
@@ -773,6 +783,7 @@ impl UiState {
             }
             Event::Thought { session, text } => {
                 if self.is_active(&session) {
+                    crate::speed::text(&self.window, None, text.chars().count());
                     self.thought(&text);
                 }
             }
@@ -801,9 +812,15 @@ impl UiState {
                 session,
                 worktree,
                 cost,
+                tokens,
             } => {
                 if self.is_active(&session) {
                     self.session_meta(worktree.as_ref(), cost.as_ref());
+                    // The agent reported the output tokens of the turn that just ended: the exact speed
+                    // replaces the estimate.
+                    if let Some((row, label)) = tokens.and_then(crate::speed::reported) {
+                        self.update_row(row, |r| r.speed = label.as_str().into());
+                    }
                 }
             }
             Event::Usage { session, usage } => {
@@ -1041,6 +1058,12 @@ pub fn install(
     let weak = window.as_weak();
     crate::live::install(window);
     crate::wallpaper::install(window);
+    let weak_speed = window.as_weak();
+    window.global::<crate::ui::ChatUi>().on_speed_tick(move || {
+        if let Some(window) = weak_speed.upgrade() {
+            crate::speed::tick(&window);
+        }
+    });
     crate::live::set_workspace(workspace);
     window.global::<PanelNav>().on_open_tab(move |id| {
         if let Some(window) = weak.upgrade() {

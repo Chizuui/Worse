@@ -476,6 +476,7 @@ impl UiState {
     /// A session was opened or left: drops the live thinking row, plan, usage and change plans.
     pub(super) fn reset_turn_view(&mut self) {
         crate::live::clear(&self.window);
+        crate::speed::reset(&self.window);
         self.turn.thought = None;
         self.turn.thought_rows.clear();
         self.turn.next_thought = -2;

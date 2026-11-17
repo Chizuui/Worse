@@ -198,6 +198,11 @@ export global ChatUi {
     in property <[BackgroundTaskRow]> background-tasks;
     in property <int> background-tasks-running;
     in property <bool> auto-compact: true;
+    // Generation speed ("tok/s", src/speed.rs): the setting, and the live figure of the running turn ("" when
+    // no text is arriving). `speed-tick` runs once a second while a turn runs so a stale figure goes away.
+    in property <bool> show-speed: true;
+    in property <string> speed;
+    callback speed-tick();
     in property <[OutputRow]> outputs;
     in property <[UsagePart]> usage-parts;
     in property <[PlanLimit]> plan-limits;

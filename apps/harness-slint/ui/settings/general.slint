@@ -889,6 +889,13 @@ export component AppearancePage inherits VerticalLayout {
                 }
             }
         }
+        BoolRow {
+            stacked: root.stacked;
+            pad-y: 10px;
+            key: "appearance.showTokenSpeed";
+            title: @tr("Show generation speed (tok/s)");
+            description: @tr("While the agent writes: an estimate from the text (≈). After the turn: the exact figure for agents that report token counts.");
+        }
     }
     // Card · Background
     Group {
