@@ -237,6 +237,7 @@ impl UiState {
             }
             dock.set_picker_open(SharedString::new());
             dock.set_machine(false);
+            crate::machine_view::set_session(&self.window, None, false, "", "");
             self.dock_state.effort_id = None;
             self.dock_state.model_id = None;
             return;
@@ -248,6 +249,13 @@ impl UiState {
         dock.set_model(sv(o.model.as_deref().unwrap_or_default()));
         dock.set_effort(sv(o.effort.as_deref().unwrap_or_default()));
         dock.set_machine(o.machine);
+        crate::machine_view::set_session(
+            &self.window,
+            self.active.as_deref(),
+            o.machine,
+            &self.sticky,
+            &self.agent_name(&self.sticky),
+        );
         dock.set_mode_name(if o.machine {
             sv("Machine")
         } else {

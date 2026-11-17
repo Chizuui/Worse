@@ -1,0 +1,256 @@
+// Computer use, live: the screen the agent sees and its pointer, with the agent's name on it (the "Screen"
+// view of the Live tab). Data: ScreenUi, filled by src/machine_view.rs from what the harness-computer tools
+// report. Coordinates are fractions of the last screenshot, so the view scales with the pane.
+import { Theme } from "../theme/tokens.slint";
+import { AgentTint } from "common.slint";
+
+export struct ScreenAct {
+    // "click" | "double" | "right" | "move" | "drag" | "scroll" | "type" | "key" | "screenshot" | "windows"
+    kind: string,
+    text: string,
+}
+
+export global ScreenUi {
+    // Machine mode is on for the open session, or a screenshot of it is still held.
+    in property <bool> available;
+    in property <image> shot;
+    in property <bool> has-shot;
+    // Height / width of the screenshot.
+    in property <float> ratio: 0.5625;
+    // Where the agent's pointer is (0..1 of the screenshot) and what it just did there.
+    in property <float> px: 0.5;
+    in property <float> py: 0.5;
+    in property <string> kind;
+    in property <string> caption;
+    // Changes with every action (restarts the click ripple and the caption).
+    in property <int> seq;
+    // Who is at the controls: agent id (colour) and display name (the tag on the pointer).
+    in property <string> agent;
+    in property <string> agent-name;
+    // The agent is using the computer right now (a turn runs and an action arrived in the last seconds).
+    in property <bool> busy;
+    in property <[ScreenAct]> log;
+}
+
+// The agent's pointer: an arrow in the agent's colour with its name on a tag, like a collaborator's cursor.
+component AgentPointer inherits Rectangle {
+    in property <color> tint;
+    in property <string> name;
+    in property <bool> pressed;
+    // Near the right / bottom edge of the picture the name tag goes to the other side of the pointer.
+    in property <bool> flip-x;
+    in property <bool> flip-y;
+    width: 0px;
+    height: 0px;
+    // Arrow: tip at (0, 0).
+    Path {
+        x: 0;
+        y: 0;
+        width: 18px;
+        height: 20px;
+        viewbox-width: 18;
+        viewbox-height: 20;
+        commands: "M 1 1 L 1 16 L 5.2 12.4 L 8 18.6 L 10.6 17.4 L 7.8 11.4 L 13.4 11.2 Z";
+        fill: root.tint;
+        stroke: Theme.dark ? #0b0c0e : #ffffff;
+        stroke-width: 1.2px;
+        transform-scale: root.pressed ? 0.86 : 1;
+        transform-origin: { x: 1px, y: 1px };
+        animate transform-scale { duration: 120ms; easing: ease-out; }
+    }
+    tag := Rectangle {
+        x: root.flip-x ? -self.width - 2px : 13px;
+        y: root.flip-y ? -self.height - 4px : 17px;
+        width: tag-t.preferred-width + 14px;
+        height: 18px;
+        border-radius: 6px;
+        background: root.tint;
+        drop-shadow-blur: 6px;
+        drop-shadow-offset-y: 2px;
+        drop-shadow-color: #00000055;
+        tag-t := Text {
+            text: root.name;
+            font-size: 10px;
+            font-weight: 600;
+            color: #0d0f0a;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component ScreenView inherits Rectangle {
+    property <color> tint: AgentTint.of(ScreenUi.agent);
+    // Displayed size of the screenshot: as wide as the pane, never taller than the room left above the log.
+    property <length> room-h: max(60px, root.height - 26px - min(ScreenUi.log.length, 6) * 20px - 16px);
+    property <length> iw: min(root.width - 16px, root.room-h / max(0.1, ScreenUi.ratio));
+    property <length> ih: root.iw * ScreenUi.ratio;
+    property <length> ix: (root.width - root.iw) / 2;
+    // A click plays a ripple for a moment; typing and keys show what was entered for a little longer.
+    property <bool> rippling: false;
+    property <bool> noting: false;
+    property <duration> ripple-start;
+    property <int> seen: ScreenUi.seq;
+    changed seen => {
+        root.rippling = ScreenUi.kind == "click" || ScreenUi.kind == "double" || ScreenUi.kind == "right" || ScreenUi.kind == "drag";
+        root.ripple-start = animation-tick();
+        root.noting = ScreenUi.caption != "";
+        ripple-end.running = root.rippling;
+        note-end.running = root.noting;
+    }
+    ripple-end := Timer {
+        interval: 650ms;
+        running: false;
+        triggered => {
+            root.rippling = false;
+            self.running = false;
+        }
+    }
+    note-end := Timer {
+        interval: 2600ms;
+        running: false;
+        triggered => {
+            root.noting = false;
+            self.running = false;
+        }
+    }
+    if !ScreenUi.has-shot: VerticalLayout {
+        alignment: center;
+        padding: 24px;
+        spacing: 8px;
+        Text {
+            text: "( o.o)⌐";
+            font-family: Theme.art-font;
+            font-size: 14px;
+            color: Theme.foreground-subtlest;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: ScreenUi.available ? @tr("When the agent looks at or uses this computer, its screen and pointer show here.") : @tr("Computer use is off for this session. Switch the mode to Machine to let the agent use this computer.");
+            font-size: Theme.ui-sm;
+            color: Theme.foreground-subtlest;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+    }
+    if ScreenUi.has-shot: frame := Rectangle {
+        x: root.ix;
+        y: 8px;
+        width: root.iw;
+        height: root.ih;
+        border-radius: Theme.radius-md;
+        border-width: 1px;
+        border-color: ScreenUi.busy ? root.tint.with-alpha(0.7) : Theme.border;
+        clip: true;
+        animate border-color { duration: 300ms; }
+        Image {
+            width: 100%;
+            height: 100%;
+            source: ScreenUi.shot;
+            image-fit: fill;
+            accessible-role: none;
+        }
+        // Ripple where the agent clicked: two rings growing out of the pointer tip.
+        if root.rippling: Rectangle {
+            property <float> t: clamp((animation-tick() - root.ripple-start) / 600ms, 0, 1);
+            x: ScreenUi.px * parent.width - self.width / 2;
+            y: ScreenUi.py * parent.height - self.height / 2;
+            width: 10px + 46px * self.t;
+            height: self.width;
+            border-radius: self.width / 2;
+            border-width: 2px;
+            border-color: root.tint.with-alpha(1 - self.t);
+            background: root.tint.with-alpha(0.22 * (1 - self.t));
+        }
+        pointer := AgentPointer {
+            x: ScreenUi.px * parent.width;
+            y: ScreenUi.py * parent.height;
+            tint: root.tint;
+            name: ScreenUi.agent-name != "" ? ScreenUi.agent-name : @tr("Agent");
+            pressed: root.rippling;
+            flip-x: ScreenUi.px * parent.width > parent.width - 150px;
+            flip-y: ScreenUi.py * parent.height > parent.height - 64px;
+            animate x, y { duration: 420ms; easing: ease-in-out; }
+        }
+        // What was typed / pressed / scrolled, on a bubble beyond the name tag.
+        if root.noting: Rectangle {
+            x: min(parent.width - self.width - 6px, max(6px, ScreenUi.px * parent.width + (pointer.flip-x ? -self.width - 2px : 13px)));
+            y: pointer.flip-y ? max(6px, ScreenUi.py * parent.height - 46px) : ScreenUi.py * parent.height + 39px;
+            width: min(parent.width - 12px, note-t.preferred-width + 16px);
+            height: 20px;
+            border-radius: 6px;
+            background: Theme.dark ? #0b0c0ee6 : #ffffffee;
+            border-width: 1px;
+            border-color: root.tint.with-alpha(0.6);
+            note-t := Text {
+                x: 8px;
+                width: parent.width - 16px;
+                height: parent.height;
+                text: ScreenUi.caption;
+                font-family: Theme.art-font;
+                font-size: 10px;
+                color: Theme.foreground;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+        // "LIVE" while the agent is at the controls.
+        if ScreenUi.busy: Rectangle {
+            x: 8px;
+            y: 8px;
+            width: live-t.preferred-width + 20px;
+            height: 18px;
+            border-radius: 9px;
+            background: Theme.dark ? #0b0c0ecc : #ffffffdd;
+            Rectangle {
+                x: 7px;
+                y: 6px;
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: Theme.destructive;
+            }
+            live-t := Text {
+                x: 16px;
+                height: parent.height;
+                text: @tr("LIVE");
+                font-size: 9px;
+                font-weight: 700;
+                letter-spacing: 0.8px;
+                color: Theme.foreground;
+                vertical-alignment: center;
+            }
+        }
+    }
+    // The last actions, newest first.
+    if ScreenUi.has-shot: VerticalLayout {
+        x: 8px;
+        y: 8px + root.ih + 8px;
+        width: root.width - 16px;
+        for a[i] in ScreenUi.log: Rectangle {
+            height: i < 6 ? 20px : 0px;
+            visible: i < 6;
+            Text {
+                x: 4px;
+                width: 62px;
+                height: parent.height;
+                text: a.kind;
+                font-family: Theme.art-font;
+                font-size: 10px;
+                color: i == 0 ? root.tint : Theme.foreground-subtlest;
+                vertical-alignment: center;
+            }
+            Text {
+                x: 70px;
+                width: parent.width - 74px;
+                height: parent.height;
+                text: a.text;
+                font-family: Theme.art-font;
+                font-size: 10px;
+                color: i == 0 ? Theme.foreground : Theme.foreground-subtle;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+    }
+}

@@ -290,6 +290,7 @@ impl UiState {
             }
         ) {
             crate::live::new_turn(&self.window);
+            crate::machine_view::new_turn();
         }
         self.note_item(id, item);
         let row = self.chat_item(id, item);

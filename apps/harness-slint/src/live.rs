@@ -178,6 +178,7 @@ pub(crate) fn install(window: &AppWindow) {
         });
         let tick = STATE.with(|cell| cell.borrow().open_tick);
         window.global::<LiveUi>().set_follow(false);
+        window.global::<LiveUi>().set_view("code".into());
         render(&window, Some(&target));
         window.global::<LiveUi>().set_open_tick(tick);
     });
@@ -204,6 +205,17 @@ pub(crate) fn install(window: &AppWindow) {
             render(&window, shown.as_ref());
         }
     });
+}
+
+/// Brings the Live tab to the front without changing what it shows (the Screen view asks for this when the
+/// agent starts using the computer).
+pub(crate) fn request_open(window: &AppWindow) {
+    let tick = STATE.with(|cell| {
+        let mut s = cell.borrow_mut();
+        s.open_tick += 1;
+        s.open_tick
+    });
+    window.global::<LiveUi>().set_open_tick(tick);
 }
 
 /// The session's workspace changed (relative tool paths resolve against it).
@@ -252,6 +264,10 @@ pub(crate) fn touch(window: &AppWindow, kind: Option<&str>, content: &[ToolConte
         }
         same
     });
+    if follow {
+        // Following the agent: it is in a file now, not at the screen.
+        window.global::<LiveUi>().set_view("code".into());
+    }
     if follow && !same {
         render(window, Some(&target));
     } else {

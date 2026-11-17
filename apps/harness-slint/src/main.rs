@@ -15,6 +15,7 @@ mod gitui;
 mod highlight;
 mod import;
 mod live;
+mod machine_view;
 mod wallpaper;
 mod inbox;
 mod live_update;
@@ -528,6 +529,7 @@ fn main() -> ExitCode {
     // §9.10：首次启动检查与 Set up agents 对话框。
     setup::install(&window, first_run_done);
     chat::install(&window, files_tx.clone(), &workspace_dir, &data_dir);
+    machine_view::install(&window, &data_dir);
     bridge::install(&window, cmd_tx, files_tx, &workspace_dir);
     panels::install(&window);
     gitui::install(&window);

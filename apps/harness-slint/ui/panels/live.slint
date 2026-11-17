@@ -4,6 +4,7 @@
 import { ListView } from "std-widgets.slint";
 import { Theme } from "../theme/tokens.slint";
 import { Icon, Icons, IconButton } from "../components/controls.slint";
+import { ScreenUi, ScreenView } from "screen.slint";
 
 // mark: 0 plain, 1 read by the agent, 2 written by the agent, 3 about to change (edit not applied yet).
 export struct LiveLine {
@@ -24,6 +25,9 @@ export struct LiveFile {
 export global LiveUi {
     // The Live tab is on screen (set by the Side Pane); Rust renders only then.
     in-out property <bool> active;
+    // What the tab shows: "code" (the file the agent touches) or "screen" (the computer it is using).
+    // With follow on, Rust switches to whichever the agent used last.
+    in-out property <string> view: "code";
     // Follow the agent: every tool that reads or edits a file moves the view there.
     in-out property <bool> follow: true;
     in property <string> path;
@@ -96,6 +100,7 @@ component LiveRow inherits Rectangle {
 }
 
 export component LivePanel inherits Rectangle {
+    property <bool> screen: LiveUi.view == "screen";
     property <length> row-h: Theme.code-size * 1.55;
     property <length> gutter: 48px;
     // Mono advance is about 0.6 em in the system code faces; 0.62 keeps a little slack.
@@ -141,23 +146,66 @@ export component LivePanel inherits Rectangle {
                 width: 8px;
                 height: 8px;
                 border-radius: 4px;
-                background: LiveUi.action == "edit" ? Theme.success : LiveUi.action == "pending" ? Theme.warning : LiveUi.action == "read" ? Theme.accent-fg : Theme.icon-subtlest;
+                background: root.screen ? (ScreenUi.busy ? Theme.destructive : Theme.icon-subtlest) : LiveUi.action == "edit" ? Theme.success : LiveUi.action == "pending" ? Theme.warning : LiveUi.action == "read" ? Theme.accent-fg : Theme.icon-subtlest;
             }
             VerticalLayout {
                 horizontal-stretch: 1;
                 alignment: center;
                 Text {
-                    text: LiveUi.path == "" ? @tr("Waiting for the agent to open a file") : LiveUi.name;
+                    text: root.screen ? (ScreenUi.has-shot ? (ScreenUi.agent-name != "" ? ScreenUi.agent-name : @tr("Agent")) : @tr("Computer use")) : LiveUi.path == "" ? @tr("Waiting for the agent to open a file") : LiveUi.name;
                     font-size: Theme.ui-caption;
                     font-weight: Theme.weight-semibold;
                     color: Theme.foreground;
                     overflow: elide;
                 }
-                if LiveUi.path != "": Text {
+                if root.screen && ScreenUi.has-shot && ScreenUi.log.length > 0: Text {
+                    text: @tr("On this computer") + " · " + ScreenUi.log[0].kind + " " + ScreenUi.log[0].text;
+                    font-size: Theme.ui-xs + 1px;
+                    color: Theme.foreground-subtlest;
+                    overflow: elide;
+                }
+                if !root.screen && LiveUi.path != "": Text {
                     text: (LiveUi.action == "edit" ? @tr("Edited") : LiveUi.action == "pending" ? @tr("About to change") : LiveUi.action == "read" ? @tr("Reading") : @tr("Opened")) + (LiveUi.note != "" ? " · " + LiveUi.note : "");
                     font-size: Theme.ui-xs + 1px;
                     color: Theme.foreground-subtlest;
                     overflow: elide;
+                }
+            }
+            // Code / Screen: only offered when the session can use the computer (or a screenshot is held).
+            if ScreenUi.available || ScreenUi.has-shot: Rectangle {
+                y: (parent.height - self.height) / 2;
+                height: 26px;
+                width: 104px;
+                border-radius: Theme.radius-sm;
+                background: Theme.surface;
+                border-width: 1px;
+                border-color: Theme.border;
+                for v[i] in [{ id: "code", label: @tr("Code") }, { id: "screen", label: @tr("Screen") }]: Rectangle {
+                    x: 2px + i * 50px;
+                    y: 2px;
+                    width: 50px;
+                    height: 22px;
+                    border-radius: Theme.radius-sm - 2px;
+                    background: LiveUi.view == v.id ? Theme.raised : transparent;
+                    accessible-role: button;
+                    accessible-label: v.label;
+                    accessible-checked: LiveUi.view == v.id;
+                    accessible-action-default => {
+                        LiveUi.view = v.id;
+                    }
+                    Text {
+                        text: v.label;
+                        font-size: Theme.ui-xs + 1px;
+                        color: LiveUi.view == v.id ? Theme.foreground : Theme.foreground-subtlest;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            LiveUi.view = v.id;
+                        }
+                    }
                 }
             }
             Rectangle {
@@ -199,7 +247,7 @@ export component LivePanel inherits Rectangle {
             }
         }
         // Trail: the files this turn touched, oldest first; click to look at one.
-        if LiveUi.trail.length > 1: HorizontalLayout {
+        if !root.screen && LiveUi.trail.length > 1: HorizontalLayout {
             height: 26px;
             padding-left: 12px;
             padding-right: 12px;
@@ -244,7 +292,10 @@ export component LivePanel inherits Rectangle {
             height: 1px;
             background: Theme.section-line;
         }
-        if LiveUi.lines.length == 0: VerticalLayout {
+        if root.screen: ScreenView {
+            vertical-stretch: 1;
+        }
+        if !root.screen && LiveUi.lines.length == 0: VerticalLayout {
             vertical-stretch: 1;
             alignment: center;
             padding: 24px;
@@ -265,8 +316,8 @@ export component LivePanel inherits Rectangle {
             }
         }
         list := ListView {
-            vertical-stretch: LiveUi.lines.length == 0 ? 0 : 1;
-            visible: LiveUi.lines.length > 0;
+            vertical-stretch: root.screen || LiveUi.lines.length == 0 ? 0 : 1;
+            visible: !root.screen && LiveUi.lines.length > 0;
             scrolled => {
                 // The user scrolled the code: stop moving the view under them.
                 if LiveUi.follow {

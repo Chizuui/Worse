@@ -7,6 +7,10 @@ use enigo::{Axis, Button, Coordinate, Direction, Enigo, Key, Keyboard, Mouse, Se
 use serde_json::{json, Value};
 
 const MAX_SIDE: u32 = 1568;
+/// Widest screenshot copy kept for the app's live view (`machine_view.rs`).
+const MIRROR_WIDTH: u32 = 1280;
+/// The event log starts over when it grows past this.
+const EVENTS_MAX: u64 = 512 * 1024;
 const OFF: &str =
     "Machine mode is off for this session. Ask the user to switch the mode to Machine.";
 
@@ -22,6 +26,16 @@ struct Server {
     session: String,
     frame: Option<Frame>,
     enigo: Option<Enigo>,
+    /// Size of the last screenshot in its own pixels (the unit of every tool coordinate).
+    shot: (u32, u32),
+    seq: u64,
+}
+
+/// Directory the app's live view reads: `events.jsonl` (one line per action) and `screen.jpg` (the last
+/// screenshot). Kept apart from the mode gate files, which are listed as "sessions with Machine mode on".
+pub(crate) fn live_dir(home: &std::path::Path, session: &str) -> PathBuf {
+    home.join("machine-live")
+        .join(harness_agent_hub::machine::gate_name(session))
 }
 
 pub fn run() -> ExitCode {
@@ -34,6 +48,8 @@ pub fn run() -> ExitCode {
         session: std::env::var("HARNESS_MACHINE_SESSION").unwrap_or_default(),
         frame: None,
         enigo: None,
+        shot: (0, 0),
+        seq: 0,
     };
     let stdin = std::io::stdin();
     let mut out = std::io::stdout().lock();
@@ -131,6 +147,49 @@ fn pause() {
     std::thread::sleep(Duration::from_millis(60));
 }
 
+/// Moves the pointer to (x, y) along a short eased path instead of jumping there, so a person watching the
+/// screen can follow what the agent does. `HARNESS_MACHINE_GLIDE=0` restores the jump.
+fn glide(input: &mut Enigo, x: i32, y: i32) -> Result<(), String> {
+    let jump = std::env::var("HARNESS_MACHINE_GLIDE").is_ok_and(|v| v == "0" || v.eq_ignore_ascii_case("false"));
+    if let (false, Ok((sx, sy))) = (jump, input.location()) {
+        let (dx, dy) = (f64::from(x - sx), f64::from(y - sy));
+        let distance = dx.hypot(dy);
+        if distance >= 6.0 {
+            let (steps, each) = glide_plan(distance);
+            for i in 1..steps {
+                // Smoothstep: slow start, slow arrival.
+                let t = f64::from(i) / f64::from(steps);
+                let e = t * t * (3.0 - 2.0 * t);
+                input
+                    .move_mouse(sx + (dx * e).round() as i32, sy + (dy * e).round() as i32, Coordinate::Abs)
+                    .map_err(|e| e.to_string())?;
+                std::thread::sleep(each);
+            }
+        }
+    }
+    input
+        .move_mouse(x, y, Coordinate::Abs)
+        .map_err(|e| e.to_string())
+}
+
+/// Steps and pause per step of a glide over `distance` pixels: 120 ms for a short hop, 360 ms across the
+/// screen, about one step per 16 ms.
+fn glide_plan(distance: f64) -> (i32, Duration) {
+    let total_ms = (120.0 + distance * 0.2).clamp(120.0, 360.0);
+    let steps = (total_ms / 16.0).round().clamp(6.0, 24.0) as i32;
+    (steps, Duration::from_micros((total_ms * 1000.0 / f64::from(steps)) as u64))
+}
+
+/// First characters of typed text for the live view (one line, no more than 60 characters).
+fn typed_preview(text: &str) -> String {
+    let flat: String = text.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
+    let mut out: String = flat.chars().take(60).collect();
+    if flat.chars().count() > 60 {
+        out.push('…');
+    }
+    out
+}
+
 impl Server {
     fn call(&mut self, params: &Value) -> Value {
         let name = params
@@ -150,14 +209,10 @@ impl Server {
             "screenshot" => self.screenshot(&args),
             "click" => self.click(&args),
             "move" => self.point(&args).and_then(|(x, y)| {
-                self.input()?
-                    .move_mouse(x, y, Coordinate::Abs)
-                    .map_err(|e| e.to_string())?;
-                Ok(text(&format!(
-                    "Moved to {}, {}",
-                    num(&args, "x")?,
-                    num(&args, "y")?
-                )))
+                let at = (num(&args, "x")?, num(&args, "y")?);
+                self.emit("move", Some(at), &format!("to {}, {}", at.0, at.1));
+                glide(self.input()?, x, y)?;
+                Ok(text(&format!("Moved to {}, {}", at.0, at.1)))
             }),
             "drag" => self.drag(&args),
             "scroll" => self.scroll(&args),
@@ -168,6 +223,67 @@ impl Server {
             other => Err(format!("unknown tool {other}")),
         };
         result.unwrap_or_else(|error| failure(&error))
+    }
+
+    /// Tells the app's live view what is about to happen (never fails the tool: the view is optional).
+    /// `at` is a point in screenshot pixels.
+    fn emit(&mut self, kind: &str, at: Option<(f64, f64)>, text: &str) {
+        self.seq += 1;
+        let dir = live_dir(&self.home, &self.session);
+        if std::fs::create_dir_all(&dir).is_err() {
+            return;
+        }
+        let path = dir.join("events.jsonl");
+        let fresh = std::fs::metadata(&path).is_ok_and(|m| m.len() > EVENTS_MAX);
+        let mut event = json!({
+            "seq": self.seq,
+            "t": std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX)),
+            "kind": kind,
+            "text": text,
+            "w": self.shot.0,
+            "h": self.shot.1,
+        });
+        if let Some((x, y)) = at {
+            event["x"] = json!(x);
+            event["y"] = json!(y);
+        }
+        let mut options = std::fs::OpenOptions::new();
+        options.create(true);
+        if fresh {
+            options.write(true).truncate(true);
+        } else {
+            options.append(true);
+        }
+        if let Ok(mut file) = options.open(&path) {
+            let _ = writeln!(file, "{event}");
+        }
+    }
+
+    /// Copy of the screenshot for the live view, written whole and then renamed into place.
+    fn mirror(&self, image: &image::RgbaImage) {
+        let dir = live_dir(&self.home, &self.session);
+        if std::fs::create_dir_all(&dir).is_err() {
+            return;
+        }
+        let (w, h) = image.dimensions();
+        let rgb = if w > MIRROR_WIDTH {
+            let height = ((u64::from(h) * u64::from(MIRROR_WIDTH) / u64::from(w)) as u32).max(1);
+            image::DynamicImage::ImageRgba8(image::imageops::thumbnail(image, MIRROR_WIDTH, height)).into_rgb8()
+        } else {
+            image::DynamicImage::ImageRgba8(image.clone()).into_rgb8()
+        };
+        let tmp = dir.join("screen.jpg.tmp");
+        let written = std::fs::File::create(&tmp).is_ok_and(|file| {
+            let mut out = std::io::BufWriter::new(file);
+            image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 72)
+                .encode_image(&rgb)
+                .is_ok()
+        });
+        if written {
+            let _ = std::fs::rename(&tmp, dir.join("screen.jpg"));
+        }
     }
 
     fn input(&mut self) -> Result<&mut Enigo, String> {
@@ -228,6 +344,9 @@ impl Server {
         image
             .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
             .map_err(|e| e.to_string())?;
+        self.shot = image.dimensions();
+        self.mirror(&image);
+        self.emit("screenshot", None, &format!("{}x{} px", image.width(), image.height()));
         let (mx, my) = (
             chosen.x().map_err(|e| e.to_string())?,
             chosen.y().map_err(|e| e.to_string())?,
@@ -272,10 +391,16 @@ impl Server {
             _ => Button::Left,
         };
         let count = int(args, "count", 1).clamp(1, 3);
+        let at = (num(args, "x")?, num(args, "y")?);
+        let (kind, name) = match (button, count) {
+            (Button::Right, _) => ("right", "right"),
+            (Button::Middle, _) => ("click", "middle"),
+            (_, 1) => ("click", "left"),
+            _ => ("double", "left"),
+        };
+        self.emit(kind, Some(at), &format!("{name} at {}, {}", at.0, at.1));
         let input = self.input()?;
-        input
-            .move_mouse(x, y, Coordinate::Abs)
-            .map_err(|e| e.to_string())?;
+        glide(input, x, y)?;
         pause();
         for _ in 0..count {
             input
@@ -293,11 +418,13 @@ impl Server {
     fn drag(&mut self, args: &Value) -> Result<Value, String> {
         let (x, y) = self.point(args)?;
         let (tx, ty) = self.map(num(args, "to_x")?, num(args, "to_y")?)?;
-        let input = self.input()?;
-        input
-            .move_mouse(x, y, Coordinate::Abs)
-            .map_err(|e| e.to_string())?;
+        let from = (num(args, "x")?, num(args, "y")?);
+        let to = (num(args, "to_x")?, num(args, "to_y")?);
+        self.emit("drag", Some(from), &format!("from {}, {} to {}, {}", from.0, from.1, to.0, to.1));
+        glide(self.input()?, x, y)?;
         pause();
+        self.emit("drop", Some(to), &format!("at {}, {}", to.0, to.1));
+        let input = self.input()?;
         input
             .button(Button::Left, Direction::Press)
             .map_err(|e| e.to_string())?;
@@ -319,10 +446,16 @@ impl Server {
         let (x, y) = self.point(args)?;
         let dx = i32::try_from(int(args, "dx", 0)).unwrap_or(0);
         let dy = i32::try_from(int(args, "dy", 0)).unwrap_or(0);
+        let at = (num(args, "x")?, num(args, "y")?);
+        let way = match (dy, dx) {
+            (d, _) if d > 0 => format!("down {d}"),
+            (d, _) if d < 0 => format!("up {}", -d),
+            (_, d) if d > 0 => format!("right {d}"),
+            (_, d) => format!("left {}", -d),
+        };
+        self.emit("scroll", Some(at), &format!("{way} at {}, {}", at.0, at.1));
         let input = self.input()?;
-        input
-            .move_mouse(x, y, Coordinate::Abs)
-            .map_err(|e| e.to_string())?;
+        glide(input, x, y)?;
         pause();
         if dy != 0 {
             input
@@ -343,6 +476,7 @@ impl Server {
             .and_then(Value::as_str)
             .ok_or_else(|| "missing text".to_owned())?
             .to_owned();
+        self.emit("type", None, &format!("“{}”", typed_preview(&value)));
         self.input()?.text(&value).map_err(|e| e.to_string())?;
         Ok(text(&format!("Typed {} characters", value.chars().count())))
     }
@@ -357,6 +491,7 @@ impl Server {
             .split_whitespace()
             .map(|combo| combo.split('+').map(key_of).collect::<Result<Vec<_>, _>>())
             .collect::<Result<Vec<_>, _>>()?;
+        self.emit("key", None, &keys);
         let input = self.input()?;
         for combo in combos {
             let Some((last, mods)) = combo.split_last() else {
@@ -500,4 +635,36 @@ fn base64(bytes: &[u8]) -> String {
         });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn glide_is_quick_for_short_hops_and_bounded_for_long_ones() {
+        let (steps, each) = glide_plan(10.0);
+        assert!((6..=9).contains(&steps), "{steps}");
+        assert!(each * u32::try_from(steps).unwrap() <= Duration::from_millis(130));
+        let (steps, each) = glide_plan(4000.0);
+        assert!(steps <= 24);
+        assert!(each * u32::try_from(steps).unwrap() <= Duration::from_millis(361));
+    }
+
+    #[test]
+    fn typed_preview_is_one_short_line() {
+        assert_eq!(typed_preview("ls -la\n"), "ls -la ");
+        let long = "x".repeat(200);
+        let shown = typed_preview(&long);
+        assert_eq!(shown.chars().count(), 61);
+        assert!(shown.ends_with('…'));
+    }
+
+    #[test]
+    fn live_dir_is_apart_from_the_gate_files() {
+        let home = std::path::Path::new("/h");
+        let dir = live_dir(home, "sess:1/2");
+        assert_eq!(dir, std::path::Path::new("/h/machine-live/sess_1_2"));
+        assert!(!dir.starts_with(harness_agent_hub::machine::gate_dir(home)));
+    }
 }
