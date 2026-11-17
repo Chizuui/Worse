@@ -21,6 +21,9 @@ export global Look {
     in property <image> wallpaper;
     in property <image> frost;
     in property <bool> has-wallpaper;
+    // The wallpaper is an animation. Glass panels then use a flat veil instead of the frosted copy, which
+    // would have to be redrawn with every frame.
+    in property <bool> wallpaper-animated;
     // 0..1: how much of the canvas colour lies over the wallpaper (darkens in dark mode, lightens in light).
     in-out property <float> dim: 0.55;
     // File name shown in Settings; `wallpaper-note` is the load state ("", "loading", or an error text).

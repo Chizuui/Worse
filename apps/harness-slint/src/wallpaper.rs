@@ -6,8 +6,10 @@
 //! that glass panels show ("frost"). The dim is not baked in: Slint draws it as a veil of the canvas colour, so
 //! the slider answers at once and follows the theme.
 //!
-//! An animation repaints the whole window on every frame. It is paused while the window is hidden or reduced
-//! motion is on, runs at 20 frames a second at most, and its frames are scaled down until they fit a fixed
+//! An animation repaints the whole window on every frame, which is costly on the CPU renderer (about half a
+//! core at 12 frames a second in a 1440x900 window). So it is paused while the window is hidden or not
+//! focused or reduced motion is on, shows at most 10 frames a second on the CPU renderer (20 on the GPU; the
+//! clock picks the frame, so the speed stays right), and its frames are scaled down until they fit a fixed
 //! memory budget.
 
 use std::cell::RefCell;
@@ -36,8 +38,10 @@ const ANIM_FRAMES: usize = 400;
 /// Width of the frosted copy and its blur. At this size the blur spans about a seventh of the picture.
 const FROST_WIDTH: u32 = 192;
 const FROST_SIGMA: f32 = 7.0;
-/// Shortest time a frame stays (20 frames a second).
+/// Shortest time a frame stays in the file's own timing (20 frames a second).
 const MIN_DELAY_MS: u32 = 50;
+/// Shortest time between two frames on screen with the CPU renderer (10 frames a second).
+const CPU_FRAME_MS: u32 = 100;
 /// The "blur" setting is in pixels of a window this wide.
 const BLUR_BASE: f32 = 1440.0;
 
@@ -152,6 +156,7 @@ fn clear(window: &AppWindow, note: &str) {
     });
     let look = window.global::<Look>();
     look.set_has_wallpaper(false);
+    look.set_wallpaper_animated(false);
     look.set_wallpaper(Image::default());
     look.set_frost(Image::default());
     look.set_wallpaper_note(note.into());
@@ -166,11 +171,12 @@ fn show(window: &AppWindow, frames: Vec<Frame>) {
         return;
     };
     let look = window.global::<Look>();
+    let animated = frames.len() > 1;
+    look.set_wallpaper_animated(animated);
     look.set_wallpaper(Image::from_rgba8(first.wall.clone()));
     look.set_frost(Image::from_rgba8(first.frost.clone()));
     look.set_has_wallpaper(true);
     look.set_wallpaper_note(slint::SharedString::new());
-    let animated = frames.len() > 1;
     let first_delay = first.delay_ms;
     STATE.with(|cell| {
         let mut s = cell.borrow_mut();
@@ -209,8 +215,9 @@ fn arm(window: &AppWindow, after_ms: u32) {
 }
 
 fn tick(window: &AppWindow) {
-    // Hidden window or reduced motion: hold the frame and look again later.
-    let paused = !window.global::<ArtClock>().get_visible() || window.global::<Theme>().get_reduce_motion();
+    // Hidden or unfocused window, or reduced motion: hold the frame and look again later.
+    let clock = window.global::<ArtClock>();
+    let paused = !clock.get_visible() || !clock.get_focused() || window.global::<Theme>().get_reduce_motion();
     if paused {
         arm(window, 500);
         return;
@@ -226,7 +233,8 @@ fn tick(window: &AppWindow) {
         }
         let at = u64::try_from(started.elapsed().as_millis()).unwrap_or(0) % total;
         let index = s.ends.partition_point(|end| *end <= at).min(s.frames.len() - 1);
-        let wait = u32::try_from(s.ends[index] - at).unwrap_or(MIN_DELAY_MS);
+        let floor = if crate::gpu_rendering() { MIN_DELAY_MS } else { CPU_FRAME_MS };
+        let wait = u32::try_from(s.ends[index] - at).unwrap_or(MIN_DELAY_MS).max(floor);
         let frame = (index != s.shown).then(|| {
             s.shown = index;
             (s.frames[index].wall.clone(), s.frames[index].frost.clone())
@@ -236,10 +244,9 @@ fn tick(window: &AppWindow) {
     let Some((frame, wait)) = next else {
         return;
     };
-    if let Some((wall, frost)) = frame {
-        let look = window.global::<Look>();
-        look.set_wallpaper(Image::from_rgba8(wall));
-        look.set_frost(Image::from_rgba8(frost));
+    if let Some((wall, _frost)) = frame {
+        // Only the wallpaper moves: panels show a flat veil over an animation (see `Frost`).
+        window.global::<Look>().set_wallpaper(Image::from_rgba8(wall));
     }
     arm(window, wait);
 }

@@ -3218,7 +3218,7 @@ export component AppWindow inherits Window {
     }
     // The one timer behind the hero glyph art (empty chat wordmark, bunny and dither field, the napping bunny
     // in an empty session list): runs only while one of them is on screen and the window is visible.
-    property <bool> art-on-screen: !Theme.reduce-motion && ArtClock.visible && (root.chat.length == 0 || root.sessions.length == 0 || (Look.field-motion == "always" && Look.field != "none"));
+    property <bool> art-on-screen: !Theme.reduce-motion && ArtClock.visible && ArtClock.focused && (root.chat.length == 0 || root.sessions.length == 0 || (Look.field-motion == "always" && Look.field != "none"));
     art-clock := Timer {
         interval: ArtClock.period;
         running: root.art-on-screen;

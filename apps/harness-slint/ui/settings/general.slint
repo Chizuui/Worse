@@ -331,9 +331,9 @@ export component GeneralPage inherits VerticalLayout {
         BoolRow {
             first: true;
             stacked: root.stacked;
-            key: "general.hardwareAcceleration";
-            title: @tr("Hardware acceleration");
-            description: @tr("Use the GPU renderer. Restart Harness to apply.");
+            key: "general.gpuRendering";
+            title: @tr("GPU rendering");
+            description: @tr("Draw with the GPU: smoother on very large screens and with animated wallpapers, at about 170 MB more memory. Off draws on the CPU and repaints only what changed. Restart Harness to apply.");
         }
         BoolRow {
             stacked: root.stacked;
@@ -936,7 +936,7 @@ export component AppearancePage inherits VerticalLayout {
             wide: true;
             pad-y: 10px;
             title: @tr("Wallpaper");
-            description: Look.wallpaper-note == "loading" ? @tr("Loading…") : Look.wallpaper-note != "" ? @tr("Could not load: {}", Look.wallpaper-note) : Look.wallpaper-name != "" ? Look.wallpaper-name : @tr("A picture or an animated GIF / WebP behind the whole window.");
+            description: Look.wallpaper-note == "loading" ? @tr("Loading…") : Look.wallpaper-note != "" ? @tr("Could not load: {}", Look.wallpaper-note) : Look.wallpaper-name != "" ? (Look.wallpaper-animated ? @tr("{} · animated: the whole window repaints for every frame, so it costs CPU. It pauses while the window is not focused; GPU rendering (General) makes it cheap.", Look.wallpaper-name) : Look.wallpaper-name) : @tr("A picture or an animated GIF / WebP behind the whole window.");
             HorizontalLayout {
                 spacing: 8px;
                 alignment: end;

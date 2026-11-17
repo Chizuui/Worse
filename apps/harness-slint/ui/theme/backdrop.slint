@@ -34,7 +34,7 @@ export component Frost inherits Rectangle {
     border-radius: root.radius;
     clip: true;
     accessible-role: none;
-    Image {
+    if !Look.wallpaper-animated: Image {
         x: -root.absolute-position.x;
         y: -root.absolute-position.y;
         width: Look.win-w;
@@ -44,7 +44,8 @@ export component Frost inherits Rectangle {
         accessible-role: none;
     }
     Rectangle {
-        background: Theme.canvas.with-alpha(min(0.94, Look.dim + root.veil));
+        // Over a moving wallpaper there is no frosted copy: the veil alone has to quiet it down.
+        background: Theme.canvas.with-alpha(Look.wallpaper-animated ? min(0.92, 0.45 + Look.dim * 0.5 + root.veil) : min(0.94, Look.dim + root.veil));
         accessible-role: none;
     }
 }

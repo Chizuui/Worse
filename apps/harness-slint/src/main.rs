@@ -194,6 +194,9 @@ fn select_renderer() {
         Ok("software") => &["software", "skia-software", "skia", "femtovg"],
         Ok("femtovg") => &["femtovg", "skia-software", "skia", "software"],
         Ok("skia" | "gpu") => &["skia", "skia-software", "femtovg", "software"],
+        Ok("skia-software" | "cpu") => &["skia-software", "skia", "femtovg", "software"],
+        // No override: Settings › General › GPU rendering decides (off by default).
+        _ if gpu_rendering_setting(&harness_home()) => &["skia", "skia-software", "femtovg", "software"],
         _ => &["skia-software", "skia", "femtovg", "software"],
     };
     for &renderer in order {
@@ -202,10 +205,38 @@ fn select_renderer() {
             .renderer_name(renderer.into())
             .select()
         {
-            Ok(()) => return,
+            Ok(()) => {
+                GPU_RENDERING.store(renderer == "skia" || renderer == "femtovg", std::sync::atomic::Ordering::Relaxed);
+                return;
+            }
             Err(error) => eprintln!("harness-slint: {renderer} renderer unavailable: {error}"),
         }
     }
+}
+
+/// The window is drawn by a GPU renderer (set once, when the renderer is chosen).
+static GPU_RENDERING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether a GPU renderer draws the window. On the CPU renderer whole-window animation is costly, so an
+/// animated wallpaper shows fewer frames there.
+pub(crate) fn gpu_rendering() -> bool {
+    GPU_RENDERING.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// `general.gpuRendering` of the settings file. The renderer is chosen before the window and the settings
+/// store exist, so this reads the file directly: `<base>/settings.json`, or the one in the relocated data
+/// directory named by `<base>/relocated.json`. Anything unreadable means "off".
+fn gpu_rendering_setting(base: &Path) -> bool {
+    let read = |path: &Path| -> Option<serde_json::Value> {
+        serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()
+    };
+    let data_dir = read(&base.join(relocation::POINTER_FILE))
+        .and_then(|v| v.get("dataDir").and_then(|d| d.as_str()).map(PathBuf::from))
+        .filter(|dir| dir.join(relocation::DATA_MARKER).exists())
+        .unwrap_or_else(|| base.to_path_buf());
+    read(&data_dir.join(harness_settings::SETTINGS_FILE))
+        .and_then(|v| v.pointer("/general/gpuRendering").and_then(serde_json::Value::as_bool))
+        .unwrap_or(false)
 }
 
 /// Gates only (automation builds): `HARNESS_UI_WINDOW_SIZE=<w>x<h>` opens the window at that logical size, so the

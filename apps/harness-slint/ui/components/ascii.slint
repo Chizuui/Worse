@@ -18,6 +18,9 @@ export global ArtClock {
     in-out property <int> tick;
     in-out property <int> busy-tick;
     in-out property <bool> visible: true;
+    // The window has the keyboard focus. Decoration (hero art, the unicode field, an animated wallpaper)
+    // rests while it does not; the pieces that show an agent at work keep going.
+    in-out property <bool> focused: true;
     out property <duration> period: 65ms;
     out property <duration> busy-period: 90ms;
 }

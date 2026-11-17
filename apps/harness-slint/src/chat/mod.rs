@@ -1544,6 +1544,15 @@ fn install_drop(window: &AppWindow) {
             }
         }
     };
+    let weak = window.as_weak();
+    let set_focused = move |focused: bool| {
+        if let Some(window) = weak.upgrade() {
+            let clock = window.global::<crate::ui::ArtClock>();
+            if clock.get_focused() != focused {
+                clock.set_focused(focused);
+            }
+        }
+    };
     window.window().on_winit_window_event(move |_, event| {
         match event {
             WindowEvent::HoveredFile(_) => drop_hover(true),
@@ -1554,7 +1563,13 @@ fn install_drop(window: &AppWindow) {
             WindowEvent::Resized(size) => set_visible(size.width > 0 && size.height > 0),
             // Some window systems report "occluded" wrongly (X11 without a window manager does at startup).
             // A window that has the focus or the pointer is on screen.
-            WindowEvent::Focused(true) | WindowEvent::CursorEntered { .. } => set_visible(true),
+            WindowEvent::CursorEntered { .. } => set_visible(true),
+            WindowEvent::Focused(focused) => {
+                if *focused {
+                    set_visible(true);
+                }
+                set_focused(*focused);
+            }
             _ => {}
         }
         EventResult::Propagate
