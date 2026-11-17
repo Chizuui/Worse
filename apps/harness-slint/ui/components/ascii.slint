@@ -1,25 +1,65 @@
 // Unicode / ASCII art pieces: frame-cycling glyph animations set in the bundled mono face.
+//
+// Cost rules (the art is the same, only how it is driven):
+// - A frame is shown only when its text differs from the one on screen. Slint marks an item dirty whenever
+//   a property it reads changes, even to an equal value, so the shown index only moves on a real change.
+// - Hero pieces (wordmark, bunny, dither field) step from one shared clock, so their changes land in the
+//   same redraw instead of each piece waking the window on its own schedule.
+// - Nothing steps while the window is minimized or covered, or with reduced motion.
 import { Theme } from "../theme.slint";
 import { AsciiArt } from "../brand/ascii_art.slint";
 export { AsciiArt }
 
+// Shared animation clocks. AppWindow runs one timer per clock, only while something that uses it is on
+// screen: `tick` (every `period`) for the hero art, `busy-tick` (every `busy-period`) for the pieces that
+// show an agent at work (tool-row spinner, the "Thinking" line, Orchestra level bars). Rust clears
+// `visible` while the window is minimized or occluded.
+export global ArtClock {
+    in-out property <int> tick;
+    in-out property <int> busy-tick;
+    in-out property <bool> visible: true;
+    out property <duration> period: 65ms;
+    out property <duration> busy-period: 90ms;
+}
+
 // Cycles through text frames. Holds `rest` when not playing or when reduced motion is on.
+// `divider` > 0: steps every `divider` ticks of ArtClock (no timer of its own; `busy` picks the busy clock);
+// otherwise it runs its own `interval` timer.
 export component GlyphAnim inherits Text {
     in property <[string]> frames;
     in property <duration> interval: 110ms;
+    in property <int> divider: 0;
+    in property <bool> busy: false;
     in property <bool> playing: true;
     in property <int> rest: 0;
-    property <int> frame: 0;
-    property <bool> live: root.playing && !Theme.reduce-motion && root.frames.length > 1;
-    text: root.frames.length == 0 ? "" : root.frames[root.live ? mod(root.frame, root.frames.length) : min(root.rest, root.frames.length - 1)];
+    property <int> count: 0;
+    property <int> shown: 0;
+    property <bool> live: root.playing && !Theme.reduce-motion && ArtClock.visible && root.frames.length > 1;
+    text: root.frames.length == 0 ? "" : root.frames[root.live ? mod(root.shown, root.frames.length) : min(root.rest, root.frames.length - 1)];
     font-family: Theme.art-font;
     wrap: no-wrap;
     accessible-role: none;
+    function advance(n: int) {
+        if root.frames.length == 0 {
+            return;
+        }
+        let next = mod(n, root.frames.length);
+        if root.frames[next] != root.frames[mod(root.shown, root.frames.length)] {
+            root.shown = next;
+        }
+    }
+    property <int> step: root.divider > 0 && root.live ? floor((root.busy ? ArtClock.busy-tick : ArtClock.tick) / root.divider) : -1;
+    changed step => {
+        if root.step >= 0 {
+            root.advance(root.step);
+        }
+    }
     Timer {
         interval: root.interval;
-        running: root.live;
+        running: root.live && root.divider <= 0;
         triggered => {
-            root.frame = mod(root.frame + 1, root.frames.length);
+            root.count += 1;
+            root.advance(root.count);
         }
     }
 }

@@ -29,12 +29,17 @@ export component Icon inherits Rectangle {
 export component Spinner inherits Rectangle {
     in property <color> tint: Theme.foreground;
     in property <length> size: Theme.icon-sm;
+    // true: steps with ArtClock's busy clock (only for spinners shown while a turn runs, which is when that
+    // clock runs); false: its own timer.
+    in property <bool> clocked: false;
     width: root.size;
     height: root.size;
     accessible-role: none;
     GlyphAnim {
         frames: AsciiArt.spinner;
         interval: 95ms;
+        divider: root.clocked ? 1 : 0;
+        busy: true;
         font-size: root.size * 1.05;
         color: root.tint;
         horizontal-alignment: center;

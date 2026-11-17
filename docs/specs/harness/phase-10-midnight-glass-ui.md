@@ -48,7 +48,8 @@ Slint 1.18.1's software renderer cannot draw this design:
 | `SLINT_BACKEND` is set | Slint picks the renderer itself. |
 | `HARNESS_RENDERER=software` | Software renderer first. |
 | `HARNESS_RENDERER=femtovg` | `winit` + `femtovg` (OpenGL) first. |
-| Otherwise | `winit` + `skia`. |
+| `HARNESS_RENDERER=skia` (or `gpu`) | `winit` + GPU `skia` first. |
+| Otherwise | `winit` + `skia-software`: the same Skia drawing (same hinting, shadows, clips) rasterized on the CPU. It repaints only dirty regions and holds no GPU context, so animations and idle memory cost less; full-window repaints (scrolling, resizing) cost more CPU than on the GPU. |
 | The chosen renderer fails | Falls back to `femtovg`, then `software`. |
 
 Skia is the default since the 2026-11-04 text-quality fix: femtovg draws text with grayscale antialiasing and no hinting, so at 100% scaling (for example 2560×1440) every glyph stem is smeared over 2–3 pixels and text reads as blurry. Skia hints glyphs and draws crisp stems. Trade-off, measured on the quick build with the Skills page open: working set 218 MB (Skia) vs 153 MB (femtovg), executable +11 MB, and the build downloads Skia's prebuilt binaries. femtovg measured about 173 MB private memory at idle with the fake core; the software renderer used about 7 MB in the phase-8 measurement.

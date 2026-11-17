@@ -1530,14 +1530,28 @@ fn wire(window: &AppWindow) {
     install_drop(window);
 }
 
-/// OS file drops (Slint's winit backend does not forward them as Slint events).
+/// OS file drops (Slint's winit backend does not forward them as Slint events), and window visibility for the
+/// glyph art: it stops stepping while the window is minimized or fully covered (`ArtClock.visible`), so a
+/// hidden window does no animation work at all. Nothing changes on screen while the window can be seen.
 fn install_drop(window: &AppWindow) {
     use slint::winit_030::{winit::event::WindowEvent, EventResult, WinitWindowAccessor};
-    window.window().on_winit_window_event(|_, event| {
+    let weak = window.as_weak();
+    let set_visible = move |visible: bool| {
+        if let Some(window) = weak.upgrade() {
+            let clock = window.global::<crate::ui::ArtClock>();
+            if clock.get_visible() != visible {
+                clock.set_visible(visible);
+            }
+        }
+    };
+    window.window().on_winit_window_event(move |_, event| {
         match event {
             WindowEvent::HoveredFile(_) => drop_hover(true),
             WindowEvent::HoveredFileCancelled => drop_hover(false),
             WindowEvent::DroppedFile(path) => dropped(path),
+            WindowEvent::Occluded(occluded) => set_visible(!occluded),
+            // Windows reports a minimized window as a 0x0 resize.
+            WindowEvent::Resized(size) => set_visible(size.width > 0 && size.height > 0),
             _ => {}
         }
         EventResult::Propagate

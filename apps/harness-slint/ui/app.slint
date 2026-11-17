@@ -15,7 +15,8 @@ import "fonts/InstrumentSerif-Italic.ttf";
 import "fonts/JetBrainsMono-Regular.ttf";
 import { Theme } from "theme/tokens.slint";
 import { MidnightBackdrop, DitherField } from "theme/backdrop.slint";
-import { GlyphAnim, AsciiArt } from "components/ascii.slint";
+import { GlyphAnim, AsciiArt, ArtClock } from "components/ascii.slint";
+export { ArtClock }
 import { Icon, Icons, IconsFill, Glass, Spinner, Button, IconButton, Tag, Divider, Card, MenuShell, MenuItem, TabBar, TabItem, SectionLabel, StatusDot, Segmented, SegmentOption } from "components/controls.slint";
 import { FileIcons } from "components/icons.slint";
 
@@ -871,7 +872,7 @@ component Sidebar inherits Rectangle {
             alignment: center;
             GlyphAnim {
                 frames: AsciiArt.bunny-sleep;
-                interval: 380ms;
+                divider: 6;
                 font-size: 13px;
                 color: Theme.foreground-subtlest;
             }
@@ -1708,15 +1709,22 @@ component EmptyState inherits VerticalLayout {
     // Needs room, so short or narrow windows skip straight to the heading.
     if root.height >= 500px && root.width >= 520px: HorizontalLayout {
         alignment: center;
-        Rectangle {
-            width: wm.preferred-width;
-            height: wm.preferred-height;
+        hero := Rectangle {
+            // One text item per letter (a letter is only redrawn when its own cells change), placed on the
+            // character grid of a single block: letters 10 cells wide, 2 cells apart, one blank row between
+            // WORSE and HARNESS. Cell size is the 8px art face's metrics (JetBrains Mono: advance 600, line
+            // 1320 per 1000 units), so positions stay fractional like glyphs inside one text would.
+            property <length> cell: 8px * 0.6;
+            property <length> line: 8px * 1.32;
+            // HARNESS (7 letters) is the wider row: 7 * 10 + 6 * 2 cells; 7 + 1 + 7 rows.
+            width: 82 * self.cell;
+            height: 15 * self.line;
             accessible-role: none;
-            wm := GlyphAnim {
-                x: 0;
-                y: 0;
-                frames: AsciiArt.wordmark;
-                interval: 130ms;
+            for letter[i] in AsciiArt.wordmark-letters: GlyphAnim {
+                x: (i < 5 ? i : i - 5) * 12 * hero.cell;
+                y: (i < 5 ? 0 : 8) * hero.line;
+                frames: letter;
+                divider: 2;
                 font-size: 8px;
                 color: Theme.foreground;
             }
@@ -1725,7 +1733,7 @@ component EmptyState inherits VerticalLayout {
                 x: parent.width - self.width + 2px;
                 y: parent.height * 0.5 - self.height + 4px;
                 frames: AsciiArt.bunny;
-                interval: 170ms;
+                divider: 3;
                 font-size: 14px;
                 color: Theme.foreground;
             }
@@ -1820,19 +1828,13 @@ component EmptyState inherits VerticalLayout {
 }
 
 component WorkingLine inherits Rectangle {
-    property <int> tick;
     property <int> secs;
-    property <float> glow: 0.55 + 0.45 * sin(root.tick * 18deg);
+    // Same 2.4 s breathing as before (20 steps of 120 ms), now stepped by the shared busy clock (90 ms), so
+    // the glow, the scan and the tool spinner change in the same redraw.
+    property <float> glow: 0.55 + 0.45 * sin(ArtClock.busy-tick * 13.5deg);
     height: 26px;
     accessible-role: text;
     accessible-label: "Thinking, " + root.secs + " seconds";
-    Timer {
-        interval: 120ms;
-        running: true;
-        triggered => {
-            root.tick = mod(root.tick + 1, 1000);
-        }
-    }
     Timer {
         interval: 1s;
         running: true;
@@ -1847,7 +1849,8 @@ component WorkingLine inherits Rectangle {
         GlyphAnim {
             y: (parent.height - self.height) / 2;
             frames: AsciiArt.scan;
-            interval: 90ms;
+            divider: 1;
+            busy: true;
             font-size: 11px;
             color: Theme.foreground-subtle;
             vertical-alignment: center;
@@ -3181,6 +3184,26 @@ export component AppWindow inherits Window {
         self.win-w = self.width;
         self.window-action("sync");
     }
+    // The one timer behind the hero glyph art (empty chat wordmark, bunny and dither field, the napping bunny
+    // in an empty session list): runs only while one of them is on screen and the window is visible.
+    property <bool> art-on-screen: !Theme.reduce-motion && ArtClock.visible && (root.chat.length == 0 || root.sessions.length == 0);
+    art-clock := Timer {
+        interval: ArtClock.period;
+        running: root.art-on-screen;
+        triggered => {
+            ArtClock.tick = mod(ArtClock.tick + 1, 1000000);
+        }
+    }
+    // Busy clock: while a turn runs or Orchestra has live subagents / tasks (the tool spinner, the
+    // "Thinking" line and the level bars all step on it, so they redraw together).
+    property <bool> busy-on-screen: !Theme.reduce-motion && ArtClock.visible && (root.running || ChatUi.subagents-running + ChatUi.background-tasks-running > 0);
+    busy-clock := Timer {
+        interval: ArtClock.busy-period;
+        running: root.busy-on-screen;
+        triggered => {
+            ArtClock.busy-tick = mod(ArtClock.busy-tick + 1, 1000000);
+        }
+    }
     property <bool> stick-bottom: true;
     property <length> chat-pad: 16px;
     // Last path component of the workspace (sidebar footer), set by Rust.
@@ -3785,7 +3808,8 @@ export component AppWindow inherits Window {
                             if orch-btn.live > 0: GlyphAnim {
                                 y: (parent.height - self.height) / 2;
                                 frames: AsciiArt.bars;
-                                interval: 110ms;
+                                divider: 1;
+                                busy: true;
                                 font-size: 9px;
                                 color: Theme.accent-fg;
                                 vertical-alignment: center;

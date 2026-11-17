@@ -11,23 +11,28 @@ export component MidnightBackdrop inherits Rectangle {
 
 // Dither field: columns of glyphs (# % * :) hugging the left and right edges and fading towards the middle.
 // `reach` is how far each side comes in; `lively` cycles the frames slowly (used on the empty chat only).
+// Each side is six stacked bands of 18 rows: bands below the window are culled and never laid out, and
+// while still each side is cached as one layer.
 export component DitherField inherits Rectangle {
     in property <length> reach: 220px;
     in property <bool> lively: false;
     in property <color> fade: Theme.canvas;
     property <color> ink: Theme.foreground.with-alpha(Theme.dark ? 0.13 : 0.16);
+    // Line height of the 9px art face (JetBrains Mono: ascent 1020 + descent 300 per 1000 units), so the
+    // bands sit exactly where the rows of one block would. A layout would round each band to whole pixels.
+    property <length> line: 9px * 1.32;
     clip: true;
     if root.reach > 40px: Rectangle {
         x: 0;
         width: root.reach;
         clip: true;
         cache-rendering-hint: !root.lively;
-        GlyphAnim {
+        for band[b] in AsciiArt.field-left: GlyphAnim {
             x: 0;
-            y: 0;
-            frames: AsciiArt.field-left;
+            y: b * 18 * root.line;
+            frames: band;
             playing: root.lively;
-            interval: 480ms;
+            divider: 7;
             font-size: 9px;
             letter-spacing: 8px;
             color: root.ink;
@@ -41,12 +46,12 @@ export component DitherField inherits Rectangle {
         width: root.reach;
         clip: true;
         cache-rendering-hint: !root.lively;
-        GlyphAnim {
+        for band[b] in AsciiArt.field-right: GlyphAnim {
             x: parent.width - self.width;
-            y: 0;
-            frames: AsciiArt.field-right;
+            y: b * 18 * root.line;
+            frames: band;
             playing: root.lively;
-            interval: 480ms;
+            divider: 7;
             font-size: 9px;
             letter-spacing: 8px;
             color: root.ink;

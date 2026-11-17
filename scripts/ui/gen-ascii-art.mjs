@@ -26,6 +26,7 @@ function noise(x, y, s) {
 }
 const slintString = (s) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`;
 const slintArray = (frames) => `[\n${frames.map((f) => `        ${slintString(f)},`).join("\n")}\n    ]`;
+const slintArray2 = (lists) => `[\n${lists.map((frames) => `        [\n${frames.map((f) => `            ${slintString(f)},`).join("\n")}\n        ],`).join("\n")}\n    ]`;
 
 // ---- 1. block wordmark ------------------------------------------------------------------------------------
 // 5x7 pixel capitals; every font pixel becomes two characters so cells come out roughly square.
@@ -86,6 +87,47 @@ function wordmarkFrames(lines, frames) {
   return out;
 }
 
+// The same wordmark split into one frame list per letter (5x7 cells, two characters per cell, no gap), so a
+// letter whose cells did not change between two frames is not redrawn. Letters run left to right, top row first.
+function wordmarkLetterFrames(lines, frames) {
+  const total = lines.reduce((n, t) => n + t.length, 0);
+  const letters = [];
+  lines.forEach((text, r) => {
+    const offset = lines.slice(0, r).reduce((n, t) => n + t.length, 0);
+    [...text].forEach((ch, li) => letters.push({ g: FONT[ch], r, li, index: offset + li }));
+  });
+  return letters.map(({ g, r, li, index }) => {
+    const out = [];
+    for (let f = 0; f < frames; f += 1) {
+      const lit = Math.floor((f / frames) * total) % total;
+      const jitter = Math.floor(f / 3);
+      const rows = [];
+      for (let y = 0; y < 7; y += 1) {
+        let line = "";
+        for (let cx = 0; cx < 5; cx += 1) {
+          if (g[y][cx] !== "#") {
+            line += "  ";
+            continue;
+          }
+          if (index === lit) {
+            line += "██";
+            continue;
+          }
+          // Same column index and hash as wordmarkFrames, so the art is identical cell for cell.
+          const x = li * 6 + cx;
+          const dist = Math.abs(index - lit);
+          const near = Math.max(0, 1 - Math.min(dist, total - dist) / 4);
+          const v = hash(x + r * 97, y, 11 + jitter) * 0.6 + near * 0.4;
+          line += v > 0.78 ? "▓▓" : v > 0.56 ? "▒▒" : v > 0.36 ? "░░" : v > 0.18 ? "##" : "%%";
+        }
+        rows.push(line);
+      }
+      out.push(rows.join("\n"));
+    }
+    return out;
+  });
+}
+
 // ---- 2. the ASCII bunny ----------------------------------------------------------------------------------
 // Deadpan by default; every few seconds an ear flicks or it gives a side-eye.
 const B = {
@@ -108,6 +150,27 @@ const bunnyWork = [...rep("nom1", 2), ...rep("nom2", 2)];
 // ---- 3. dither field -------------------------------------------------------------------------------------
 // Sparse glyph grid (drawn with wide letter spacing), dense at the window edge and fading out towards the
 // content column. `mirror` flips it for the right edge. Frames drift slowly so cycling them reads as a shimmer.
+// `keep` columns are emitted (the ones nearest the window edge; the rest are always clipped), and rows are
+// split into `bands` stacked text items so bands below the window are never laid out. Returns [band][frame].
+function fieldBands(cols, keep, rows, bands, frames, mirror, seed) {
+  const full = fieldFrames(cols, rows, frames, mirror, seed);
+  const per = Math.ceil(rows / bands);
+  const out = [];
+  for (let b = 0; b < bands; b += 1) {
+    out.push(
+      full.map((frame) =>
+        frame
+          .split("\n")
+          .slice(b * per, (b + 1) * per)
+          // Never an empty line: a band must keep its full height so the bands stack like one block.
+          .map((line) => (mirror ? line.padStart(cols, " ").slice(cols - keep) : line.slice(0, keep).replace(/\s+$/, "") || " "))
+          .join("\n"),
+      ),
+    );
+  }
+  return out;
+}
+
 function fieldFrames(cols, rows, frames, mirror, seed) {
   const out = [];
   for (let f = 0; f < frames; f += 1) {
@@ -153,8 +216,11 @@ export global AsciiArt {
     out property <[string]> bunny: ${slintArray(bunnyIdle)};
     out property <[string]> bunny-sleep: ${slintArray(bunnySleep)};
     out property <[string]> bunny-work: ${slintArray(bunnyWork)};
-    out property <[string]> field-left: ${slintArray(fieldFrames(46, 108, 6, false, 3))};
-    out property <[string]> field-right: ${slintArray(fieldFrames(46, 108, 6, true, 19))};
+    // Per letter ([letter][frame]): W O R S E, then H A R N E S S.
+    out property <[[string]]> wordmark-letters: ${slintArray2(wordmarkLetterFrames(["WORSE", "HARNESS"], 48))};
+    // Dither field, [band][frame]: 6 bands of 18 rows; 32 visible columns of a 46-column field.
+    out property <[[string]]> field-left: ${slintArray2(fieldBands(46, 32, 108, 6, 6, false, 3))};
+    out property <[[string]]> field-right: ${slintArray2(fieldBands(46, 32, 108, 6, 6, true, 19))};
     out property <[string]> spinner: ${slintArray(spinner)};
     out property <[string]> scan: ${slintArray(scan)};
     out property <[string]> bars: ${slintArray(bars)};

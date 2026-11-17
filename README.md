@@ -275,7 +275,7 @@ Useful environment switches:
 | `HARNESS_WORKSPACE` | force the workspace folder |
 | `HARNESS_UI_CORE=fake` | scripted in-process core, no agent CLIs (demos, UI tests) |
 | `HARNESS_NO_SHADOW=1` | disable the live-update shadow copy |
-| `HARNESS_RENDERER=skia\|femtovg\|software` | renderer order |
+| `HARNESS_RENDERER=skia\|femtovg\|software` | renderer order (default: Skia on the CPU, `skia-software`; `skia` puts GPU Skia first) |
 
 ## Project layout
 

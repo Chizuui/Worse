@@ -179,16 +179,20 @@ fn relaunch() {
     }
 }
 
-/// Renderer choice (phase-10 Midnight Glass UI §2): Skia by default, then femtovg, then software.
-/// `HARNESS_RENDERER=femtovg|software` puts that renderer first, `SLINT_BACKEND` overrides all.
+/// Renderer choice (phase-10 Midnight Glass UI §2). Default: Skia rasterizing on the CPU (`skia-software`).
+/// It draws exactly what GPU Skia draws (same Skia, same glyph hinting), but repaints only the dirty region
+/// (GPU Skia redraws the whole window for every change) and needs no GPU context, which saves memory.
+/// `HARNESS_RENDERER=skia` (GPU Skia first) suits very large or high-refresh screens, where scrolling the
+/// whole window on the CPU costs more. `femtovg|software` put those first; `SLINT_BACKEND` overrides all.
 fn select_renderer() {
     if std::env::var_os("SLINT_BACKEND").is_some_and(|v| !v.is_empty()) {
         return;
     }
     let order: &[&str] = match std::env::var("HARNESS_RENDERER").as_deref() {
-        Ok("software") => &["software", "skia", "femtovg"],
-        Ok("femtovg") => &["femtovg", "skia", "software"],
-        _ => &["skia", "femtovg", "software"],
+        Ok("software") => &["software", "skia-software", "skia", "femtovg"],
+        Ok("femtovg") => &["femtovg", "skia-software", "skia", "software"],
+        Ok("skia" | "gpu") => &["skia", "skia-software", "femtovg", "software"],
+        _ => &["skia-software", "skia", "femtovg", "software"],
     };
     for &renderer in order {
         match slint::BackendSelector::new()
