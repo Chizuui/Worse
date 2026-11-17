@@ -11,9 +11,9 @@
 # Worse Harness
 
 **A native desktop orchestrator for AI coding agents.** Worse Harness (Harness for short) runs the coding agents you already
-use (Claude Code, Codex, Antigravity, or any OpenAI-compatible model such as DeepSeek) side by side
-in one fast Rust app, keeps every conversation in one place, and moves work between agents when one
-of them runs out of quota.
+use (Claude Code, Codex, Antigravity, Command Code, a Hermes gateway, or any OpenAI-compatible model such
+as DeepSeek) side by side in one fast Rust app, keeps every conversation in one place, and moves work
+between agents when one of them runs out of quota.
 
 <p align="center">
   <img src="docs/screenshots/home-dark.webp" alt="Harness on an empty session: the block wordmark, the ASCII bunny and four starters" width="100%">
@@ -61,6 +61,23 @@ of them runs out of quota.
   <tr>
     <td width="50%"><img src="docs/screenshots/home-light.webp" alt="The empty session in the light theme"><br><sub>Light theme: paper instead of near-black, ink instead of white.</sub></td>
     <td width="50%"><img src="docs/screenshots/settings-dark.webp" alt="Settings, General page"><br><sub>Settings open as a dialog over the session.</sub></td>
+  </tr>
+</table>
+
+**Watching the agents work**
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/live-code-dark.webp" alt="The Live tab follows the file the agent is about to change; the chat shows the changed lines under each edit"><br><sub>Live code: the side pane follows the file the agent reads or edits and marks the lines; each edit shows its first changed lines in the chat.</sub></td>
+    <td width="50%"><img src="docs/screenshots/screen-live-dark.webp" alt="The Screen view: the agent's last screenshot with its named pointer and a list of its actions"><br><sub>Computer use: the screen the agent sees, its pointer with its name on it, and what it clicked, typed and pressed.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/team-dark.webp" alt="The team strip: one lane per subagent with its current step and the steps before"><br><sub>Team: one lane per subagent with the step in progress, the steps before it, and who waits for an approval.</sub></td>
+    <td width="50%"><img src="docs/screenshots/wallpaper-dark.webp" alt="A wallpaper behind the window with frosted glass panels and the dither field on top"><br><sub>Your own background: a picture or an animated GIF, blurred and dimmed to taste; the panes turn into frosted glass.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/appearance-dark.webp" alt="Appearance settings: thinking animations and background choices"><br><sub>Appearance: ten "thinking" animations and five unicode fields, each previewed in motion.</sub></td>
+    <td width="50%"><img src="docs/screenshots/command-code-keys-dark.webp" alt="The provider dialog with the Command Code keys preset"><br><sub>Several Command Code API keys: sessions take them in turn, and a key at its limit is skipped.</sub></td>
   </tr>
 </table>
 
@@ -112,8 +129,24 @@ history and its own usage limits. Harness puts a single desktop app in front of 
 - Git worktree sessions for isolated changes.
 - Import history from ZCode and Claude Code, with native resume where the agent supports it.
 
+**Watch the work**
+- **Live code**: tool rows show the lines they covered (`L40–96`) and, for edits, the first changed
+  lines; the **Live** tab of the side pane follows the file the agent reads or edits, marks the
+  lines (read, about to change, written) and keeps a trail of the files of the turn.
+- **Live screen**: in Machine mode the Live tab also shows the agent's last screenshot with its
+  pointer, named after the agent, a ripple where it clicked and what it typed or pressed; the real
+  pointer glides to its target instead of jumping.
+- **Team strip**: a session that delegated work shows one lane per subagent with its current
+  step, the steps before it and the time it has been at it.
+- **Generation speed**: tokens per second beside the working line (an estimate while the agent
+  writes) and under each answer (exact for agents that report token counts); switchable.
+
 **Agents and accounts**
-- Built-in adapters for Claude Code, Codex and Antigravity (`agy`), plus custom API providers.
+- Built-in adapters for Claude Code, Codex, Antigravity (`agy`) and Command Code, plus custom API
+  providers and Hermes gateways.
+- Several API keys for one service (all Command Code keys; providers with the same endpoint and
+  model) form a pool: new sessions and subagents take the keys in turn (round robin), and a key at
+  its usage limit is skipped until it resets.
 - Multiple Claude Code accounts (separate `CLAUDE_CONFIG_DIR` profiles) and multiple Antigravity
   accounts (credential swap through the OS credential store).
 - Quota detection per agent dialect and automatic failover in a configurable order.
@@ -140,6 +173,16 @@ history and its own usage limits. Harness puts a single desktop app in front of 
 
 **Workspace panels**
 - Diff ("turn changes"), Git, file tree with fast search, integrated terminal (PTY), plan usage.
+
+**Look**
+- Ten unicode "thinking" animations (Scan, Bars, Pulse, Quads, Charge, Moon, Cipher, Chevrons,
+  Bunny, or a different one every turn) and plain or playful status words.
+- Unicode field at the window edges: Dither, Rain, Stars, Circuit or none; moving on the home
+  screen only, always, or never.
+- Wallpaper: a picture or an animated GIF / WebP behind the window with blur and dim sliders. The
+  panes show a frosted copy of it, so they read as glass. An animated wallpaper repaints the whole
+  window for every frame; it rests while the window is not focused, and **GPU rendering**
+  (Settings → General) makes it cheap.
 
 **App**
 - Live update on Windows: the app runs from a shadow copy, so a new build can be installed while
@@ -192,7 +235,13 @@ The same executable also serves helper modes selected by a leading flag (`--api-
 | Claude Code | [`claude-agent-acp`](https://github.com/agentclientprotocol/claude-agent-acp) | `npm i -g @agentclientprotocol/claude-agent-acp`, signed-in `claude` |
 | Codex | [`codex-acp`](https://github.com/agentclientprotocol/codex-acp) | `npm i -g @agentclientprotocol/codex-acp`, signed-in `codex` |
 | Antigravity | `agy acp` | Antigravity CLI 1.5+, signed in by running `agy` |
+| Command Code | `command-code acp` | `npm i -g command-code`, then `command-code login`, or API keys in Settings → Agents → API providers → "Command Code keys" |
+| Hermes Agent | built-in `harness-api-agent` against the gateway's API server | `hermes gateway` with `API_SERVER_KEY`; add it with the "Hermes gateway" preset |
 | Any OpenAI-compatible API (DeepSeek, …) | built-in `harness-api-agent` | provider URL and API key in Settings → Providers |
+
+A Hermes gateway is a whole agent, not a model: it runs its own tools on its host. Harness sends the
+message, shows Hermes's replies, tool progress and approval requests, and lets other agents delegate to
+it; nothing is installed on the Hermes side.
 
 Harness never reads or logs credential files; API keys are kept in `providers.json` and only sent
 in the `Authorization` header.
@@ -259,12 +308,13 @@ All state lives under `HARNESS_HOME` (default `~/.harness`):
 | Path | Contents |
 | --- | --- |
 | `settings.json` | app settings |
-| `providers.json` | custom API providers (contains API keys) |
+| `providers.json` | custom API providers and Command Code keys (contains API keys); `"rotation": "off"` stops the round robin |
 | `accounts.json`, `agy_accounts.json` | Claude / Antigravity account lists (no secrets) |
 | `mcp.json` | Harness MCP registry |
 | `remote.json` | paired device tokens |
 | `harness.sqlite` | sessions, turns, board, inbox, schedules |
 | `bin/` | live-update shadow copies |
+| `machine-live/` | what an agent using this computer last saw and did (for the Live › Screen view); removed at startup |
 | `MEMORY.md` | global memory (projects use `<project>/.harness/MEMORY.md`) |
 
 Useful environment switches:
@@ -275,7 +325,10 @@ Useful environment switches:
 | `HARNESS_WORKSPACE` | force the workspace folder |
 | `HARNESS_UI_CORE=fake` | scripted in-process core, no agent CLIs (demos, UI tests) |
 | `HARNESS_NO_SHADOW=1` | disable the live-update shadow copy |
-| `HARNESS_RENDERER=skia\|femtovg\|software` | renderer order (default: Skia on the CPU, `skia-software`; `skia` puts GPU Skia first) |
+| `HARNESS_RENDERER=cpu\|gpu\|femtovg\|software` | renderer, overriding Settings → General → GPU rendering (`cpu` = Skia on the CPU, the default; `gpu` = GPU Skia) |
+| `HARNESS_KEY_ROTATION=off` | do not rotate over several API keys of one service (failover still walks them) |
+| `HARNESS_MACHINE_GLIDE=0` | in computer use, jump the pointer to its target instead of gliding |
+| `HARNESS_PROVIDER_KIND=hermes\|openai` | for one provider process: skip the question whether its endpoint is a Hermes gateway |
 
 ## Project layout
 
