@@ -277,8 +277,9 @@ export component BoardPage inherits Rectangle {
             }
             Text {
                 text: BoardUi.project == "" ? "Board" : BoardUi.project;
-                font-size: 18px;
-                font-weight: Theme.weight-semibold;
+                font-family: Theme.display-font;
+                font-size: 17px;
+                font-weight: 700;
                 color: Theme.foreground;
                 vertical-alignment: center;
                 overflow: elide;

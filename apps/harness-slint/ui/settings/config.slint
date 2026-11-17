@@ -61,7 +61,7 @@ global ConfigCopy {
         return "global";
     }
     pure public function scope-tint(scope: string) -> color {
-        return scope == "user" ? #5BC0FF : Theme.accent-fg;
+        return scope == "user" ? Theme.info : Theme.accent-fg;
     }
 }
 
@@ -990,7 +990,7 @@ component HookRow inherits Rectangle {
                 alignment: center;
                 Pill {
                     text: root.item.detail != "" ? root.item.detail : ".*";
-                    tint: #5BC0FF;
+                    tint: Theme.info;
                 }
             }
         }
@@ -1137,7 +1137,7 @@ export component ConfigPage inherits VerticalLayout {
                     alignment: center;
                     Pill {
                         text: ConfigUi.agent == "harness" ? "built-in + configured" : ConfigCopy.scope-name(ConfigUi.scope) + " scope";
-                        tint: #5BC0FF;
+                        tint: Theme.info;
                     }
                 }
             }
@@ -1303,7 +1303,7 @@ component InstructionsBody inherits VerticalLayout {
                         alignment: center;
                         Pill {
                             text: "new file";
-                            tint: #5BC0FF;
+                            tint: Theme.info;
                         }
                     }
                     if DocUi.dirty: VerticalLayout {
@@ -1471,7 +1471,7 @@ component MemoryRow inherits Rectangle {
             Pill {
                 small: true;
                 text: DocUi.scope == "workspace" ? "Project" : "Global";
-                tint: DocUi.scope == "workspace" ? Theme.accent-fg : #5BC0FF;
+                tint: DocUi.scope == "workspace" ? Theme.accent-fg : Theme.info;
             }
         }
         Text {
@@ -1568,7 +1568,7 @@ component MemoryBody inherits VerticalLayout {
                         alignment: center;
                         Pill {
                             text: DocUi.scope == "workspace" ? "Project" : "Global";
-                            tint: DocUi.scope == "workspace" ? Theme.accent-fg : #5BC0FF;
+                            tint: DocUi.scope == "workspace" ? Theme.accent-fg : Theme.info;
                         }
                     }
                 }
@@ -1691,7 +1691,7 @@ export component DocPage inherits VerticalLayout {
         ChipBar {
             AgentChip {
                 agent-id: "harness";
-                dot: #5BC0FF;
+                dot: Theme.info;
                 text: "Global";
                 active: DocUi.scope == "user";
                 picked => {

@@ -474,7 +474,13 @@ impl State {
         theme.set_ui_font_size(f32::from(settings.appearance.ui_font_size) * zoom);
         theme.set_code_size(f32::from(settings.appearance.code_font_size) * zoom);
         theme.set_reduce_motion(settings.appearance.reduce_motion);
-        if let Some(c) = parse_hex(&settings.appearance.accent_color) {
+        // "#7C8CFF" was the old default accent and is no longer offered: treat it as "use the default".
+        let accent = if settings.appearance.accent_color.eq_ignore_ascii_case("#7C8CFF") {
+            "#C8F04A"
+        } else {
+            settings.appearance.accent_color.as_str()
+        };
+        if let Some(c) = parse_hex(accent) {
             theme.set_accent_pick(c);
         }
         sync_launch_at_startup(settings.general.launch_at_startup);

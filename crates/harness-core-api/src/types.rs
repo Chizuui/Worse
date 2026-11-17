@@ -446,6 +446,19 @@ pub struct TurnView {
     /// Set when a scheduled prompt sent the turn.
     #[serde(default)]
     pub origin: Option<crate::chat::TurnOrigin>,
+    /// Agent reasoning in stream order (API 0.20.0).
+    #[serde(default)]
+    pub thoughts: Vec<ThoughtView>,
+}
+
+/// One block of agent reasoning within a turn.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThoughtView {
+    pub attempt: u32,
+    /// Byte length of the attempt's assistant text when the reasoning ended.
+    pub text_offset: usize,
+    pub text: String,
 }
 
 /// One piece of a turn's transcript in display order (spec §15.1 request 4).

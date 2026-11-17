@@ -66,11 +66,11 @@ pub use types::{
     PermissionOptionKind, PermissionRequestId, PermissionRequestView, QuotaState, SendAccepted,
     SendMessage, SessionCost, SessionDetail, SessionId, SessionSummary, SubagentStatus,
     SubagentView, ToolCallStatus, ToolCallView, TurnAttempt, TurnDiff, TurnId, TurnSegment,
-    TurnStatus, TurnView, WorktreeInfo, WorktreeRequest,
+    ThoughtView, TurnStatus, TurnView, WorktreeInfo, WorktreeRequest,
 };
 
 /// API version string; bumped (minor) on every additive change.
-pub const API_VERSION: &str = "0.19.0";
+pub const API_VERSION: &str = "0.20.0";
 
 /// Default body of the methods added in 0.4.0 and later.
 fn unsupported<T: Send + 'static>(name: &'static str) -> BoxFuture<'static, ApiResult<T>> {

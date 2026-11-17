@@ -9,6 +9,7 @@ pub mod acp;
 mod admin;
 pub mod agents;
 mod agy_accounts;
+mod agy_agents;
 pub mod agy_cred;
 mod agy_ops;
 mod board;

@@ -117,7 +117,7 @@ export component ProjectsPage inherits VerticalLayout {
     callback request-remove(bool);
     callback add-folder();
     // Design project dots: orange, accent, blue, purple, green (cycled).
-    property <[color]> dots: [#E88A5C, #7C8CFF, #5BC0FF, #B07CFF, #3DD68C];
+    property <[color]> dots: [Theme.ember, Theme.accent-fg, Theme.info, Theme.violet, Theme.success];
     spacing: 20px;
     PageHeader {
         title: @tr("Projects");
@@ -141,7 +141,7 @@ export component ProjectsPage inherits VerticalLayout {
             alignment: center;
             Pill {
                 text: @tr("{0} sessions", ProjectsUi.total-sessions);
-                tint: #5BC0FF;
+                tint: Theme.info;
             }
         }
         Rectangle {
@@ -254,7 +254,7 @@ export component ProjectsPage inherits VerticalLayout {
                                     Pill {
                                         height: 16px;
                                         text: @tr("open");
-                                        tint: #3DD68C;
+                                        tint: Theme.success;
                                     }
                                 }
                                 if p.unused: VerticalLayout {
@@ -450,7 +450,7 @@ export component ArchivePage inherits VerticalLayout {
                                 alignment: center;
                                 Dot {
                                     size: 6px;
-                                    tint: a.agent == "Claude Code" ? #E88A5C : a.agent == "Codex" ? #3DD68C : a.agent == "Harness" ? #7C8CFF : #5BC0FF;
+                                    tint: a.agent == "Claude Code" ? Theme.ember : a.agent == "Codex" ? Theme.success : a.agent == "Harness" ? Theme.accent-fg : Theme.info;
                                 }
                             }
                             Text {

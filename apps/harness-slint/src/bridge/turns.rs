@@ -345,7 +345,7 @@ impl UiState {
         self.window.global::<ChatUi>()
     }
 
-    fn fail(&self, error: &str) {
+    pub(super) fn fail(&self, error: &str) {
         self.window.set_error_text(sv(error));
     }
 
@@ -1178,6 +1178,7 @@ impl UiState {
                 self.session_action(if pinned { "unpin" } else { "pin" }, &session);
             }
             "fork" => self.fork(session, None),
+            "export" => self.export_session(session),
             "delete" => self.open_dialog(DialogTarget::Delete(session), "", "", false),
             "ungroup" => self.move_sessions(session, None),
             other => {

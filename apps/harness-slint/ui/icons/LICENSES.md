@@ -33,7 +33,10 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 
 ## Fonts
 
-Embedded in the executable, both under the SIL Open Font License 1.1:
+Embedded in the executable, all under the SIL Open Font License 1.1:
 
 - `ui/fonts/PlusJakartaSans-*.ttf`: Plus Jakarta Sans by Tokotype (https://github.com/tokotype/PlusJakartaSans), license in `ui/fonts/PlusJakartaSans-OFL.txt`.
 - `ui/fonts/Inter-*.ttf`: Inter by Rasmus Andersson (https://github.com/rsms/inter), license in `ui/fonts/Inter-OFL.txt`.
+- `ui/fonts/Syne-Bold.ttf`: Syne by Bonjour Monde and Lucas Descroix (https://gitlab.com/bonjour-monde/fonderie/syne-typeface), display headings, license in `ui/fonts/Syne-OFL.txt`.
+- `ui/fonts/InstrumentSerif-Italic.ttf`: Instrument Serif by Rodrigo Fuenzalida and Jordan Egstad (https://github.com/Instrument/instrument-serif), taglines, license in `ui/fonts/InstrumentSerif-OFL.txt`.
+- `ui/fonts/JetBrainsMono-Regular.ttf`: JetBrains Mono by JetBrains (https://github.com/JetBrains/JetBrainsMono), glyph art and mono labels, license in `ui/fonts/JetBrainsMono-OFL.txt`.

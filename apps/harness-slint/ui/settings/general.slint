@@ -136,7 +136,7 @@ export component GeneralPage inherits VerticalLayout {
                     alignment: center;
                     Pill {
                         text: @tr("update");
-                        tint: #5bc0ff;
+                        tint: Theme.info;
                     }
                 }
                 if root.update-ready: SetButton {
@@ -489,11 +489,11 @@ component ThemeOption inherits Rectangle {
             height: 110px;
             border-radius: 6px;
             clip: true;
-            background: root.kind == 2 ? #f4f5f7 : #0b0c0e;
+            background: root.kind == 2 ? #f3f2ee : #08090a;
             if root.kind != 0: HorizontalLayout {
                 Rectangle {
                     width: 34px;
-                    background: root.kind == 2 ? #e4e6ea : #111215;
+                    background: root.kind == 2 ? #e7e5df : #131416;
                 }
                 VerticalLayout {
                     padding-top: 18px;
@@ -501,41 +501,41 @@ component ThemeOption inherits Rectangle {
                     padding-right: 12px;
                     spacing: 8px;
                     alignment: start;
-                    HorizontalLayout { alignment: start; MockLine { width: 150px; tint: root.kind == 2 ? #d8dbe0 : #2a2d33; } }
-                    HorizontalLayout { alignment: start; MockLine { width: 110px; tint: root.kind == 2 ? #d8dbe0 : #2a2d33; } }
-                    HorizontalLayout { alignment: start; MockLine { width: 70px; tint: root.kind == 2 ? #d8dbe0 : #2a2d33; } }
+                    HorizontalLayout { alignment: start; MockLine { width: 150px; tint: root.kind == 2 ? #d5d3cc : #2c2d31; } }
+                    HorizontalLayout { alignment: start; MockLine { width: 110px; tint: root.kind == 2 ? #d5d3cc : #2c2d31; } }
+                    HorizontalLayout { alignment: start; MockLine { width: 70px; tint: root.kind == 2 ? #d5d3cc : #2c2d31; } }
                 }
             }
             if root.kind == 0: HorizontalLayout {
                 Rectangle {
-                    background: #0b0c0e;
+                    background: #08090a;
                     HorizontalLayout {
-                        Rectangle { width: 16px; background: #111215; }
+                        Rectangle { width: 16px; background: #131416; }
                         VerticalLayout {
                             padding-top: 14px;
                             padding-left: 10px;
                             padding-right: 10px;
                             spacing: 6px;
                             alignment: start;
-                            HorizontalLayout { alignment: start; MockLine { width: 78px; height: 5px; tint: #2a2d33; } }
-                            HorizontalLayout { alignment: start; MockLine { width: 58px; height: 5px; tint: #2a2d33; } }
-                            HorizontalLayout { alignment: start; MockLine { width: 36px; height: 5px; tint: #2a2d33; } }
+                            HorizontalLayout { alignment: start; MockLine { width: 78px; height: 5px; tint: #2c2d31; } }
+                            HorizontalLayout { alignment: start; MockLine { width: 58px; height: 5px; tint: #2c2d31; } }
+                            HorizontalLayout { alignment: start; MockLine { width: 36px; height: 5px; tint: #2c2d31; } }
                         }
                     }
                 }
                 Rectangle {
-                    background: #f4f5f7;
+                    background: #f3f2ee;
                     HorizontalLayout {
-                        Rectangle { width: 16px; background: #e4e6ea; }
+                        Rectangle { width: 16px; background: #e7e5df; }
                         VerticalLayout {
                             padding-top: 14px;
                             padding-left: 10px;
                             padding-right: 10px;
                             spacing: 6px;
                             alignment: start;
-                            HorizontalLayout { alignment: start; MockLine { width: 78px; height: 5px; tint: #d8dbe0; } }
-                            HorizontalLayout { alignment: start; MockLine { width: 58px; height: 5px; tint: #d8dbe0; } }
-                            HorizontalLayout { alignment: start; MockLine { width: 36px; height: 5px; tint: #d8dbe0; } }
+                            HorizontalLayout { alignment: start; MockLine { width: 78px; height: 5px; tint: #d5d3cc; } }
+                            HorizontalLayout { alignment: start; MockLine { width: 58px; height: 5px; tint: #d5d3cc; } }
+                            HorizontalLayout { alignment: start; MockLine { width: 36px; height: 5px; tint: #d5d3cc; } }
                         }
                     }
                 }
@@ -637,17 +637,17 @@ export component AppearancePage inherits VerticalLayout {
                 spacing: 10px;
                 alignment: end;
                 for s in [
-                    { c: #7c8cff, h: "#7C8CFF" },
-                    { c: #b07cff, h: "#B07CFF" },
-                    { c: #5bc0ff, h: "#5BC0FF" },
-                    { c: #3dd68c, h: "#3DD68C" },
+                    { c: #c8f04a, h: "#C8F04A" },
+                    { c: #5fd8cb, h: "#5FD8CB" },
+                    { c: #7cc4ff, h: "#7CC4FF" },
                     { c: #f5b14c, h: "#F5B14C" },
-                    { c: #e88a5c, h: "#E88A5C" },
-                    { c: #f2555a, h: "#F2555A" },
+                    { c: #ff9a52, h: "#FF9A52" },
+                    { c: #f2708a, h: "#F2708A" },
+                    { c: #f4f4f5, h: "#F4F4F5" },
                 ]: Swatch {
                     tint: s.c;
                     hex: s.h;
-                    selected: root.accent == s.h || (root.accent == "" && s.h == "#7C8CFF");
+                    selected: root.accent == s.h || ((root.accent == "" || root.accent == "#7C8CFF") && s.h == "#C8F04A");
                     picked => {
                         SettingsUi.set-string("appearance.accentColor", s.h);
                     }

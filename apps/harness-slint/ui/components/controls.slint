@@ -1,5 +1,6 @@
 import { Theme } from "../theme/tokens.slint";
 import { Icons, IconsFill, Tiles } from "icons.slint";
+import { GlyphAnim, AsciiArt } from "ascii.slint";
 
 export { Icons, IconsFill, Tiles }
 
@@ -24,22 +25,25 @@ export component Icon inherits Rectangle {
     }
 }
 
+// Busy indicator: a quadrant glyph turning in place (unicode frames, no rotation transform).
 export component Spinner inherits Rectangle {
-    in property <color> tint: Theme.accent-fg;
+    in property <color> tint: Theme.foreground;
     in property <length> size: Theme.icon-sm;
     width: root.size;
     height: root.size;
     accessible-role: none;
-    Image {
-        width: root.size;
-        height: root.size;
-        source: Icons.loader-circle;
-        colorize: root.tint;
-        transform-rotation: mod(animation-tick() / 1ms, 800) / 800 * 360deg;
-        accessible-role: none;
+    GlyphAnim {
+        frames: AsciiArt.spinner;
+        interval: 95ms;
+        font-size: root.size * 1.05;
+        color: root.tint;
+        horizontal-alignment: center;
+        vertical-alignment: center;
     }
 }
 
+// Glass pane: translucent tint, a rim that is brightest along the top edge, an inner glow (Skia only) and a
+// soft drop shadow. `strong` is the near-opaque cut for anything that floats over text.
 export component Glass inherits Rectangle {
     in property <string> level: "panel";
     in property <length> radius: Theme.radius-xl;
@@ -48,24 +52,23 @@ export component Glass inherits Rectangle {
     background: root.level == "strong" ? Theme.glass-strong : root.level == "deep" ? Theme.glass-deep : root.level == "card" ? Theme.card : Theme.glass;
     border-radius: root.radius;
     border-width: 1px;
-    border-color: root.level == "card" ? Theme.card-border : Theme.glass-border;
+    border-color: root.level == "card" ? Theme.card-border : Theme.glass-rim;
     drop-shadow-blur: root.shadow ? Theme.glass-shadow-blur : 0px;
     drop-shadow-offset-y: root.shadow ? Theme.glass-shadow-y : 0px;
     drop-shadow-color: root.shadow ? Theme.glass-shadow : transparent;
     if root.highlight: Rectangle {
-        x: root.radius;
-        y: 0px;
-        width: max(0px, root.width - root.radius * 2);
-        height: 1px;
-        background: @linear-gradient(90deg, Theme.glass-highlight.with-alpha(0) 0%, Theme.glass-highlight 50%, Theme.glass-highlight.with-alpha(0) 100%);
+        border-radius: root.radius;
+        inner-shadow-blur: Theme.glass-inner-blur;
+        inner-shadow-offset-y: 1px;
+        inner-shadow-color: Theme.glass-inner;
         accessible-role: none;
     }
     @children
 }
 
-// Redesign 2026-11 (frames 01/02/03/S1–S16): buttons are 8px-radius pills with 13px semibold labels.
-// primary = #EDEEF0 on dark text, secondary = raised (#1C1F24) + strong border, outline = surface,
-// ghost = transparent, accent = brand gradient, destructive/warning = 1F tint + coloured border.
+// Buttons: rounded rectangles with 13px semibold labels. primary = white on black (ink on paper),
+// secondary = raised + strong border, outline = surface, ghost = transparent, accent = flat accent fill,
+// destructive / warning = tinted fill + coloured border.
 export component Button inherits Rectangle {
     in property <string> text;
     in property <string> label: self.text;
@@ -76,7 +79,7 @@ export component Button inherits Rectangle {
     in property <bool> trailing-chevron: false;
     in property <bool> enabled: true;
     in property <bool> active: false;
-    in property <color> text-color: root.variant == "primary" ? Theme.primary-foreground : root.variant == "accent" ? #ffffff : root.variant == "destructive" ? Theme.destructive : root.variant == "warning" ? Theme.warning : root.variant == "ghost" ? Theme.foreground-subtle : Theme.foreground;
+    in property <color> text-color: root.variant == "primary" ? Theme.primary-foreground : root.variant == "accent" ? Theme.on-accent : root.variant == "destructive" ? Theme.destructive : root.variant == "warning" ? Theme.warning : root.variant == "ghost" ? Theme.foreground-subtle : Theme.foreground;
     callback clicked;
     out property <bool> hovered: ta.has-hover;
     property <bool> hot: ta.has-hover && root.enabled;
@@ -87,14 +90,13 @@ export component Button inherits Rectangle {
     min-width: self.h;
     preferred-width: row.preferred-width;
     horizontal-stretch: 0;
-    // 8px everywhere except the compact xs/sm caps, which keep the 6px chip radius.
-    border-radius: root.size == "xs" ? Theme.radius-sm : Theme.radius-md;
+    border-radius: root.size == "xs" || root.size == "sm" ? Theme.radius-sm : Theme.radius-md;
     property <bool> glassy: root.variant == "outline" || root.variant == "secondary" || root.variant == "destructive" || root.variant == "warning" || root.variant == "ghost";
     border-width: root.glassy ? 1px : 0px;
     border-color: root.variant == "destructive" ? Theme.destructive.with-alpha(root.hot ? 0.7 : 0.35) : root.variant == "warning" ? Theme.warning.with-alpha(root.hot ? 0.7 : 0.35) : root.variant == "ghost" ? transparent : root.variant == "secondary" ? Theme.border-hover : root.hot ? Theme.border-hover : Theme.glass-border;
     background: root.variant == "primary" ? (root.hot ? Theme.primary-hover : Theme.primary) : root.variant == "accent" ? Theme.brand-gradient : root.variant == "secondary" ? (root.active || root.hot ? Theme.surface-hover : Theme.raised) : root.variant == "destructive" ? (root.hot ? Theme.destructive.with-alpha(0.16) : Theme.destructive.with-alpha(0.08)) : root.variant == "warning" ? (root.hot ? Theme.warning.with-alpha(0.16) : Theme.warning.with-alpha(0.08)) : root.variant == "outline" ? (root.active ? Theme.raised : root.hot ? Theme.raised : Theme.surface) : (root.active ? Theme.raised : root.hot ? Theme.hover : transparent);
-    drop-shadow-blur: root.variant == "primary" || root.variant == "accent" ? 3px : 0px;
-    drop-shadow-offset-y: root.variant == "primary" || root.variant == "accent" ? 1px : 0px;
+    drop-shadow-blur: root.variant == "primary" || root.variant == "accent" ? 8px : 0px;
+    drop-shadow-offset-y: root.variant == "primary" || root.variant == "accent" ? 2px : 0px;
     drop-shadow-color: (root.variant == "primary" || root.variant == "accent") && root.enabled ? Theme.primary-shadow : transparent;
     opacity: root.enabled ? 1 : 0.45;
     transform-scale: ta.pressed && root.enabled ? 0.97 : 1;
@@ -179,7 +181,7 @@ export component IconButton inherits Rectangle {
     Icon {
         source: root.icon;
         size: root.icon-size;
-        tint: root.active ? Theme.accent-fg : ta.has-hover ? Theme.icon : root.tint;
+        tint: root.active ? Theme.foreground : ta.has-hover ? Theme.icon : root.tint;
     }
     ta := TouchArea {
         enabled: root.enabled;
@@ -201,7 +203,7 @@ export component Tag inherits Rectangle {
     height: root.font-size <= Theme.ui-xs ? 20px : 22px;
     preferred-width: row.preferred-width;
     horizontal-stretch: 0;
-    border-radius: Theme.radius-full;
+    border-radius: Theme.radius-sm;
     background: root.tone == "neutral" ? Theme.tag : root.fg.with-alpha(0.12);
     accessible-role: AccessibleRole.text;
     accessible-label: root.text;
@@ -237,7 +239,7 @@ export component Divider inherits Rectangle {
 }
 
 export component Card inherits Rectangle {
-    in property <length> radius: 12px;
+    in property <length> radius: Theme.radius-lg;
     background: Theme.card;
     border-radius: root.radius;
     border-width: 1px;
@@ -249,7 +251,10 @@ export component MenuShell inherits Rectangle {
     background: Theme.menu;
     border-radius: Theme.radius-xl;
     border-width: 1px;
-    border-color: Theme.popover-border;
+    border-color: Theme.glass-rim;
+    inner-shadow-blur: Theme.glass-inner-blur;
+    inner-shadow-offset-y: 1px;
+    inner-shadow-color: Theme.glass-inner.with-alpha(0.06);
     drop-shadow-blur: Theme.shadow-md-blur;
     drop-shadow-offset-y: Theme.shadow-md-y;
     drop-shadow-color: Theme.shadow-md-color;
@@ -311,7 +316,7 @@ export component MenuItem inherits Rectangle {
         if root.has-icon: Icon {
             source: root.icon;
             size: Theme.icon-sm;
-            tint: !root.enabled ? Theme.icon-subtlest : root.checked ? Theme.accent-fg : Theme.icon-subtle;
+            tint: !root.enabled ? Theme.icon-subtlest : root.checked ? Theme.foreground : Theme.icon-subtle;
         }
         Text {
             text: root.text;
@@ -365,7 +370,7 @@ export component Dialog inherits Rectangle {
     TouchArea { }
     Glass {
         level: "strong";
-        radius: Theme.radius-xl;
+        radius: Theme.radius-2xl;
         width: min(root.dialog-width, root.width - 32px);
         height: min(body.preferred-height, root.height - 32px);
         x: (root.width - self.width) / 2;
@@ -489,7 +494,7 @@ export component SectionLabel inherits Text {
     font-size: Theme.ui-xs;
     font-weight: Theme.weight-semibold;
     color: Theme.caps-label;
-    letter-spacing: 0.8px;
+    letter-spacing: 1.2px;
     vertical-alignment: center;
     overflow: elide;
 }

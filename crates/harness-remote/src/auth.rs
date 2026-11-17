@@ -143,7 +143,7 @@ impl Auth {
     }
 
     /// Redeems a pair offer by token or by short code. Single use; `None` when it is unknown,
-    /// expired, already used, or the device cap is reached.
+    /// expired or already used. At the device cap the least recently seen device is unpaired.
     pub(crate) fn pair(
         &self,
         token: Option<&str>,
@@ -161,8 +161,17 @@ impl Auth {
             _ => false,
         })?;
         let offer = state.offers.remove(index);
-        if state.devices.len() >= MAX_DEVICES {
-            return None;
+        while state.devices.len() >= MAX_DEVICES {
+            let Some(stale) = state
+                .devices
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, device)| device.last_seen_ms)
+                .map(|(index, _)| index)
+            else {
+                break;
+            };
+            state.devices.remove(stale);
         }
         let device = Device {
             id: hex(&random_bytes(16)),
@@ -385,5 +394,18 @@ mod tests {
         let stale = auth.new_offer("Old");
         auth.expire(&stale.token);
         assert!(auth.pair(Some(&stale.token), None, None).is_none());
+    }
+
+    #[test]
+    fn full_device_list_unpairs_the_oldest() {
+        let auth = temp_auth("cap");
+        let mut tokens = Vec::new();
+        for _ in 0..=MAX_DEVICES {
+            let offer = auth.new_offer("Phone");
+            let (_, token) = auth.pair(None, Some(&offer.code), None).unwrap();
+            tokens.push(token);
+        }
+        assert!(auth.device_for_token(&tokens[0]).is_none());
+        assert!(auth.device_for_token(&tokens[MAX_DEVICES]).is_some());
     }
 }

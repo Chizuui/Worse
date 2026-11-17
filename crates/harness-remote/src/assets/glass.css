@@ -1,0 +1,209 @@
+/* Monochrome glass layer — loaded last, on top of the Material styles.
+   Near-black (paper in light mode) surfaces, white (ink) primary actions, grey hairlines, glass panes with a
+   light rim and real backdrop blur, a dither field of glyphs behind everything, and one small accent. */
+:root {
+  --bg: #08090a;
+  --bg2: #111214;
+  --bg3: #1a1b1e;
+  --fg: #f4f4f5;
+  --fg2: #a1a1a6;
+  --line: rgba(255, 255, 255, 0.09);
+  --acc: #f4f4f5;
+  --acc-fg: #0b0c0d;
+  --hi: #c8f04a;
+  --border-hover: rgba(255, 255, 255, 0.2);
+  --text-2: #dcdce0;
+  --subtle: #8a8c92;
+  --faint: #6f7177;
+  --info: #7cc4ff;
+  --surface: rgba(255, 255, 255, 0.045);
+  --raised: rgba(255, 255, 255, 0.08);
+  --border: var(--line);
+  --md-surface-low: #111214;
+  --md-surface-highest: rgba(255, 255, 255, 0.13);
+  --md-outline: #6f7177;
+  --md-outline-variant: rgba(255, 255, 255, 0.14);
+  --md-primary-container: rgba(255, 255, 255, 0.12);
+  --md-on-primary-container: #f4f4f5;
+  --md-secondary-container: rgba(255, 255, 255, 0.1);
+  --md-on-secondary-container: #f4f4f5;
+  --md-inverse-surface: #f4f4f5;
+  --md-inverse-on-surface: #111214;
+  --lg-pane: rgba(20, 21, 23, 0.62);
+  --lg-pane-strong: rgba(19, 20, 22, 0.9);
+  --lg-rim: rgba(255, 255, 255, 0.12);
+  --lg-rim-top: rgba(255, 255, 255, 0.26);
+  --lg-glow: rgba(255, 255, 255, 0.06);
+  --lg-shadow: 0 18px 44px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --lg-blur: blur(22px) saturate(140%);
+  --glyph: rgba(255, 255, 255, 0.13);
+  --r-chip: 8px;
+  --r-row: 12px;
+  --r-card: 18px;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f3f2ee;
+    --bg2: #ffffff;
+    --bg3: #f8f7f4;
+    --fg: #1a1b1d;
+    --fg2: #5c5d5f;
+    --line: rgba(26, 27, 29, 0.09);
+    --acc: #1a1b1d;
+    --acc-fg: #fbfaf7;
+    --hi: #55730a;
+    --border-hover: rgba(26, 27, 29, 0.22);
+    --text-2: #303134;
+    --subtle: #6c6d6f;
+    --faint: #8a8b8d;
+    --info: #0b68b0;
+    --surface: rgba(255, 255, 255, 0.7);
+    --raised: rgba(255, 255, 255, 0.95);
+    --md-surface-low: #ffffff;
+    --md-surface-highest: rgba(26, 27, 29, 0.09);
+    --md-outline: #8a8b8d;
+    --md-outline-variant: rgba(26, 27, 29, 0.16);
+    --md-primary-container: rgba(26, 27, 29, 0.1);
+    --md-on-primary-container: #1a1b1d;
+    --md-secondary-container: rgba(26, 27, 29, 0.08);
+    --md-on-secondary-container: #1a1b1d;
+    --md-inverse-surface: #1a1b1d;
+    --md-inverse-on-surface: #f8f7f4;
+    --lg-pane: rgba(255, 255, 255, 0.62);
+    --lg-pane-strong: rgba(255, 255, 255, 0.92);
+    --lg-rim: rgba(255, 255, 255, 0.85);
+    --lg-rim-top: rgba(255, 255, 255, 1);
+    --lg-glow: rgba(255, 255, 255, 0.7);
+    --lg-shadow: 0 18px 44px rgba(42, 38, 24, 0.14), 0 2px 6px rgba(42, 38, 24, 0.08);
+    --glyph: rgba(26, 27, 29, 0.15);
+  }
+}
+
+html, body { background: var(--bg); }
+
+/* Dither field: a tile of glyphs (# % * :) repeated down both edges and masked out towards the middle. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--glyph);
+  -webkit-mask-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='126' font-family='monospace' font-size='10' fill='%23000'%3E%3Ctext x='2' y='10'%3E%23%3C/text%3E%3Ctext x='16' y='10'%3E%25%3C/text%3E%3Ctext x='44' y='10'%3E:%3C/text%3E%3Ctext x='2' y='24'%3E%25%3C/text%3E%3Ctext x='30' y='24'%3E*%3C/text%3E%3Ctext x='58' y='24'%3E%23%3C/text%3E%3Ctext x='16' y='38'%3E%23%3C/text%3E%3Ctext x='30' y='38'%3E%23%3C/text%3E%3Ctext x='72' y='38'%3E:%3C/text%3E%3Ctext x='2' y='52'%3E*%3C/text%3E%3Ctext x='44' y='52'%3E%25%3C/text%3E%3Ctext x='58' y='52'%3E%25%3C/text%3E%3Ctext x='16' y='66'%3E:%3C/text%3E%3Ctext x='30' y='66'%3E%25%3C/text%3E%3Ctext x='72' y='66'%3E%23%3C/text%3E%3Ctext x='2' y='80'%3E%23%3C/text%3E%3Ctext x='44' y='80'%3E*%3C/text%3E%3Ctext x='58' y='80'%3E:%3C/text%3E%3Ctext x='16' y='94'%3E%25%3C/text%3E%3Ctext x='30' y='94'%3E:%3C/text%3E%3Ctext x='72' y='94'%3E%25%3C/text%3E%3Ctext x='2' y='108'%3E:%3C/text%3E%3Ctext x='44' y='108'%3E%23%3C/text%3E%3Ctext x='58' y='108'%3E*%3C/text%3E%3Ctext x='16' y='122'%3E*%3C/text%3E%3Ctext x='30' y='122'%3E%23%3C/text%3E%3Ctext x='72' y='122'%3E%25%3C/text%3E%3C/svg%3E"),
+    linear-gradient(90deg, #000 0%, transparent 34%, transparent 66%, #000 100%);
+  mask-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='126' font-family='monospace' font-size='10' fill='%23000'%3E%3Ctext x='2' y='10'%3E%23%3C/text%3E%3Ctext x='16' y='10'%3E%25%3C/text%3E%3Ctext x='44' y='10'%3E:%3C/text%3E%3Ctext x='2' y='24'%3E%25%3C/text%3E%3Ctext x='30' y='24'%3E*%3C/text%3E%3Ctext x='58' y='24'%3E%23%3C/text%3E%3Ctext x='16' y='38'%3E%23%3C/text%3E%3Ctext x='30' y='38'%3E%23%3C/text%3E%3Ctext x='72' y='38'%3E:%3C/text%3E%3Ctext x='2' y='52'%3E*%3C/text%3E%3Ctext x='44' y='52'%3E%25%3C/text%3E%3Ctext x='58' y='52'%3E%25%3C/text%3E%3Ctext x='16' y='66'%3E:%3C/text%3E%3Ctext x='30' y='66'%3E%25%3C/text%3E%3Ctext x='72' y='66'%3E%23%3C/text%3E%3Ctext x='2' y='80'%3E%23%3C/text%3E%3Ctext x='44' y='80'%3E*%3C/text%3E%3Ctext x='58' y='80'%3E:%3C/text%3E%3Ctext x='16' y='94'%3E%25%3C/text%3E%3Ctext x='30' y='94'%3E:%3C/text%3E%3Ctext x='72' y='94'%3E%25%3C/text%3E%3Ctext x='2' y='108'%3E:%3C/text%3E%3Ctext x='44' y='108'%3E%23%3C/text%3E%3Ctext x='58' y='108'%3E*%3C/text%3E%3Ctext x='16' y='122'%3E*%3C/text%3E%3Ctext x='30' y='122'%3E%23%3C/text%3E%3Ctext x='72' y='122'%3E%25%3C/text%3E%3C/svg%3E"),
+    linear-gradient(90deg, #000 0%, transparent 34%, transparent 66%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  animation: lg-drift 26s linear infinite;
+}
+@keyframes lg-drift {
+  to { -webkit-mask-position: 0 126px, 0 0; mask-position: 0 126px, 0 0; }
+}
+body > * { position: relative; z-index: 1; }
+
+/* Views sit on the field instead of painting a solid sheet. */
+#view-pair, #view-list, #view-session, #view-settings,
+#view-session .composer-area, #view-session .queue-wrap, #view-session .subs-wrap { background: transparent; }
+
+/* Glass recipe: translucent pane, backdrop blur, light rim, inner glow, soft shadow. */
+.bar, #view-pair .pair-bar, #view-list .hl-head, #view-settings .set-head, #view-session .session-bar,
+#view-session .composer, #view-session .sheet, #view-session .perm,
+#view-pair .pair-card, #view-settings .set-card, #view-settings .set-searchbox,
+#view-list .hl-search, .toast {
+  background: var(--lg-pane);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border: 1px solid var(--lg-rim);
+  box-shadow: inset 0 1px 0 var(--lg-rim-top), inset 0 0 18px var(--lg-glow), var(--lg-shadow);
+}
+.bar, #view-session .session-bar, #view-pair .pair-bar, #view-settings .set-head, #view-list .hl-head {
+  margin: calc(8px + env(safe-area-inset-top)) 10px 6px;
+  padding-top: 8px;
+  border-radius: 20px;
+  min-height: 56px;
+}
+#view-session .composer { border-radius: 22px; background: var(--lg-pane-strong); }
+#view-session .composer:focus-within { border-color: var(--border-hover); }
+#view-session .sheet { border-radius: 26px 26px 0 0; background: var(--lg-pane-strong); border-bottom: 0; }
+#view-session .perm, #view-pair .pair-card, #view-settings .set-card { border-radius: var(--r-card); }
+#view-settings .set-searchbox, #view-list .hl-search { border-radius: 14px; }
+.toast { border-radius: 12px; background: var(--lg-pane-strong); }
+
+/* Buttons: rounded rectangles; primary is white on black (ink on paper). */
+.btn, #view-pair .btn, #view-session .perm .p-acts .btn, #view-session .model-chip { border-radius: 12px; }
+#view-pair .btn.ghost, #view-session .perm .p-acts .deny { color: var(--fg); border-color: var(--md-outline-variant); }
+.icon-btn { border-radius: 12px; }
+.icon-btn:active { background: var(--raised); }
+#view-session .composer .send, #view-session .composer .stop { border-radius: 12px; }
+
+/* Chat: soft user bubble with a tighter tail corner, flat tool rows in mono. */
+#view-session .bubble.user {
+  border-radius: 18px 18px 6px 18px;
+  background: var(--raised);
+  border: 0;
+  color: var(--fg);
+}
+#view-session .bubble.user .msg-body code { color: var(--fg); }
+#view-session details.tool {
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+}
+#view-session details.tool > summary, #view-session details.tool .t-title { font-family: var(--mono); font-size: 12.5px; font-weight: 400; }
+#view-session details.tool[open] { background: var(--surface); }
+#view-session .msg-body pre { border-radius: 12px; }
+#view-session .msg-body code, #view-session .msg-body pre code { font-family: var(--mono); }
+
+/* Lists. */
+#view-list .hl-row { border-radius: 14px; }
+#view-list .hl-row.is-active { background: var(--raised); box-shadow: inset 0 1px 0 var(--lg-rim-top); }
+#view-list .hl-label, #view-list .hl-gh-label, #view-settings .set-caps { font-family: var(--mono); letter-spacing: 0.12em; }
+
+/* Pair screen: the ASCII bunny blinks above the logo tile; mono code field. */
+#view-pair .pair-hero { background: transparent; box-shadow: none; }
+#view-pair .pair-hero::before {
+  content: "(\\_/)\A( -.-)\Ao_(\")(\")";
+  display: block;
+  white-space: pre;
+  font: 15px/1.2 var(--mono);
+  color: var(--fg);
+  margin: 0 auto 14px;
+  width: max-content;
+  text-align: left;
+  animation: lg-bunny 5.2s steps(1) infinite;
+}
+@keyframes lg-bunny {
+  0%, 100% { content: "(\\_/)\A( -.-)\Ao_(\")(\")"; }
+  34% { content: "(\\_|)\A( -.-)\Ao_(\")(\")"; }
+  37% { content: "(\\_\\)\A( -.-)\Ao_(\")(\")"; }
+  43% { content: "(\\_/)\A( -.-)\Ao_(\")(\")"; }
+  70% { content: "(\\_/)\A( -.o)\Ao_(\")(\")"; }
+  82% { content: "(\\_/)\A( -.-)\Ao_(\")(\")"; }
+}
+#view-pair .code-input {
+  border-radius: 14px;
+  background: var(--surface);
+  border-color: var(--lg-rim);
+  font-family: var(--mono);
+}
+#view-pair .code-input:focus { border-color: var(--border-hover); box-shadow: inset 0 0 0 1px var(--border-hover); }
+#view-pair .pair-step-n { font-family: var(--mono); border-radius: 8px; color: var(--fg); }
+#view-pair .pair-dot, #view-list .hl-conn-dot, .dot.live { background: var(--hi); }
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bar, #view-pair .pair-bar, #view-list .hl-head, #view-settings .set-head, #view-session .session-bar,
+  #view-session .composer, #view-session .sheet, #view-session .perm, #view-pair .pair-card,
+  #view-settings .set-card, .toast { background: var(--lg-pane-strong); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .bar, #view-pair .pair-bar, #view-list .hl-head, #view-settings .set-head, #view-session .session-bar,
+  #view-session .composer, #view-session .sheet, #view-session .perm, #view-pair .pair-card,
+  #view-settings .set-card, .toast { background: var(--lg-pane-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body::before, #view-pair .pair-hero::before { animation: none; }
+}

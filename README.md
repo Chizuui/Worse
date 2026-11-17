@@ -1,3 +1,13 @@
+<p align="center">
+  <img src="docs/brand/banner.svg" alt="Worse Harness: one harness for every coding agent" width="100%">
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-f4f4f5?style=flat-square&labelColor=08090a"></a>
+  <img alt="Built with Rust" src="https://img.shields.io/badge/built%20with-Rust-f4f4f5?style=flat-square&labelColor=08090a">
+  <img alt="Platforms: Windows, macOS, Linux" src="https://img.shields.io/badge/platforms-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-c8f04a?style=flat-square&labelColor=08090a">
+</p>
+
 # Worse Harness
 
 **A native desktop orchestrator for AI coding agents.** Worse Harness (Harness for short) runs the coding agents you already
@@ -5,7 +15,11 @@ use (Claude Code, Codex, Antigravity, or any OpenAI-compatible model such as Dee
 in one fast Rust app, keeps every conversation in one place, and moves work between agents when one
 of them runs out of quota.
 
-[![Made with Slint](https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-light.svg)](https://slint.dev)
+<p align="center">
+  <img src="docs/screenshots/home-dark.webp" alt="Harness on an empty session: the block wordmark, the ASCII bunny and four starters" width="100%">
+</p>
+
+<a href="https://slint.dev"><img src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-light.svg" alt="Made with Slint" height="44"></a>
 
 > Worse Harness is an independent project. It started as a Rust remake of
 > [ZCode](https://github.com/zai-org/ZCode) and builds on many open-source projects; see
@@ -15,6 +29,7 @@ of them runs out of quota.
 
 ## Contents
 
+- [Screenshots](#screenshots)
 - [Concept](#concept)
 - [Features](#features)
 - [How it works](#how-it-works)
@@ -30,6 +45,39 @@ of them runs out of quota.
 - [License](#license)
 
 ---
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/home-anim.gif" alt="The empty session in motion: the lit letter walks through the wordmark and the bunny flicks an ear" width="760"><br>
+  <sub>In motion: the lit letter walks through the wordmark, the dither field shimmers, the bunny flicks an ear.</sub>
+</p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/chat-dark.webp" alt="A session: flat tool rows, a code block and the floating glass composer"><br><sub>A session: tool calls as flat rows, replies as plain text, the composer on glass.</sub></td>
+    <td width="50%"><img src="docs/screenshots/chat-panel-dark.webp" alt="The same session with the side panel open"><br><sub>Side panel open: overview, git, terminal and files beside the chat.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/home-light.webp" alt="The empty session in the light theme"><br><sub>Light theme: paper instead of near-black, ink instead of white.</sub></td>
+    <td width="50%"><img src="docs/screenshots/settings-dark.webp" alt="Settings, General page"><br><sub>Settings open as a dialog over the session.</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/remote-phone.webp" alt="The phone client: pairing screen and a session" width="520"><br>
+  <sub>The phone client served by Harness: pair once, then follow and steer sessions from your phone.</sub>
+</p>
+
+The look is monochrome on purpose: near-black, white primary actions, grey hairlines, glass panes with a
+light rim, and one small accent. The texture is type: a dither field of `# % * :` behind the chat, a block
+wordmark whose lit letter walks through the name, and glyph spinners (`░▒▓█`) instead of rotating icons.
+With reduced motion on, the art stays and the animation stops.
+
+<p align="center">
+  <img src="docs/brand/mascot-hero.svg" alt="The Worse Harness bunny, unimpressed by a carrot on a stick" width="170"><br>
+  <sub>The mascot: a deadpan bunny in a hi-vis harness. In the app it lives as <code>( -.-)</code> and naps in empty lists.</sub>
+</p>
 
 ## Concept
 
@@ -324,6 +372,17 @@ Worse Harness stands on the shoulders of these projects. Thank you to their auth
 - [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme) by
   Philipp Kief (MIT), via ZCode
 - Icon data packaged by [Iconify](https://github.com/iconify/icon-sets)
+
+**Fonts** (SIL Open Font License 1.1, license texts in `apps/harness-slint/ui/fonts`)
+- [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) by Tokotype and
+  [Inter](https://github.com/rsms/inter) by Rasmus Andersson: interface text
+- [Syne](https://gitlab.com/bonjour-monde/fonderie/syne-typeface) by Bonjour Monde: display headings
+- [Instrument Serif](https://github.com/Instrument/instrument-serif): italic taglines
+- [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono): glyph art and mono labels
+
+**Mascot**: the deadpan bunny in the hi-vis harness (`docs/brand`, `apps/harness-slint/ui/brand`) is
+original artwork for this project, as is its ASCII form `( -.-)` that naps in empty lists. The glyph
+art frames are generated by `scripts/ui/gen-ascii-art.mjs`.
 
 Product names and trademarks belong to their owners. Worse Harness is not affiliated with or endorsed by
 Anthropic, OpenAI, Google, Z.ai, DeepSeek, Cloudflare or Zed Industries.

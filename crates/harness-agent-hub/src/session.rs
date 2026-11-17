@@ -120,6 +120,7 @@ struct Running {
     connection: Option<Arc<AcpConnection>>,
     native: Option<String>,
     text: String,
+    thought: String,
     cancelling: bool,
     prompt_sent: bool,
     autonomous: Option<background::Autonomous>,
@@ -437,6 +438,7 @@ impl SessionActor {
             usage: None,
             context_usage: None,
             origin,
+            thoughts: Vec::new(),
         };
         let session_id = self.row.id.clone();
         let stored = turn.clone();
@@ -741,6 +743,7 @@ impl SessionActor {
             connection: None,
             native: None,
             text: String::new(),
+            thought: String::new(),
             cancelling: false,
             prompt_sent: false,
             autonomous: None,
@@ -1058,6 +1061,30 @@ impl SessionActor {
         }
     }
 
+    async fn flush_thought(&mut self) {
+        let Some(running) = self.running.as_mut() else {
+            return;
+        };
+        if running.thought.trim().is_empty() {
+            running.thought.clear();
+            return;
+        }
+        let text = std::mem::take(&mut running.thought);
+        let turn_id = running.turn_id.clone();
+        let text_offset = running.text.len();
+        let Some(turn) = self.turn_mut(&turn_id) else {
+            return;
+        };
+        let thought = harness_core_api::ThoughtView {
+            attempt: turn.attempts.last().map_or(1, |a| a.attempt),
+            text_offset,
+            text,
+        };
+        turn.thoughts.push(thought.clone());
+        let payload = serde_json::to_value(&thought).unwrap_or(Value::Null);
+        self.append_event(&turn_id, "thought", payload).await;
+    }
+
     async fn on_update(&mut self, update: &Value) {
         let Some(running) = self.running.as_mut() else {
             return;
@@ -1080,6 +1107,10 @@ impl SessionActor {
                 };
                 let text = text.to_owned();
                 if kind == "agent_message_chunk" {
+                    self.flush_thought().await;
+                    let Some(running) = self.running.as_mut() else {
+                        return;
+                    };
                     running.text.push_str(&text);
                     self.emit(EventKind::MessageDelta {
                         turn_id,
@@ -1087,6 +1118,7 @@ impl SessionActor {
                         text,
                     });
                 } else {
+                    running.thought.push_str(&text);
                     self.emit(EventKind::ThoughtDelta {
                         turn_id,
                         agent,
@@ -1095,8 +1127,9 @@ impl SessionActor {
                 }
             }
             "tool_call" | "tool_call_update" => {
+                self.flush_thought().await;
                 let tool = tool_view(update);
-                let offset = running.text.len();
+                let offset = self.running.as_ref().map_or(0, |r| r.text.len());
                 let mut mark = None;
                 if let Some(turn) = self.turn_mut(&turn_id) {
                     let attempt = turn.attempts.last().map_or(1, |a| a.attempt);
@@ -1416,6 +1449,7 @@ impl SessionActor {
                 .map(|r| r.text.clone())
                 .unwrap_or_default();
             self.cancel_pending_permissions();
+            self.flush_thought().await;
             if let Some(running) = self.running.take() {
                 if let Some(connection) = &running.connection {
                     self.ctx
@@ -1433,6 +1467,7 @@ impl SessionActor {
             )
             .await;
             if crate::agy_ops::is_agy(&self.ctx, agent)
+                && crate::agy_agents::account_of(agent).is_none()
                 && crate::agy_ops::rotate_on_quota(&self.ctx).await
             {
                 let attempts = self.turn(turn_id).map_or(0, |t| t.attempts.len());
@@ -1485,6 +1520,7 @@ impl SessionActor {
         outcome: TurnOutcome,
     ) {
         self.cancel_pending_permissions();
+        self.flush_thought().await;
         let Some(running) = self.running.take() else {
             return;
         };
@@ -1810,6 +1846,13 @@ async fn drive_setup(
     plan: PrefPlan,
     session: &harness_core_api::SessionId,
 ) -> Result<Ready, AgentErrorInfo> {
+    crate::agy_agents::ensure_account(ctx, agent)
+        .await
+        .map_err(|message| AgentErrorInfo {
+            code: None,
+            message,
+            data: None,
+        })?;
     let connection = ctx
         .pool
         .acquire(agent)

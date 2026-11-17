@@ -311,6 +311,7 @@ impl SessionActor {
                 schedule_title: String::new(),
                 background: Some(task_id.clone()),
             }),
+            thoughts: Vec::new(),
         };
         let session_id = self.row.id.clone();
         let stored = turn.clone();
@@ -348,6 +349,7 @@ impl SessionActor {
             connection: Some(connection),
             native: Some(native.to_owned()),
             text: String::new(),
+            thought: String::new(),
             cancelling: false,
             prompt_sent: true,
             autonomous: Some(Autonomous {

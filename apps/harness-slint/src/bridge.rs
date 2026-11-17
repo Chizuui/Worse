@@ -26,6 +26,7 @@ use harness_core_api::{ContextItem, PermissionOptionKind};
 
 mod board;
 mod dock;
+mod export;
 mod fleet;
 mod thumbs;
 mod turns;

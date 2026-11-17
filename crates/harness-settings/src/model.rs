@@ -250,7 +250,7 @@ impl Default for AppearanceSettings {
             wrap_lines: false,
             code_font_size: 13,
             native_frame: true,
-            accent_color: "#7C8CFF".into(),
+            accent_color: "#C8F04A".into(),
             density: "comfortable".into(),
             reduce_motion: false,
             show_token_usage: true,

@@ -243,7 +243,7 @@ export component SettingsShell inherits Rectangle {
     // Agents (frames 02/03) is full-bleed: the page draws its own 28px padding.
     property <bool> bleed: SettingsUi.page == "agents";
     property <bool> rail: !root.narrow && root.width < 860px;
-    background: Theme.canvas;
+    background: transparent;
     accessible-role: AccessibleRole.text;
     accessible-label: @tr("Settings");
     // Swallow clicks so nothing underneath reacts.
@@ -333,7 +333,7 @@ export component SettingsShell inherits Rectangle {
         }
         if !root.narrow || !SettingsUi.narrow-nav: frame := Rectangle {
             horizontal-stretch: 1;
-            background: Theme.canvas;
+            background: Theme.glass-panel;
             init => {
                 root.side-pad = self.width >= 760px ? 32px : self.width >= 520px ? 24px : 16px;
                 root.right-pad = self.width >= 760px ? max(32px, self.width - 32px - 880px) : root.side-pad;

@@ -1,0 +1,25 @@
+// Unicode / ASCII art pieces: frame-cycling glyph animations set in the bundled mono face.
+import { Theme } from "../theme.slint";
+import { AsciiArt } from "../brand/ascii_art.slint";
+export { AsciiArt }
+
+// Cycles through text frames. Holds `rest` when not playing or when reduced motion is on.
+export component GlyphAnim inherits Text {
+    in property <[string]> frames;
+    in property <duration> interval: 110ms;
+    in property <bool> playing: true;
+    in property <int> rest: 0;
+    property <int> frame: 0;
+    property <bool> live: root.playing && !Theme.reduce-motion && root.frames.length > 1;
+    text: root.frames.length == 0 ? "" : root.frames[root.live ? mod(root.frame, root.frames.length) : min(root.rest, root.frames.length - 1)];
+    font-family: Theme.art-font;
+    wrap: no-wrap;
+    accessible-role: none;
+    Timer {
+        interval: root.interval;
+        running: root.live;
+        triggered => {
+            root.frame = mod(root.frame + 1, root.frames.length);
+        }
+    }
+}

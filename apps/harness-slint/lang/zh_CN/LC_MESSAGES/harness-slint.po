@@ -1675,3 +1675,6 @@ msgstr "{0} 的子代理"
 
 msgid "Back to main session"
 msgstr "返回主会话"
+
+msgid "No sessions yet"
+msgstr "还没有会话"

@@ -70,13 +70,14 @@ export component ToolCard inherits VerticalLayout {
     }
     property <image> kind-icon: root.tool-kind == "read" ? Icons.file-text : root.tool-kind == "fetch" ? Icons.globe : root.tool-kind == "edit" || root.tool-kind == "move" ? Icons.square-pen : root.tool-kind == "delete" ? Icons.trash-2 : root.tool-kind == "search" ? Icons.search : root.tool-kind == "think" ? Icons.brain : root.tool-kind == "execute" ? Icons.square-terminal : Icons.wrench;
     spacing: 4px;
+    // Flat row (no box): a fill appears only on hover or while its detail is open.
     Rectangle {
-        height: 36px;
+        height: 30px;
         clip: true;
-        border-radius: Theme.radius-lg;
-        background: tta.has-hover && root.parts.length > 0 ? Theme.raised : Theme.surface;
-        border-width: root.hit ? 2px : 1px;
-        border-color: root.hit ? Theme.find-highlight-active : root.expanded || tta.has-hover ? Theme.border-hover : Theme.border;
+        border-radius: Theme.radius-md;
+        background: root.expanded ? Theme.surface : tta.has-hover && root.parts.length > 0 ? Theme.hover : Theme.hover.with-alpha(0);
+        border-width: root.hit ? 2px : 0px;
+        border-color: root.hit ? Theme.find-highlight-active : transparent;
         animate background, border-color { duration: Theme.dur-hover; easing: ease-out-quint; }
         accessible-item-selected: root.hit;
         accessible-role: AccessibleRole.button;
@@ -96,19 +97,19 @@ export component ToolCard inherits VerticalLayout {
             }
         }
         HorizontalLayout {
-            padding-left: 12px;
-            padding-right: 12px;
-            spacing: 8px;
+            padding-left: 8px;
+            padding-right: 8px;
+            spacing: 9px;
             Icon {
                 y: (parent.height - self.height) / 2;
                 source: root.kind-icon;
-                size: Theme.icon-sm;
-                tint: tta.has-hover ? Theme.icon : Theme.icon-subtle;
+                size: Theme.icon-xs;
+                tint: tta.has-hover ? Theme.icon : Theme.icon-subtlest;
             }
             Text {
                 text: root.title;
-                font-size: 13px;
-                font-weight: Theme.weight-medium;
+                font-family: Theme.art-font;
+                font-size: 12px;
                 color: tta.has-hover ? Theme.foreground : Theme.foreground-subtle;
                 vertical-alignment: center;
                 overflow: elide;
@@ -124,7 +125,7 @@ export component ToolCard inherits VerticalLayout {
             }
             if root.status == 0: Spinner {
                 y: (parent.height - self.height) / 2;
-                size: 15px;
+                size: 14px;
                 tint: Theme.accent-fg;
             }
             if root.status == 2: Icon {
@@ -230,9 +231,9 @@ export component ThinkingRow inherits VerticalLayout {
     in property <bool> expanded;
     spacing: 4px;
     Rectangle {
-        height: 32px;
-        border-radius: Theme.radius-lg;
-        background: tha.has-hover ? Theme.surface-hover : transparent;
+        height: 30px;
+        border-radius: Theme.radius-md;
+        background: tha.has-hover ? Theme.hover : Theme.hover.with-alpha(0);
         animate background { duration: Theme.dur-hover; easing: ease-out-quint; }
         accessible-role: AccessibleRole.button;
         accessible-label: root.active ? @tr("Thinking…") : @tr("Thought");
@@ -247,14 +248,14 @@ export component ThinkingRow inherits VerticalLayout {
             }
         }
         HorizontalLayout {
-            padding-left: 6px;
+            padding-left: 8px;
             padding-right: 8px;
-            spacing: 10px;
+            spacing: 9px;
             Icon {
                 y: (parent.height - self.height) / 2;
                 source: Icons.brain;
-                size: Theme.icon-sm;
-                tint: Theme.icon-subtle;
+                size: Theme.icon-xs;
+                tint: Theme.icon-subtlest;
             }
             Text {
                 text: root.active ? @tr("Thinking…") : @tr("Thought");

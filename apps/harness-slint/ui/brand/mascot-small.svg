@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<!-- Worse Harness mascot: a deadpan bunny in a hi-vis harness collar. Original artwork for this project. -->
+  <g transform="translate(0 -2.5)" stroke="#15171c" stroke-width="3.6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M20 50 C20 60.5 26 64 32 64 C38 64 44 60.5 44 50 Z" fill="#c8f04a"/>
+    <path d="M18 31 C15 22 15 11 19 7 C21.5 4.5 25.5 4.5 27.5 7 C31 11 31 22 29 31 Z" fill="#f6f1e7"/>
+    <path d="M22.4 28 C21 21 21.4 14 23.2 11 C25 14 25.6 21 25 28 Z" fill="#ffb596" stroke="none"/>
+    <path d="M35.5 31 C34.5 24 35 19 37 15.5 L46.5 15.5 C47 21 46.8 26 45.5 31 Z" fill="#f6f1e7"/>
+    <path d="M36.6 16 C38 10.5 43.6 8 49.4 10 C55 12 58 17.6 56.6 23.4 C55.8 26.6 51.8 27 50.4 24.2 C49.4 21.2 48.2 18.2 46.5 16 Z" fill="#f6f1e7"/>
+    <path d="M32 25.5 C43.6 25.5 51.4 31 52 40 C52.6 49.4 45.8 57 32 57 C18.2 57 11.4 49.4 12 40 C12.6 31 20.4 25.5 32 25.5 Z" fill="#f6f1e7"/>
+    <path d="M20.5 40.5 H28.5 M35.5 40.5 H43.5" fill="none" stroke-width="3.4"/>
+    <path d="M21.8 41 A2.9 3.3 0 0 0 27.6 41 Z M36.6 41 A2.9 3.3 0 0 0 42.4 41 Z" fill="#15171c" stroke="none"/>
+    <path d="M30 46 H34 L32 48.4 Z" fill="#ff9a5c" stroke-width="1.6"/>
+  </g>
+</svg>

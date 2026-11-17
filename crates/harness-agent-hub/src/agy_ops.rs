@@ -14,7 +14,7 @@ use crate::util::now_ms;
 
 #[derive(Default)]
 pub(crate) struct AgyState {
-    lock: tokio::sync::Mutex<()>,
+    pub(crate) lock: tokio::sync::Mutex<()>,
     exhausted: std::sync::Mutex<HashSet<String>>,
 }
 
@@ -54,7 +54,7 @@ pub(crate) fn is_agy(ctx: &HubCtx, agent: &AgentId) -> bool {
     agent.as_str() == "agy" || ctx.config.agent_kinds.get(agent) == Some(&AgentKind::Agy)
 }
 
-async fn stop_agy(ctx: &HubCtx) {
+pub(crate) async fn stop_agy(ctx: &HubCtx) {
     let ids: Vec<AgentId> = ctx
         .specs
         .keys()

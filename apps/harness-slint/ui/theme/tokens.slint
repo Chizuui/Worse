@@ -1,110 +1,140 @@
 import { Palette } from "std-widgets.slint";
 
+// Design tokens. Monochrome first: near-black (or paper-white) surfaces, white (or ink) primary actions, grey
+// hairlines, and one small accent (the bunny's hi-vis harness). Glass panels get a light rim and an inner glow.
 export global Theme {
     in-out property <int> pref: 0;
     out property <bool> dark: pref == 2 || (pref == 0 && Palette.color-scheme == ColorScheme.dark);
     in-out property <bool> reduce-motion: false;
 
-    out property <color> canvas: dark ? #0b0c0e : #e9edf3;
-    out property <color> glass: dark ? #111215 : #f7f8fbd9;
-    out property <color> glass-strong: dark ? #16181c : #fffffff7;
-    out property <color> glass-deep: dark ? #0b0c0e : #fbfcfdf0;
-    out property <color> glass-border: dark ? #24272d : #0b10201a;
-    out property <color> glass-hairline: #00000000;
-    out property <color> glass-highlight: dark ? #00000000 : #ffffff;
-    out property <length> glass-shadow-blur: 20px;
-    out property <length> glass-shadow-y: 10px;
-    out property <color> glass-shadow: dark ? #00000080 : #0b102014;
-
-    // Accent picked in Settings › Appearance (S2 swatches); dark theme only, light keeps its contrast-safe blue.
-    in-out property <color> accent-pick: #7c8cff;
-    out property <color> accent-fg: dark ? accent-pick : #2f5bd3;
-    out property <color> accent-soft: dark ? accent-pick.with-alpha(0.12) : #2f5bd314;
-    out property <color> accent-line: dark ? accent-pick.with-alpha(0.35) : #2f5bd359;
-    out property <color> glow: #00000000;
-    out property <color> violet: dark ? #b07cff : #4b5470;
-    out property <color> violet-soft: dark ? #b07cff1f : #4b547014;
-    out property <color> ember: dark ? #e88a5c : #a45a1f;
-    out property <color> ember-soft: dark ? #e88a5c1f : #a45a1f14;
-    out property <color> sky: accent-fg;
-    out property <color> sky-soft: accent-soft;
-    out property <brush> primary-brush: primary;
-    out property <brush> primary-brush-hover: primary-hover;
-    out property <color> primary-shadow: dark ? #00000080 : #0b102033;
-
-    out property <color> background: glass-deep;
+    // ---- surfaces ------------------------------------------------------------------------------------
+    out property <color> canvas: dark ? #08090a : #f3f2ee;
+    // Opaque cover for full-bleed pages (board, diff blocks).
+    out property <color> background: dark ? #0b0c0d : #f8f7f4;
     out property <color> background-win-alt: canvas;
     out property <color> header: transparent;
+    // Glass: translucent pane tint, and the opaque cut for anything that floats over text (there is no
+    // backdrop blur here, so see-through would mean sharp text behind text), plus an inset well.
+    out property <color> glass: dark ? #ffffff0a : #ffffff9e;
+    out property <color> glass-strong: dark ? #131416 : #ffffff;
+    out property <color> glass-deep: dark ? #050506 : #ecebe6;
+    out property <color> glass-border: dark ? #ffffff1f : #ffffffd9;
+    out property <color> glass-hairline: #00000000;
+    out property <color> glass-highlight: dark ? #ffffff3d : #ffffff;
+    out property <length> glass-shadow-blur: 44px;
+    out property <length> glass-shadow-y: 18px;
+    out property <color> glass-shadow: dark ? #00000080 : #2a26181f;
+    out property <color> glass-panel: dark ? #ffffff08 : #ffffff8c;
+    // Rim: bright where the light hits (top), a faint return at the bottom edge.
+    out property <brush> glass-rim: dark ? @linear-gradient(180deg, #ffffff3d 0%, #ffffff14 28%, #ffffff0a 72%, #ffffff1f 100%) : @linear-gradient(180deg, #ffffff 0%, #ffffffd9 45%, #1a1b1d1f 100%);
+    out property <brush> glass-sheen: dark ? @linear-gradient(180deg, #ffffff0d 0%, #ffffff03 30%, #ffffff00 55%) : @linear-gradient(180deg, #ffffffa6 0%, #ffffff33 30%, #ffffff00 55%);
+    // Inner glow (Skia renderer only; other renderers skip inner shadows).
+    out property <color> glass-inner: dark ? #ffffff1a : #ffffffe6;
+    out property <length> glass-inner-blur: 16px;
     out property <color> panel: glass;
     out property <color> sidebar: glass;
-    out property <color> surface: dark ? #16181c : #ffffffcc;
-    out property <color> surface-hover: dark ? #1c1f24 : #ffffff;
-    out property <color> user-bubble: dark ? #16181c : #0b10200a;
-    out property <color> card: dark ? #111215 : #ffffffb3;
-    out property <color> card-selected: dark ? #1c1f24 : #ffffff;
-    out property <color> card-border: dark ? #24272d : #0b102012;
+    out property <color> well: dark ? #00000059 : #1a1b1d0a;
+
+    out property <color> surface: dark ? #ffffff0a : #ffffffb8;
+    out property <color> surface-hover: dark ? #ffffff17 : #ffffff;
+    out property <color> raised: dark ? #ffffff12 : #ffffff;
+    out property <color> user-bubble: dark ? #ffffff12 : #1a1b1d0f;
+    out property <color> card: dark ? #ffffff08 : #ffffff99;
+    out property <color> card-selected: dark ? #ffffff14 : #ffffff;
+    out property <color> card-border: dark ? #ffffff14 : #1a1b1d14;
     out property <color> popover: glass-strong;
-    out property <color> popover-header: dark ? #ffffff05 : #0b102005;
-    out property <color> popover-border: dark ? #2a2d33 : #0b102014;
+    out property <color> popover-header: dark ? #ffffff05 : #1a1b1d05;
+    out property <color> popover-border: dark ? #ffffff24 : #1a1b1d1a;
     out property <color> menu: glass-strong;
-    out property <color> menu-hover: dark ? #1c1f24 : #0b10200d;
-    out property <color> input: dark ? #16181c : #ffffffcc;
-    out property <color> input-focused: dark ? #16181c : #ffffff;
-    out property <color> input-border: dark ? #24272d : #0b10201a;
-    out property <color> input-border-hover: dark ? #2a2d33 : #0b10202e;
-    out property <color> input-border-focused: accent-line;
+    out property <color> menu-hover: dark ? #ffffff14 : #1a1b1d0d;
+    out property <color> input: dark ? #ffffff0a : #ffffffcc;
+    out property <color> input-focused: dark ? #ffffff10 : #ffffff;
+    out property <color> input-border: dark ? #ffffff1a : #1a1b1d1f;
+    out property <color> input-border-hover: dark ? #ffffff2e : #1a1b1d38;
+    out property <color> input-border-focused: dark ? #ffffff66 : #1a1b1d80;
     out property <color> tab: transparent;
-    out property <color> tab-active: dark ? #1c1f24 : #ffffff;
+    out property <color> tab-active: dark ? #ffffff17 : #ffffff;
     out property <color> tab-border: card-border;
     out property <color> toast: glass-strong;
-    out property <color> tooltip: dark ? #1c1f24 : #0b1020f0;
-    out property <color> tooltip-foreground: dark ? #edeef0 : #f8fafc;
-    out property <color> tag: dark ? #1c1f24 : #0b10200d;
-    out property <color> scrim: dark ? #00000099 : #0b102040;
+    out property <color> tooltip: dark ? #26272af5 : #1a1b1df0;
+    out property <color> tooltip-foreground: dark ? #f4f4f5 : #f8f7f4;
+    out property <color> tag: dark ? #ffffff12 : #1a1b1d0d;
+    out property <color> scrim: dark ? #000000a6 : #1a1b1d47;
+    out property <color> composer: dark ? #111214 : #ffffff;
+    out property <color> composer-border: dark ? #ffffff24 : glass-border;
 
-    out property <color> border: dark ? #24272d : #0b102014;
-    out property <color> border-hover: dark ? #2a2d33 : #0b102026;
-    out property <color> hover: dark ? #ffffff0a : #0b10200a;
-    out property <color> selected: dark ? #ffffff12 : #0b10200f;
-    out property <color> text-selection: dark ? #7c8cff59 : #2f6bdc4d;
+    out property <color> border: dark ? #ffffff14 : #1a1b1d14;
+    out property <color> border-hover: dark ? #ffffff29 : #1a1b1d29;
+    out property <color> section-line: dark ? #ffffff10 : #1a1b1d0f;
+    out property <color> hover: dark ? #ffffff0d : #1a1b1d0a;
+    out property <color> selected: dark ? #ffffff14 : #1a1b1d12;
+    out property <color> resize-handle: dark ? #ffffff33 : #1a1b1d33;
+
+    // ---- accent ------------------------------------------------------------------------------------------
+    // Accent picked in Settings › Appearance. Dark shows it as picked; light uses a darker cut of the same hue
+    // for text and lines (the picked colour is too pale on paper) and the picked colour itself for fills.
+    in-out property <color> accent-pick: #c8f04a;
+    out property <color> accent-fill: accent-pick;
+    out property <color> on-accent: #10140a;
+    out property <color> accent-fg: dark ? accent-pick : accent-pick.darker(0.9).mix(#1a1b1d, 0.55);
+    out property <color> accent-soft: dark ? accent-pick.with-alpha(0.12) : accent-pick.with-alpha(0.34);
+    out property <color> accent-line: dark ? accent-pick.with-alpha(0.42) : accent-fg.with-alpha(0.5);
+    out property <color> glow: #00000000;
+    out property <color> violet: dark ? #b3a7ee : #5d55a3;
+    out property <color> violet-soft: dark ? #b3a7ee1f : #5d55a314;
+    out property <color> ember: dark ? #ff9a52 : #b4530f;
+    out property <color> ember-soft: dark ? #ff9a521f : #b4530f14;
+    out property <color> sky: dark ? #7cc4ff : #0b68b0;
+    out property <color> sky-soft: dark ? #7cc4ff1f : #0b68b014;
+    out property <color> text-selection: dark ? accent-pick.with-alpha(0.3) : accent-pick.with-alpha(0.6);
     out property <color> accent: accent-soft;
     out property <color> brand: accent-fg;
-    out property <color> resize-handle: accent-fg;
-    out property <color> find-highlight: dark ? #fbbf2433 : #fde68a;
-    out property <color> find-highlight-active: dark ? #fbbf24 : #f59e0b;
+    out property <color> find-highlight: dark ? #ffd24a33 : #fde68a;
+    out property <color> find-highlight-active: dark ? #ffd24a : #f59e0b;
 
-    out property <color> foreground: dark ? #edeef0 : #0b1020;
-    out property <color> foreground-subtle: dark ? #c9ccd2 : #0b1020b3;
-    out property <color> foreground-subtlest: dark ? #8a909a : #0b102085;
-    out property <color> foreground-inverse: dark ? #0b0c0e : #ffffff;
-    out property <color> muted: dark ? #8a909a : #475569;
+    // ---- text --------------------------------------------------------------------------------------------
+    out property <color> foreground: dark ? #f4f4f5 : #1a1b1d;
+    out property <color> foreground-subtle: dark ? #c5c6ca : #1a1b1dbd;
+    out property <color> foreground-subtlest: dark ? #86888e : #1a1b1d85;
+    out property <color> foreground-inverse: dark ? #08090a : #ffffff;
+    out property <color> muted: dark ? #8f9197 : #5c5d5f;
+    out property <color> caps-label: dark ? #6a6c72 : #7a7b7d;
     out property <color> icon: foreground;
-    out property <color> icon-subtle: dark ? #8a909a : #0b1020a6;
-    out property <color> icon-subtlest: dark ? #6b717c : #0b102066;
+    out property <color> icon-subtle: dark ? #9a9ca2 : #1a1b1da6;
+    out property <color> icon-subtlest: dark ? #686a70 : #1a1b1d66;
     out property <color> link: sky;
     out property <color> icon-purple: violet;
 
-    out property <color> primary: dark ? #edeef0 : #0b1020;
-    out property <color> primary-hover: dark ? #ffffff : #1c2338;
-    out property <color> primary-foreground: dark ? #0b0c0e : #ffffff;
+    // ---- primary action: white on black, ink on paper -----------------------------------------------------
+    out property <color> primary: dark ? #f4f4f5 : #1a1b1d;
+    out property <color> primary-hover: dark ? #ffffff : #303134;
+    out property <color> primary-foreground: dark ? #0b0c0d : #fbfaf7;
+    out property <brush> primary-brush: primary;
+    out property <brush> primary-brush-hover: primary-hover;
+    out property <color> primary-shadow: dark ? #00000080 : #1a1b1d33;
     out property <color> secondary: surface;
+    // Kept for callers of the old gradient: the "accent" button variant is now a flat accent fill.
+    out property <brush> brand-gradient: accent-fill;
 
-    out property <color> success: dark ? #3dd68c : #16a34a;
+    // ---- status ------------------------------------------------------------------------------------------
+    out property <color> success: dark ? #4bd992 : #17894a;
     out property <color> success-foreground: dark ? #04210f : #ffffff;
-    out property <color> success-surface: dark ? #3dd68c1f : #16a34a1f;
-    out property <color> success-surface-foreground: dark ? #3dd68c : #15803d;
-    out property <color> warning: dark ? #f5b14c : #d97706;
+    out property <color> success-surface: dark ? #4bd9921f : #17894a1f;
+    out property <color> success-surface-foreground: dark ? #4bd992 : #136f3d;
+    out property <color> warning: dark ? #f5b14c : #c26a05;
     out property <color> warning-foreground: dark ? #2a1a00 : #ffffff;
-    out property <color> warning-surface: dark ? #f5b14c1f : #d977061f;
-    out property <color> warning-surface-foreground: dark ? #f5b14c : #b45309;
-    out property <color> destructive: dark ? #f2555a : #dc2626;
+    out property <color> warning-surface: dark ? #f5b14c1f : #c26a051f;
+    out property <color> warning-surface-foreground: dark ? #f5b14c : #9c5504;
+    out property <color> destructive: dark ? #f2555a : #d13b3b;
     out property <color> destructive-foreground: #ffffff;
-    out property <color> destructive-surface: dark ? #f2555a1f : #dc26261a;
-    out property <color> destructive-surface-foreground: dark ? #f2555a : #b91c1c;
-    out property <color> progress-surface: sky-soft;
-    out property <color> progress-surface-foreground: sky;
-    out property <color> confirm-surface: dark ? #3dd68c1f : #16a34a1a;
-    out property <color> confirm-foreground: dark ? #3dd68c : #15803d;
+    out property <color> destructive-surface: dark ? #f2555a1f : #d13b3b1a;
+    out property <color> destructive-surface-foreground: dark ? #f2555a : #b02a2a;
+    out property <color> info: dark ? #7cc4ff : #0b68b0;
+    out property <color> info-surface: dark ? #7cc4ff1f : #0b68b01a;
+    out property <color> progress-surface: dark ? #ffffff12 : #1a1b1d0d;
+    out property <color> progress-surface-foreground: foreground;
+    out property <color> confirm-surface: success-surface;
+    out property <color> confirm-foreground: success-surface-foreground;
     out property <color> ask-surface: sky-soft;
     out property <color> ask-foreground: sky;
     out property <color> idle-task: violet;
@@ -114,8 +144,8 @@ export global Theme {
     out property <color> diff-added-foreground: success-foreground;
     out property <color> diff-removed: destructive;
     out property <color> diff-removed-foreground: dark ? #2a0505 : #ffffff;
-    out property <color> diff-added-surface: dark ? #3dd68c1a : #16a34a17;
-    out property <color> diff-removed-surface: dark ? #f2555a1a : #dc262614;
+    out property <color> diff-added-surface: dark ? #4bd9921a : #17894a17;
+    out property <color> diff-removed-surface: dark ? #f2555a1a : #d13b3b14;
     out property <color> git-modified: warning;
     out property <color> git-added: success;
     out property <color> git-deleted: destructive;
@@ -124,27 +154,33 @@ export global Theme {
     out property <color> git-ignored: foreground-subtlest;
     out property <color> git-descendant: warning;
 
-    out property <color> terminal-bg: dark ? #0b0c0e : #ffffffcc;
+    out property <color> terminal-bg: dark ? #050506e6 : #ffffffcc;
     out property <color> terminal-fg: foreground;
     out property <color> terminal-cursor: accent-fg;
-    out property <color> terminal-selection: dark ? #7c8cff40 : #2f5bd333;
-    out property <[color]> terminal-ansi: dark ? [#2a2f3d, #f87171, #4ade80, #fbbf24, #60a5fa, #c084fc, #5eead4, #cbd5e1, #64748b, #fca5a5, #86efac, #fcd34d, #93c5fd, #d8b4fe, #99f6e4, #f8fafc] : [#334155, #dc2626, #16a34a, #d97706, #2563eb, #9333ea, #0d9488, #94a3b8, #64748b, #ef4444, #22c55e, #f59e0b, #3b82f6, #a855f7, #14b8a6, #0b1020];
+    out property <color> terminal-selection: dark ? #ffffff33 : #1a1b1d2e;
+    out property <[color]> terminal-ansi: dark ? [#2b2d31, #f2555a, #4bd992, #f5b14c, #7cc4ff, #b3a7ee, #5fd8cb, #c5c6ca, #686a70, #ff8a8e, #86efac, #fcd34d, #a8d8ff, #cfc6ff, #99f6e4, #f4f4f5] : [#2b2d31, #d13b3b, #17894a, #c26a05, #0b68b0, #5d55a3, #0d8a80, #8f9197, #686a70, #e45858, #22a35a, #d98a1c, #2b83c9, #7a72c2, #14a79b, #1a1b1d];
 
-    out property <color> markdown-inline-code: dark ? #1c1f24 : #0b10200d;
+    out property <color> markdown-inline-code: dark ? #ffffff14 : #1a1b1d0f;
     out property <color> file-node: sky-soft;
     out property <color> file-node-foreground: sky;
     out property <color> command-node: violet-soft;
     out property <color> command-node-foreground: violet;
 
-    out property <color> syntax-keyword: dark ? #c792ea : #be185d;
-    out property <color> syntax-string: dark ? #a7d7b4 : #2f7a4a;
-    out property <color> syntax-comment: dark ? #6b717c : #64748b;
-    out property <color> syntax-function: dark ? #9aa6ff : #6d28d9;
-    out property <color> syntax-type: dark ? #f5b14c : #c2410c;
-    out property <color> syntax-number: dark ? #5bc0ff : #0369a1;
+    out property <color> syntax-keyword: dark ? #ff9a6b : #b4470f;
+    out property <color> syntax-string: dark ? #b8d977 : #4c6b0b;
+    out property <color> syntax-comment: dark ? #686a70 : #8a8b8d;
+    out property <color> syntax-function: dark ? #8fcbff : #0b63b0;
+    out property <color> syntax-type: dark ? #e9c46a : #8a5a00;
+    out property <color> syntax-number: dark ? #c9b8ff : #6a3fb8;
 
+    // ---- type --------------------------------------------------------------------------------------------
     in property <string> ui-font: "";
     in property <string> mono-font: "Consolas";
+    // Bundled faces: wide display headings, the italic serif for taglines, and the mono the glyph art is set in.
+    // AppWindow swaps the first two for the UI font when the interface language needs CJK glyphs.
+    in-out property <string> display-font: "Syne";
+    in-out property <string> serif-font: "Instrument Serif";
+    out property <string> art-font: "JetBrains Mono";
     in-out property <length> ui-font-size: 14px;
     out property <length> ui-xl: ui-font-size + 4px;
     out property <length> ui-lg: ui-font-size + 2px;
@@ -172,13 +208,14 @@ export global Theme {
     out property <length> space-6: 24px;
     out property <length> space-8: 32px;
 
+    // Rounded, not pill-shaped: controls 8–10, cards 12–16, floating glass 18–24.
     out property <length> radius-full: 999px;
     out property <length> radius-3xl: 24px;
     out property <length> radius-2xl: 20px;
-    out property <length> radius-xl: 14px;
-    out property <length> radius-lg: 10px;
-    out property <length> radius-md: 8px;
-    out property <length> radius-sm: 6px;
+    out property <length> radius-xl: 16px;
+    out property <length> radius-lg: 12px;
+    out property <length> radius-md: 10px;
+    out property <length> radius-sm: 7px;
 
     out property <length> control-xs: 22px;
     out property <length> control-sm: 26px;
@@ -192,20 +229,17 @@ export global Theme {
     out property <length> sidebar-width: 272px;
     out property <length> side-pane-width: 316px;
     out property <length> topbar-height: 52px;
-    out property <color> composer: dark ? #16181c : glass-strong;
-    out property <color> composer-border: dark ? #2a2d33 : glass-border;
-    out property <color> section-line: dark ? #24272d : #0b10200f;
-    out property <color> switch-on: accent-fg;
+    out property <color> switch-on: accent-fill;
     out property <length> chat-max-width: 768px;
 
-    out property <length> shadow-md-blur: 24px;
-    out property <length> shadow-md-y: 8px;
-    out property <color> shadow-md-color: dark ? #00000080 : #0b10201f;
-    out property <length> shadow-lg-blur: 48px;
-    out property <length> shadow-lg-y: 16px;
-    out property <color> shadow-lg-color: dark ? #00000099 : #0b10202e;
-    out property <length> shadow-composer-blur: 36px;
-    out property <color> shadow-composer-color: dark ? #00000080 : #0b10201f;
+    out property <length> shadow-md-blur: 32px;
+    out property <length> shadow-md-y: 12px;
+    out property <color> shadow-md-color: dark ? #00000099 : #2a261829;
+    out property <length> shadow-lg-blur: 64px;
+    out property <length> shadow-lg-y: 24px;
+    out property <color> shadow-lg-color: dark ? #000000b3 : #2a261838;
+    out property <length> shadow-composer-blur: 40px;
+    out property <color> shadow-composer-color: dark ? #00000099 : #2a261826;
 
     out property <duration> dur-press: reduce-motion ? 0ms : 120ms;
     out property <duration> dur-hover: reduce-motion ? 0ms : 150ms;
@@ -215,12 +249,7 @@ export global Theme {
     out property <duration> dur-dialog: reduce-motion ? 0ms : 240ms;
     out property <duration> dur-panel: reduce-motion ? 0ms : 280ms;
 
-    // Redesign 2026-11: brand + agent identity colours
-    out property <brush> brand-gradient: @linear-gradient(90deg, #7c8cff 0%, #b07cff 100%);
-    out property <color> info: dark ? #5bc0ff : #0369a1;
-    out property <color> info-surface: dark ? #5bc0ff1f : #0369a11a;
-    out property <color> caps-label: dark ? #5d636d : #64748b;
-    out property <color> raised: dark ? #1c1f24 : #ffffff;
+    // Agent identity colours (the only other chroma in the UI).
     out property <color> agent-claude: #e88a5c;
     out property <color> agent-codex: #3dd68c;
     out property <color> agent-deepseek: #4d6bfe;

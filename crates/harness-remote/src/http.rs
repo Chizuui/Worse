@@ -73,6 +73,11 @@ const ASSETS: &[Asset] = &[
         body: include_bytes!("assets/settings.css"),
     },
     Asset {
+        name: "glass.css",
+        content_type: "text/css; charset=utf-8",
+        body: include_bytes!("assets/glass.css"),
+    },
+    Asset {
         name: "sessions.js",
         content_type: "text/javascript; charset=utf-8",
         body: include_bytes!("assets/sessions.js"),

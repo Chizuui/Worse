@@ -1172,6 +1172,9 @@ impl Adapter {
             } => answer(reply, async move {
                 core.move_sessions(ids(sessions), group).await
             }),
+            ChatCall::Export { session, reply } => answer(reply, async move {
+                core.open_session(api::SessionId::new(session)).await
+            }),
             ChatCall::Fork {
                 session,
                 item,

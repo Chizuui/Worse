@@ -1,15 +1,65 @@
 import { Theme } from "tokens.slint";
+import { GlyphAnim, AsciiArt } from "../components/ascii.slint";
 
+// Window backdrop: flat near-black (or paper). No colour fields and no gradients, so the dither field and
+// the glass panes can fade into it without a seam.
 export component MidnightBackdrop inherits Rectangle {
-    property <length> light: max(root.width, root.height) * 1.5;
-    background: Theme.dark ? #0b0c0e : @linear-gradient(180deg, #f4f6fa 0%, #e9edf3 100%);
+    background: Theme.canvas;
     clip: true;
-    Rectangle {
-        width: root.light;
-        height: root.light;
-        x: (root.width - self.width) / 2;
-        y: -root.height * 0.25 - self.height / 2;
-        background: Theme.dark ? transparent : @radial-gradient(circle, #ffffffcc 0%, #ffffff59 35%, #ffffff00 70%);
-    }
     @children
+}
+
+// Dither field: columns of glyphs (# % * :) hugging the left and right edges and fading towards the middle.
+// `reach` is how far each side comes in; `lively` cycles the frames slowly (used on the empty chat only).
+export component DitherField inherits Rectangle {
+    in property <length> reach: 220px;
+    in property <bool> lively: false;
+    in property <color> fade: Theme.canvas;
+    property <color> ink: Theme.foreground.with-alpha(Theme.dark ? 0.13 : 0.16);
+    clip: true;
+    if root.reach > 40px: Rectangle {
+        x: 0;
+        width: root.reach;
+        clip: true;
+        cache-rendering-hint: !root.lively;
+        GlyphAnim {
+            x: 0;
+            y: 0;
+            frames: AsciiArt.field-left;
+            playing: root.lively;
+            interval: 480ms;
+            font-size: 9px;
+            letter-spacing: 8px;
+            color: root.ink;
+        }
+        Rectangle {
+            background: @linear-gradient(90deg, root.fade.with-alpha(0) 0%, root.fade.with-alpha(0) 35%, root.fade 100%);
+        }
+    }
+    if root.reach > 40px: Rectangle {
+        x: root.width - self.width;
+        width: root.reach;
+        clip: true;
+        cache-rendering-hint: !root.lively;
+        GlyphAnim {
+            x: parent.width - self.width;
+            y: 0;
+            frames: AsciiArt.field-right;
+            playing: root.lively;
+            interval: 480ms;
+            font-size: 9px;
+            letter-spacing: 8px;
+            color: root.ink;
+            horizontal-alignment: right;
+        }
+        Rectangle {
+            background: @linear-gradient(90deg, root.fade 0%, root.fade.with-alpha(0) 65%, root.fade.with-alpha(0) 100%);
+        }
+    }
+    // Fade out towards the bottom so the columns never end on a hard line.
+    Rectangle {
+        y: root.height - self.height;
+        height: min(root.height, 180px);
+        background: @linear-gradient(180deg, root.fade.with-alpha(0) 0%, root.fade 100%);
+    }
 }

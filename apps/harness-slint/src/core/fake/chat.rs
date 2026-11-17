@@ -154,6 +154,7 @@ impl FakeCore {
             | ChatCall::SetSchedulesEnabled(_, reply)
             | ChatCall::DeleteSchedule(_, reply) => unsupported(reply, "this call"),
             ChatCall::Fork { reply, .. } => unsupported(reply, "fork"),
+            ChatCall::Export { reply, .. } => unsupported(reply, "export"),
             ChatCall::Rewind { reply, .. } => unsupported(reply, "rewind"),
             ChatCall::PlanFiles { reply, .. } => unsupported(reply, "file changes"),
             ChatCall::ApplyFiles { reply, .. } => unsupported(reply, "file changes"),

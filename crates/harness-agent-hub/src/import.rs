@@ -164,6 +164,7 @@ fn insert_imported(
             usage: None,
             context_usage: None,
             origin: None,
+            thoughts: Vec::new(),
         };
         store::insert_turn(&tx, &row.id, &view, None)?;
         store::update_turn(&tx, &view)?;

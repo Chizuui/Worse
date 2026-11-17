@@ -14,8 +14,9 @@ export component PageHeader inherits VerticalLayout {
     spacing: 6px;
     Text {
         text: root.title;
+        font-family: Theme.display-font;
         font-size: 22px;
-        font-weight: Theme.weight-semibold;
+        font-weight: 700;
         color: Theme.foreground;
         accessible-role: AccessibleRole.text;
         accessible-label: root.title;
@@ -171,7 +172,7 @@ export component Switch inherits Rectangle {
     width: 32px;
     height: 18px;
     border-radius: 9px;
-    background: root.checked ? Theme.accent-fg : Theme.border-hover;
+    background: root.checked ? Theme.accent-fill : Theme.border-hover;
     opacity: root.enabled ? 1 : 0.5;
     accessible-role: checkbox;
     accessible-label: root.label;
@@ -190,7 +191,7 @@ export component Switch inherits Rectangle {
         y: 2px;
         x: root.checked ? root.width - self.width - 2px : 2px;
         border-radius: 7px;
-        background: root.checked ? #ffffff : Theme.foreground-subtlest;
+        background: root.checked ? Theme.on-accent : Theme.foreground-subtlest;
         animate x, background { duration: Theme.dur-hover; }
     }
     TouchArea {
@@ -771,7 +772,7 @@ export component SetButton inherits Rectangle {
     in property <bool> enabled: true;
     callback clicked;
     property <bool> hot: ta.has-hover && root.enabled;
-    property <color> fg: root.variant == "primary" ? Theme.primary-foreground : root.variant == "accent" ? #ffffff : root.variant == "destructive" ? Theme.destructive : root.variant == "ghost" ? Theme.foreground-subtle : Theme.foreground;
+    property <color> fg: root.variant == "primary" ? Theme.primary-foreground : root.variant == "accent" ? Theme.on-accent : root.variant == "destructive" ? Theme.destructive : root.variant == "ghost" ? Theme.foreground-subtle : Theme.foreground;
     height: 29px;
     preferred-width: bt.preferred-width + 24px;
     min-width: self.preferred-width;
@@ -780,7 +781,7 @@ export component SetButton inherits Rectangle {
     border-radius: Theme.radius-md;
     border-width: root.variant == "secondary" || root.variant == "destructive" ? 1px : 0px;
     border-color: root.variant == "destructive" ? Theme.destructive.with-alpha(root.hot ? 0.8 : 0.5) : (root.hot ? #34383f : Theme.border-hover);
-    background: root.variant == "primary" ? (root.hot ? Theme.primary-hover : Theme.primary) : root.variant == "accent" ? Theme.brand-gradient : root.variant == "destructive" ? Theme.destructive.with-alpha(root.hot ? 0.18 : 0.12) : root.variant == "ghost" ? (root.hot ? Theme.hover : transparent) : (root.hot ? #23262c : Theme.raised);
+    background: root.variant == "primary" ? (root.hot ? Theme.primary-hover : Theme.primary) : root.variant == "accent" ? Theme.brand-gradient : root.variant == "destructive" ? Theme.destructive.with-alpha(root.hot ? 0.18 : 0.12) : root.variant == "ghost" ? (root.hot ? Theme.hover : transparent) : (root.hot ? Theme.surface-hover : Theme.raised);
     opacity: root.enabled ? 1 : 0.45;
     transform-scale: ta.pressed && root.enabled ? 0.97 : 1;
     accessible-role: button;

@@ -405,6 +405,11 @@ pub enum ChatCall {
         group: Option<String>,
         reply: Reply<()>,
     },
+    /// Full snapshot of a session for "Export as Markdown".
+    Export {
+        session: SessionId,
+        reply: Reply<api::SessionDetail>,
+    },
     /// Copies the finished turns up to `item`'s turn (`None` = all) into a new session.
     Fork {
         session: SessionId,

@@ -1,5 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Harness">
-  <rect width="64" height="64" rx="14" fill="#0f1115"/>
-  <path d="M17 17v30M47 17v30M17 32h30" fill="none" stroke="#4c8dff" stroke-width="5" stroke-linecap="round"/>
-  <circle cx="32" cy="32" r="4.5" fill="#3fb950"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="64" height="64" role="img" aria-label="Harness">
+<!-- Worse Harness mascot: a deadpan bunny in a hi-vis harness collar. Original artwork for this project. -->
+  <defs>
+    <linearGradient id="t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1e22"/><stop offset="1" stop-color="#0b0c0d"/></linearGradient>
+    <linearGradient id="r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/><stop offset="0.4" stop-color="#ffffff" stop-opacity="0.08"/><stop offset="1" stop-color="#ffffff" stop-opacity="0.14"/></linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#t)"/>
+  <rect x="19" y="19" width="474" height="474" rx="109" fill="none" stroke="url(#r)" stroke-width="6"/>
+  <g transform="translate(66 50) scale(0.74)" stroke="#060708" stroke-width="18" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M160 412 C160 480 204 510 256 510 C308 510 352 480 352 412 Z" fill="#c8f04a"/>
+    <!-- left ear -->
+    <path d="M146 262 C124 198 122 112 148 72 C163 48 193 48 208 72 C232 112 234 198 228 262 Z" fill="#f6f1e7"/>
+    <path d="M170 246 C158 198 158 132 170 102 C175 90 181 90 186 102 C198 132 204 198 202 246 Z" fill="#ffb596" stroke="none"/>
+    <!-- right ear: upright stub + folded flap -->
+    <path d="M284 262 C278 212 280 168 292 136 L372 136 C376 178 374 220 366 262 Z" fill="#f6f1e7"/>
+    <path d="M308 246 C304 210 306 180 312 160 L348 160 C350 188 348 218 342 246 Z" fill="#ffb596" stroke="none"/>
+    <path d="M290 138 C300 96 344 76 392 92 C436 107 462 150 452 196 C446 222 414 226 402 204 C394 180 386 156 372 138 Z" fill="#f6f1e7"/>
+    <!-- head -->
+    <path d="M256 206 C348 206 406 250 414 320 C422 394 366 458 256 458 C146 458 90 394 98 320 C106 250 164 206 256 206 Z" fill="#f6f1e7"/>
+    <!-- deadpan eyes -->
+    <path d="M174 322 A23 25 0 0 0 220 322 Z" fill="#15171c" stroke="none"/>
+    <path d="M292 322 A23 25 0 0 0 338 322 Z" fill="#15171c" stroke="none"/>
+    <path d="M162 320 H232 M280 320 H350" fill="none" stroke-width="15"/>
+    <!-- nose + mouth -->
+    <path d="M238 362 H274 L256 383 Z" fill="#ff9a5c" stroke-width="8"/>
+    <path d="M256 386 V397 M256 397 C246 409 232 407 226 397 M256 397 C266 409 280 407 286 397" fill="none" stroke-width="10"/>
+
+    <circle cx="256" cy="492" r="16" fill="#f6f1e7" stroke-width="11"/>
+  </g>
 </svg>

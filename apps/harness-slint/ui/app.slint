@@ -9,8 +9,13 @@ import "fonts/Inter-Regular.ttf";
 import "fonts/Inter-Medium.ttf";
 import "fonts/Inter-SemiBold.ttf";
 import "fonts/Inter-Bold.ttf";
+// Brand faces: wide display headings, italic serif taglines, and the mono the glyph art is set in.
+import "fonts/Syne-Bold.ttf";
+import "fonts/InstrumentSerif-Italic.ttf";
+import "fonts/JetBrainsMono-Regular.ttf";
 import { Theme } from "theme/tokens.slint";
-import { MidnightBackdrop } from "theme/backdrop.slint";
+import { MidnightBackdrop, DitherField } from "theme/backdrop.slint";
+import { GlyphAnim, AsciiArt } from "components/ascii.slint";
 import { Icon, Icons, IconsFill, Glass, Spinner, Button, IconButton, Tag, Divider, Card, MenuShell, MenuItem, TabBar, TabItem, SectionLabel, StatusDot, Segmented, SegmentOption } from "components/controls.slint";
 import { FileIcons } from "components/icons.slint";
 
@@ -557,8 +562,9 @@ component ChatRow inherits VerticalLayout {
     // The session runs (turn actions that rewrite history are disabled; the hub would answer Busy).
     in property <bool> busy;
     callback link(string);
-    padding-top: 8px;
-    padding-bottom: 8px;
+    // Tool and thinking rows are flat one-liners: they stack tight; messages keep their breathing room.
+    padding-top: root.item.kind == 2 || root.item.kind == 5 ? 1px : 8px;
+    padding-bottom: root.item.kind == 2 || root.item.kind == 5 ? 1px : 8px;
     // User message: right-aligned bubble (`bg-user-bubble rounded-xl`), at most 80% of the column.
     if root.item.kind == 0: Rectangle {
         min-width: ul.min-width;
@@ -577,20 +583,21 @@ component ChatRow inherits VerticalLayout {
                 HorizontalLayout {
                     alignment: end;
                     Rectangle {
-                        // Design 01: surface bubble, radius 12, at most 560px wide.
+                        // Soft filled bubble, no outline; the bottom-right corner is tighter, like a tail.
                         max-width: min(root.bubble-max, 560px);
-                        background: Theme.surface;
-                        border-radius: 12px;
-                        border-width: 1px;
-                        border-color: root.hit ? Theme.find-highlight-active : Theme.border;
+                        background: Theme.user-bubble;
+                        border-radius: 18px;
+                        border-bottom-right-radius: 6px;
+                        border-width: root.hit ? 1px : 0px;
+                        border-color: root.hit ? Theme.find-highlight-active : transparent;
                         accessible-role: AccessibleRole.text;
                         accessible-label: root.item.text;
                         accessible-item-selected: root.hit;
                         HorizontalLayout {
                             padding-top: 10px;
                             padding-bottom: 10px;
-                            padding-left: 14px;
-                            padding-right: 14px;
+                            padding-left: 15px;
+                            padding-right: 15px;
                             TextInput {
                                 text: root.item.text;
                                 read-only: true;
@@ -852,6 +859,31 @@ component Sidebar inherits Rectangle {
     property <length> drag-y;
     property <length> drop-row: 28px;
     property <length> drop-top: root.height - 48px - (ChatUi.groups.length + 1) * root.drop-row;
+    // Nothing here yet: the ASCII bunny naps where the list would be.
+    if root.sessions.length == 0: VerticalLayout {
+        x: 0;
+        y: root.height * 0.32;
+        width: root.width;
+        height: 96px;
+        alignment: center;
+        spacing: 10px;
+        HorizontalLayout {
+            alignment: center;
+            GlyphAnim {
+                frames: AsciiArt.bunny-sleep;
+                interval: 380ms;
+                font-size: 13px;
+                color: Theme.foreground-subtlest;
+            }
+        }
+        Text {
+            text: @tr("No sessions yet");
+            font-size: Theme.ui-sm;
+            color: Theme.foreground-subtlest;
+            horizontal-alignment: center;
+            accessible-role: none;
+        }
+    }
     VerticalLayout {
         padding: 12px;
         padding-top: 4px;
@@ -1580,16 +1612,17 @@ component RoundButton inherits Rectangle {
     }
 }
 
-// Starter card (design 12): surface card radius 10, coloured dot + title 13, muted hint 12.
+// Starter card: hairline card with a mono index, the title and a muted hint; an arrow slides in on hover.
 component StarterRow inherits Rectangle {
     in property <string> text;
     in property <string> hint;
+    in property <string> index: "01";
     in property <color> tint: Theme.accent-fg;
     in property <bool> last;
     callback clicked;
-    height: 68px;
-    border-radius: Theme.radius-lg;
-    background: sra.has-hover ? Theme.raised : Theme.surface;
+    height: 70px;
+    border-radius: Theme.radius-xl;
+    background: sra.has-hover ? Theme.surface-hover : Theme.card;
     border-width: 1px;
     border-color: sra.has-hover ? Theme.border-hover : Theme.border;
     animate background, border-color { duration: Theme.dur-hover; easing: ease-out-quint; }
@@ -1598,45 +1631,46 @@ component StarterRow inherits Rectangle {
     accessible-action-default => {
         root.clicked();
     }
-    VerticalLayout {
+    HorizontalLayout {
         padding-left: 14px;
         padding-right: 14px;
-        alignment: center;
-        spacing: 6px;
-        HorizontalLayout {
-            spacing: 9px;
-            Rectangle {
-                y: (parent.height - self.height) / 2;
-                width: 7px;
-                height: 7px;
-                border-radius: 3.5px;
-                background: root.tint;
-            }
+        spacing: 12px;
+        Text {
+            text: root.index;
+            font-family: Theme.art-font;
+            font-size: 11px;
+            color: sra.has-hover ? Theme.accent-fg : Theme.caps-label;
+            vertical-alignment: center;
+            accessible-role: none;
+            animate color { duration: Theme.dur-hover; easing: ease-out-quint; }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 5px;
             Text {
                 text: root.text;
                 font-size: Theme.ui-caption;
-                font-weight: Theme.weight-medium;
+                font-weight: Theme.weight-semibold;
                 color: Theme.foreground;
-                vertical-alignment: center;
                 overflow: elide;
-                horizontal-stretch: 1;
                 accessible-role: none;
             }
-            Icon {
-                y: (parent.height - self.height) / 2;
-                source: Icons.arrow-right;
-                size: Theme.icon-xs;
-                tint: Theme.icon-subtle;
-                opacity: sra.has-hover ? 1 : 0;
-                animate opacity { duration: Theme.dur-hover; easing: ease-out-quint; }
+            if root.hint != "": Text {
+                text: root.hint;
+                font-size: Theme.ui-sm;
+                color: Theme.muted;
+                overflow: elide;
+                accessible-role: none;
             }
         }
-        if root.hint != "": Text {
-            text: root.hint;
-            font-size: Theme.ui-sm;
-            color: Theme.muted;
-            overflow: elide;
-            accessible-role: none;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            source: Icons.arrow-right;
+            size: Theme.icon-xs;
+            tint: Theme.foreground;
+            opacity: sra.has-hover ? 1 : 0;
+            animate opacity { duration: Theme.dur-hover; easing: ease-out-quint; }
         }
     }
     sra := TouchArea {
@@ -1651,17 +1685,17 @@ component EmptyState inherits VerticalLayout {
     in property <string> place;
     callback pick(string);
     property <bool> shown: false;
-    property <length> list-w: 560px;
+    property <length> list-w: 600px;
     alignment: center;
     padding: 24px;
     min-width: 0px;
     opacity: self.shown ? 1 : 0;
     animate opacity { duration: Theme.dur-enter; easing: ease-out-quint; }
     init => {
-        self.list-w = min(560px, self.width - 48px);
+        self.list-w = min(600px, self.width - 48px);
     }
     changed width => {
-        self.list-w = min(560px, self.width - 48px);
+        self.list-w = min(600px, self.width - 48px);
     }
     Timer {
         interval: 16ms;
@@ -1670,32 +1704,41 @@ component EmptyState inherits VerticalLayout {
             root.shown = true;
         }
     }
-    // Logo tile (brand gradient).
-    HorizontalLayout {
+    // Hero: the unicode wordmark (one letter at a time lights up) with the ASCII bunny sitting on it.
+    // Needs room, so short or narrow windows skip straight to the heading.
+    if root.height >= 500px && root.width >= 520px: HorizontalLayout {
         alignment: center;
         Rectangle {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            background: Theme.brand-gradient;
-            Text {
-                text: "H";
-                font-size: 20px;
-                font-weight: 700;
-                color: #ffffff;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-                accessible-role: none;
+            width: wm.preferred-width;
+            height: wm.preferred-height;
+            accessible-role: none;
+            wm := GlyphAnim {
+                x: 0;
+                y: 0;
+                frames: AsciiArt.wordmark;
+                interval: 130ms;
+                font-size: 8px;
+                color: Theme.foreground;
+            }
+            // In the gap right of "WORSE", feet on the top edge of "HARNESS".
+            GlyphAnim {
+                x: parent.width - self.width + 2px;
+                y: parent.height * 0.5 - self.height + 4px;
+                frames: AsciiArt.bunny;
+                interval: 170ms;
+                font-size: 14px;
+                color: Theme.foreground;
             }
         }
     }
-    Rectangle {
-        height: 18px;
+    if root.height >= 500px && root.width >= 520px: Rectangle {
+        height: 30px;
     }
     Text {
         text: @tr("What should we build?");
-        font-size: 24px;
-        font-weight: Theme.weight-semibold;
+        font-family: Theme.display-font;
+        font-size: 30px;
+        font-weight: 700;
         color: Theme.foreground;
         horizontal-alignment: center;
         wrap: word-wrap;
@@ -1706,16 +1749,18 @@ component EmptyState inherits VerticalLayout {
     HorizontalLayout {
         alignment: center;
         Text {
-            width: min(root.list-w, 420px);
+            width: min(root.list-w, 460px);
             text: root.place != "" ? @tr("Working in {0}. Pick a starter or describe a task.", root.place) : @tr("Pick a starter or describe a task.");
-            font-size: Theme.ui-caption;
+            font-family: Theme.serif-font;
+            font-italic: Theme.serif-font == "Instrument Serif";
+            font-size: Theme.serif-font == "Instrument Serif" ? 19px : Theme.ui-caption;
             wrap: word-wrap;
             horizontal-alignment: center;
-            color: Theme.muted;
+            color: Theme.foreground-subtle;
         }
     }
     Rectangle {
-        height: 24px;
+        height: 26px;
     }
     // 2×2 starter cards.
     HorizontalLayout {
@@ -1726,7 +1771,8 @@ component EmptyState inherits VerticalLayout {
             HorizontalLayout {
                 spacing: 10px;
                 StarterRow {
-                    horizontal-stretch: 1;
+                    width: (root.list-w - 10px) / 2;
+                    index: "01";
                     text: @tr("Explain this repo");
                     hint: @tr("map modules & entry points");
                     tint: Theme.info;
@@ -1735,7 +1781,8 @@ component EmptyState inherits VerticalLayout {
                     }
                 }
                 StarterRow {
-                    horizontal-stretch: 1;
+                    width: (root.list-w - 10px) / 2;
+                    index: "02";
                     text: @tr("Review my changes");
                     hint: @tr("uncommitted diff, bugs & risky edits");
                     tint: Theme.agent-codex;
@@ -1747,7 +1794,8 @@ component EmptyState inherits VerticalLayout {
             HorizontalLayout {
                 spacing: 10px;
                 StarterRow {
-                    horizontal-stretch: 1;
+                    width: (root.list-w - 10px) / 2;
+                    index: "03";
                     text: @tr("Find and fix a bug");
                     hint: @tr("describe the symptom");
                     tint: Theme.warning-surface-foreground;
@@ -1756,8 +1804,9 @@ component EmptyState inherits VerticalLayout {
                     }
                 }
                 StarterRow {
-                    horizontal-stretch: 1;
+                    width: (root.list-w - 10px) / 2;
                     last: true;
+                    index: "04";
                     text: @tr("Plan a feature");
                     hint: @tr("step by step before writing code");
                     tint: Theme.agent-agy;
@@ -1794,18 +1843,14 @@ component WorkingLine inherits Rectangle {
     HorizontalLayout {
         padding-left: 6px;
         spacing: 10px;
-        HorizontalLayout {
-            spacing: 3px;
-            for i in 3: Rectangle {
-                property <int> phase: mod(root.tick + 6 - i * 2, 6);
-                y: (parent.height - self.height) / 2 - (self.phase < 2 ? 2px : 0px);
-                width: 6px;
-                height: 6px;
-                border-radius: 3px;
-                background: Theme.accent-fg;
-                opacity: self.phase < 2 ? 1 : 0.35;
-                animate opacity, y { duration: 160ms; easing: ease-out-quint; }
-            }
+        // Unicode scan: a shade ramp (░▒▓█▓▒░) sweeping through eight cells.
+        GlyphAnim {
+            y: (parent.height - self.height) / 2;
+            frames: AsciiArt.scan;
+            interval: 90ms;
+            font-size: 11px;
+            color: Theme.foreground-subtle;
+            vertical-alignment: center;
         }
         Text {
             text: "Thinking…";
@@ -2148,7 +2193,7 @@ component UsageRing inherits Rectangle {
                                 width: 12px;
                                 height: 12px;
                                 border-radius: 6px;
-                                background: ChatUi.auto-compact ? #ffffff : Theme.foreground-subtle;
+                                background: ChatUi.auto-compact ? Theme.on-accent : Theme.foreground-subtle;
                                 animate x { duration: 120ms; }
                             }
                         }
@@ -2173,16 +2218,26 @@ component Composer inherits VerticalLayout {
     public function focus-input() {
         input.focus();
     }
-    // Design 01: surface card, radius 12, strong border (accent line on focus).
+    // Composer: floating glass slab. Near-opaque so the transcript does not show through; light rim, inner
+    // glow, and a brighter rim while the input has focus.
     pill := Rectangle {
-        border-radius: 12px;
+        border-radius: Theme.radius-2xl;
         background: Theme.composer;
         border-width: 1px;
-        border-color: input.has-focus ? Theme.accent-line : Theme.border-hover;
-        drop-shadow-blur: 16px;
-        drop-shadow-offset-y: 4px;
-        drop-shadow-color: Theme.glass-shadow;
-        animate border-color { duration: Theme.dur-move; easing: ease-out-quint; }
+        border-color: Theme.glass-rim;
+        drop-shadow-blur: Theme.shadow-composer-blur;
+        drop-shadow-offset-y: 14px;
+        drop-shadow-color: Theme.shadow-composer-color;
+        Rectangle {
+            border-radius: parent.border-radius;
+            inner-shadow-blur: Theme.glass-inner-blur;
+            inner-shadow-offset-y: 1px;
+            inner-shadow-color: Theme.glass-inner.with-alpha(input.has-focus ? 0.16 : 0.08);
+            border-width: 1px;
+            border-color: input.has-focus ? Theme.input-border-focused : transparent;
+            animate border-color, inner-shadow-color { duration: Theme.dur-move; easing: ease-out-quint; }
+            accessible-role: none;
+        }
         VerticalLayout {
             padding: 10px;
             padding-left: 10px;
@@ -2324,14 +2379,28 @@ component Composer inherits VerticalLayout {
                             }
                             reject
                         }
-                        input := TextInput {
-                            text <=> root.draft;
-                            single-line: false;
-                            wrap: word-wrap;
-                            font-size: Theme.ui-caption;
-                            color: Theme.foreground;
-                            selection-background-color: Theme.selected;
-                            accessible-label: @tr("Message");
+                        input-flick := Flickable {
+                            interactive: false;
+                            content-width: self.width;
+                            content-height: max(self.height, input.preferred-height);
+                            input := TextInput {
+                                width: input-flick.width;
+                                height: max(input-flick.height, self.preferred-height);
+                                text <=> root.draft;
+                                single-line: false;
+                                wrap: word-wrap;
+                                font-size: Theme.ui-caption;
+                                color: Theme.foreground;
+                                selection-background-color: Theme.selected;
+                                accessible-label: @tr("Message");
+                                cursor-position-changed(p) => {
+                                    if p.y + input-flick.content-y < 0 {
+                                        input-flick.content-y = -p.y;
+                                    } else if p.y + self.font-size * 1.5 + input-flick.content-y > input-flick.height {
+                                        input-flick.content-y = min(0px, input-flick.height - p.y - self.font-size * 1.5);
+                                    }
+                                }
+                            }
                         }
                     }
                     if root.draft == "": Text {
@@ -2856,13 +2925,21 @@ component SidePane inherits Rectangle {
     in-out property <bool> wide;
     callback toggle(int);
     callback close();
-    // Design 01: flat panel with a 1px left border.
+    // Floating glass pane beside the transcript.
     background: Theme.panel;
+    border-radius: Theme.radius-2xl;
+    border-width: 1px;
+    border-color: Theme.glass-rim;
+    drop-shadow-blur: Theme.glass-shadow-blur;
+    drop-shadow-offset-y: Theme.glass-shadow-y;
+    drop-shadow-color: Theme.glass-shadow;
     clip: true;
     Rectangle {
-        x: 0;
-        width: 1px;
-        background: Theme.border;
+        border-radius: parent.border-radius;
+        inner-shadow-blur: Theme.glass-inner-blur;
+        inner-shadow-offset-y: 1px;
+        inner-shadow-color: Theme.glass-inner;
+        accessible-role: none;
     }
     property <bool> shown: false;
     opacity: self.shown ? 1 : 0;
@@ -2911,14 +2988,6 @@ component SidePane inherits Rectangle {
                 label: root.wide ? @tr("Collapse panel") : @tr("Expand panel");
                 clicked => {
                     root.wide = !root.wide;
-                }
-            }
-            IconButton {
-                y: (parent.height - self.height) / 2;
-                icon: Icons.x;
-                label: @tr("Close panel");
-                clicked => {
-                    root.close();
                 }
             }
         }
@@ -3031,6 +3100,13 @@ export component AppWindow inherits Window {
     // 由 Rust 按平台传入含简体中文字形的 UI 字体（空字符串 = Slint 默认）。
     in property <string> ui-font-family;
     default-font-family: root.ui-font-family;
+    icon: @image-url("brand/app-icon.png");
+    // Syne / Instrument Serif are Latin only: when the UI font is a system CJK face, headings use it too.
+    property <bool> latin-ui: root.ui-font-family == "Plus Jakarta Sans" || root.ui-font-family == "Inter" || root.ui-font-family == "Segoe UI" || root.ui-font-family == "";
+    changed latin-ui => {
+        Theme.display-font = self.latin-ui ? "Syne" : root.ui-font-family;
+        Theme.serif-font = self.latin-ui ? "Instrument Serif" : root.ui-font-family;
+    }
 
     in property <[SessionRow]> sessions;
     in property <[AgentRow]> agents;
@@ -3308,24 +3384,40 @@ export component AppWindow inherits Window {
             height: parent.height;
         }
         HorizontalLayout {
-            padding-left: 0px;
-            spacing: 0px;
-            // Sidebar (design 01): flat panel, 1px right border.
+            // Liquid-glass redesign: sidebar, chat and side pane float as rounded glass cards over the backdrop.
+            padding: Theme.frame-gap;
+            spacing: Theme.frame-gap;
             if root.show-sidebar: VerticalLayout {
                 width: root.sidebar-w;
-                Rectangle {
-                    background: Theme.sidebar;
-                    Rectangle {
-                        x: parent.width - 1px;
-                        width: 1px;
-                        background: Theme.border;
-                    }
+                Glass {
+                    radius: Theme.radius-2xl;
+                    clip: true;
                     VerticalLayout {
+                // Brand row: the bunny mark and the short name, then history / hide controls.
                 HorizontalLayout {
-                    height: Theme.topbar-height;
-                    padding-left: 16px;
-                    padding-right: 12px;
+                    height: Theme.topbar-height - 4px;
+                    padding-left: 14px;
+                    padding-right: 10px;
                     spacing: 2px;
+                    Image {
+                        y: (parent.height - self.height) / 2;
+                        width: 26px;
+                        height: 26px;
+                        source: @image-url("brand/mascot-small.svg");
+                        accessible-role: none;
+                    }
+                    Rectangle {
+                        width: 6px;
+                    }
+                    Text {
+                        text: "Harness";
+                        font-family: Theme.display-font;
+                        font-weight: 700;
+                        font-size: Theme.ui-lg;
+                        color: Theme.foreground;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
                     Rectangle {
                         horizontal-stretch: 1;
                         TitleDrag {
@@ -3369,28 +3461,43 @@ export component AppWindow inherits Window {
                             root.sidebar-hidden = true;
                         }
                     }
-                    Rectangle {
-                        width: 4px;
-                    }
-                    // New session (design 01: bordered "+" tile); right click or the chevron opens the options menu.
+                }
+                // New session: white primary row; right click or the chevron opens the options menu.
+                HorizontalLayout {
+                    height: 36px;
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    padding-bottom: 4px;
+                    spacing: 6px;
                     new-btn := Rectangle {
-                        y: (parent.height - self.height) / 2;
-                        width: 28px;
-                        height: 28px;
+                        horizontal-stretch: 1;
                         border-radius: Theme.radius-md;
-                        background: nbta.has-hover ? Theme.border-hover : Theme.raised;
-                        border-width: 1px;
-                        border-color: Theme.border-hover;
+                        background: nbta.has-hover ? Theme.primary-hover : Theme.primary;
+                        drop-shadow-blur: 10px;
+                        drop-shadow-offset-y: 3px;
+                        drop-shadow-color: Theme.primary-shadow;
                         animate background { duration: Theme.dur-hover; easing: ease-out-quint; }
                         accessible-role: button;
                         accessible-label: @tr("New session");
                         accessible-action-default => {
                             root.new-session();
                         }
-                        Icon {
-                            source: Icons.plus;
-                            size: Theme.icon-sm;
-                            tint: Theme.foreground;
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 6px;
+                            Icon {
+                                source: Icons.plus;
+                                size: Theme.icon-xs;
+                                tint: Theme.primary-foreground;
+                            }
+                            Text {
+                                text: @tr("New session");
+                                font-size: Theme.ui-caption;
+                                font-weight: Theme.weight-semibold;
+                                color: Theme.primary-foreground;
+                                vertical-alignment: center;
+                                accessible-role: none;
+                            }
                         }
                         nbta := TouchArea {
                             mouse-cursor: pointer;
@@ -3404,14 +3511,28 @@ export component AppWindow inherits Window {
                             }
                         }
                     }
-                    IconButton {
-                        y: (parent.height - self.height) / 2;
-                        size: 20px;
-                        icon-size: 12px;
-                        icon: Icons.chevron-down;
-                        label: "New session options";
-                        clicked => {
+                    Rectangle {
+                        width: 32px;
+                        border-radius: Theme.radius-md;
+                        background: nmta.has-hover ? Theme.surface-hover : Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.border;
+                        animate background { duration: Theme.dur-hover; easing: ease-out-quint; }
+                        accessible-role: button;
+                        accessible-label: "New session options";
+                        accessible-action-default => {
                             root.open-new-menu(new-btn.absolute-position.x, new-btn.absolute-position.y + new-btn.height + 4px);
+                        }
+                        Icon {
+                            source: Icons.chevron-down;
+                            size: Theme.icon-xs;
+                            tint: Theme.icon-subtle;
+                        }
+                        nmta := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.open-new-menu(new-btn.absolute-position.x, new-btn.absolute-position.y + new-btn.height + 4px);
+                            }
                         }
                     }
                 }
@@ -3454,15 +3575,10 @@ export component AppWindow inherits Window {
             }
             VerticalLayout {
             horizontal-stretch: 1;
-            // Topbar (design 01): 52px, title + workspace chip, Board / Orchestra / panel toggle, 1px bottom border.
+            // Topbar: floats directly on the backdrop (no fill, no rule) above the chat card.
             Rectangle {
                 height: Theme.topbar-height;
-                background: Theme.background;
-                Rectangle {
-                    y: parent.height - 1px;
-                    height: 1px;
-                    background: Theme.border;
-                }
+                background: transparent;
                 HorizontalLayout {
                     padding-left: 12px;
                     padding-right: 4px;
@@ -3518,7 +3634,8 @@ export component AppWindow inherits Window {
                     if !(root.title-editing && ChatUi.dialog-open && ChatUi.dialog-kind == "rename"): title-btn := Rectangle {
                         y: (parent.height - self.height) / 2;
                         height: 28px;
-                        width: min(title-text.preferred-width + 16px, 420px);
+                        // `win-w` (not `root.width`): a plain property written from `changed width`, so no layout binding loop.
+                        width: min(title-text.preferred-width + 16px, root.narrow ? max(80px, root.win-w - 190px) : 420px);
                         border-radius: Theme.radius-md;
                         background: tta.has-hover ? Theme.hover : transparent;
                         accessible-role: button;
@@ -3578,7 +3695,7 @@ export component AppWindow inherits Window {
                         }
                     }
                     // Workspace chip (design 01: "ZCode/Worse").
-                    if root.workspace-name != "": Rectangle {
+                    if root.workspace-name != "" && !root.narrow: Rectangle {
                         y: (parent.height - self.height) / 2;
                         height: 22px;
                         width: min(ws-chip.preferred-width + 16px, 220px);
@@ -3589,6 +3706,7 @@ export component AppWindow inherits Window {
                             x: 8px;
                             width: parent.width - 16px;
                             text: root.workspace-name;
+                            font-family: Theme.art-font;
                             font-size: Theme.ui-sm - 1px;
                             color: Theme.muted;
                             vertical-alignment: center;
@@ -3607,8 +3725,8 @@ export component AppWindow inherits Window {
                             }
                         }
                     }
-                    // Board (design 01: ghost text button).
-                    Rectangle {
+                    // Board: ghost text button (dropped on phone-size windows, where the title needs the room).
+                    if !root.narrow: Rectangle {
                         y: (parent.height - self.height) / 2;
                         height: 28px;
                         width: board-t.preferred-width + 20px;
@@ -3641,7 +3759,9 @@ export component AppWindow inherits Window {
                         height: 28px;
                         width: orch-row.preferred-width;
                         border-radius: Theme.radius-md;
-                        background: orta.has-hover ? Theme.accent-line : Theme.accent-soft;
+                        background: orta.has-hover ? Theme.surface-hover : Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.border;
                         animate background { duration: Theme.dur-hover; easing: ease-out-quint; }
                         accessible-role: button;
                         accessible-label: @tr("Orchestra");
@@ -3654,18 +3774,27 @@ export component AppWindow inherits Window {
                             padding-left: 10px;
                             padding-right: 10px;
                             spacing: 7px;
-                            Rectangle {
+                            // Idle: a quiet dot. While subagents / tasks run: unicode level bars, in the accent.
+                            if orch-btn.live == 0: Rectangle {
                                 y: (parent.height - self.height) / 2;
                                 width: 6px;
                                 height: 6px;
                                 border-radius: 3px;
-                                background: Theme.accent-fg;
+                                background: Theme.icon-subtlest;
                             }
-                            Text {
+                            if orch-btn.live > 0: GlyphAnim {
+                                y: (parent.height - self.height) / 2;
+                                frames: AsciiArt.bars;
+                                interval: 110ms;
+                                font-size: 9px;
+                                color: Theme.accent-fg;
+                                vertical-alignment: center;
+                            }
+                            if !root.narrow: Text {
                                 text: orch-btn.live > 0 ? @tr("Orchestra · {0}", orch-btn.live) : @tr("Orchestra");
                                 font-size: Theme.ui-caption;
                                 font-weight: Theme.weight-medium;
-                                color: Theme.accent-fg;
+                                color: orta.has-hover || orch-btn.live > 0 ? Theme.foreground : Theme.foreground-subtle;
                                 vertical-alignment: center;
                                 accessible-role: none;
                             }
@@ -3815,12 +3944,16 @@ export component AppWindow inherits Window {
                 vertical-stretch: 1;
                 padding-right: 0px;
                 padding-bottom: 0px;
-                spacing: 0px;
-                // Main column (design 01): flat app background, no frame.
+                spacing: Theme.frame-gap;
+                // Main column: flat on the backdrop (no card). The dither field hugs its edges and stays clear of
+                // the transcript column; on the empty chat it comes further in and shimmers.
                 main-panel := Rectangle {
                     horizontal-stretch: 1;
-                    background: Theme.background;
                     clip: true;
+                    DitherField {
+                        lively: root.chat.length == 0 && !root.settings-open;
+                        reach: root.chat.length == 0 ? clamp((parent.width - 600px) / 2, 0px, 420px) : clamp((parent.width - Theme.chat-max-width) / 2 - 12px, 0px, 300px);
+                    }
                     // 与 narrow 相同：内容列宽度用 changed 回调写入普通属性，避免宽度→内边距→布局的绑定环。
                     changed width => {
                         root.chat-pad = max(16px, (self.width - Theme.chat-max-width) / 2);
@@ -4152,7 +4285,7 @@ export component AppWindow inherits Window {
                     }
                 }
                 if root.files-open && !root.narrow: SidePane {
-                    property <length> main-w: root.win-w - (root.show-sidebar ? root.sidebar-w + 1px : 0px);
+                    property <length> main-w: root.win-w - (root.show-sidebar ? root.sidebar-w + Theme.frame-gap : 0px) - Theme.frame-gap * 2;
                     width: self.wide ? max(Theme.side-pane-width, self.main-w * 0.7) : root.side-tab == "diff" ? max(Theme.side-pane-width, self.main-w * 0.5) : Theme.side-pane-width;
                     tab <=> root.side-tab;
                     files: root.files;
@@ -4170,7 +4303,8 @@ export component AppWindow inherits Window {
 
         // Sidebar resize handle (ZCode: drag the sidebar edge; 200–420px). Width is UI-local.
         if root.show-sidebar: Rectangle {
-            x: root.sidebar-w - 3px;
+            // Sits in the gap between the sidebar card and the chat card.
+            x: Theme.frame-gap + root.sidebar-w + Theme.frame-gap / 2 - 3px;
             y: Theme.topbar-height;
             width: 6px;
             height: parent.height - Theme.topbar-height * 2;
@@ -4288,11 +4422,18 @@ export component AppWindow inherits Window {
                 }
             }
             Rectangle {
-                x: 0;
-                y: 0;
+                x: Theme.frame-gap;
+                y: Theme.frame-gap;
                 width: min(300px, parent.width - 48px);
-                height: parent.height;
-                background: Theme.sidebar;
+                height: parent.height - Theme.frame-gap * 2;
+                background: Theme.glass-strong;
+                border-radius: Theme.radius-2xl;
+                border-width: 1px;
+                border-color: Theme.glass-rim;
+                drop-shadow-blur: Theme.shadow-lg-blur;
+                drop-shadow-offset-y: Theme.shadow-lg-y;
+                drop-shadow-color: Theme.shadow-lg-color;
+                clip: true;
                 Sidebar {
                     show-new: true;
                     sessions: root.sessions;
@@ -4518,6 +4659,16 @@ export component AppWindow inherits Window {
                 }
             }
             MenuItem {
+                text: @tr("Export as Markdown");
+                show-check: false;
+                has-icon: true;
+                icon: Icons.download;
+                clicked => {
+                    root.ctx-open = false;
+                    ChatUi.session-action("export", root.ctx-id);
+                }
+            }
+            MenuItem {
                 text: root.ctx-pinned ? @tr("Unpin") : @tr("Pin");
                 show-check: false;
                 has-icon: true;
@@ -4589,8 +4740,8 @@ export component AppWindow inherits Window {
             }
         }
         if root.header-menu-open: MenuShell {
-            x: (root.show-sidebar ? root.sidebar-w + 1px : 40px) + 8px;
-            y: Theme.topbar-height;
+            x: (root.show-sidebar ? root.sidebar-w + Theme.frame-gap * 2 : 40px) + 8px;
+            y: Theme.topbar-height + Theme.frame-gap;
             width: 280px;
             height: self.preferred-height;
             accessible-role: AccessibleRole.groupbox;
@@ -4839,7 +4990,7 @@ export component AppWindow inherits Window {
         // the window is too small for a dialog.
         if root.settings-open: settings-overlay := Rectangle {
             property <bool> modal: !root.narrow && root.width >= 760px && root.height >= 520px;
-            background: self.modal ? #00000099 : transparent;
+            background: self.modal ? Theme.scrim : transparent;
             TouchArea {
                 clicked => {
                     root.settings-open = false;
@@ -4850,14 +5001,15 @@ export component AppWindow inherits Window {
                 y: (parent.height - self.height) / 2;
                 width: parent.modal ? min(1120px, parent.width - 96px) : parent.width;
                 height: parent.modal ? min(780px, parent.height - 96px) : parent.height;
-                border-radius: parent.modal ? 14px : 0px;
-                drop-shadow-blur: parent.modal ? 40px : 0px;
-                drop-shadow-offset-y: parent.modal ? 12px : 0px;
-                drop-shadow-color: #00000080;
+                border-radius: parent.modal ? Theme.radius-3xl : 0px;
+                drop-shadow-blur: parent.modal ? 60px : 0px;
+                drop-shadow-offset-y: parent.modal ? 20px : 0px;
+                drop-shadow-color: Theme.shadow-lg-color;
                 background: Theme.canvas;
                 Rectangle {
                     border-radius: parent.border-radius;
                     clip: true;
+                    MidnightBackdrop { }
                     SettingsShell {
             init => {
                 SettingsUi.open-page(SettingsUi.page);
@@ -4883,7 +5035,7 @@ export component AppWindow inherits Window {
                 Rectangle {
                     border-radius: parent.border-radius;
                     border-width: settings-overlay.modal ? 1px : 0px;
-                    border-color: Theme.border;
+                    border-color: Theme.glass-rim;
                 }
             }
         }

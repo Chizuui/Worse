@@ -24,11 +24,11 @@ global LiveStatus {
         return @tr("Interrupted");
     }
     public pure function tint(s: int) -> color {
-        if s == 0 { return #3DD68C; }
-        if s == 1 { return #F5B14C; }
-        if s == 2 { return #5BC0FF; }
-        if s == 3 { return #F2555A; }
-        return #8A909A;
+        if s == 0 { return Theme.success; }
+        if s == 1 { return Theme.warning; }
+        if s == 2 { return Theme.info; }
+        if s == 3 { return Theme.destructive; }
+        return Theme.muted;
     }
     public pure function initial(agent: string) -> string {
         if agent == "claude-code" || agent == "claude" { return "C"; }
@@ -87,7 +87,7 @@ component Progress inherits Rectangle {
     in property <color> tint;
     height: 4px;
     border-radius: 2px;
-    background: #24272D;
+    background: Theme.border;
     clip: true;
     property <float> phase: Theme.reduce-motion ? 0.3 : Math.mod(animation-tick() / 1ms, 1800) / 1800;
     if root.status == 0 || root.status == 1: Rectangle {
@@ -95,7 +95,7 @@ component Progress inherits Rectangle {
         x: (parent.width * 1.35) * root.phase - parent.width * 0.35;
         height: parent.height;
         border-radius: 2px;
-        background: root.status == 1 ? #F5B14C : root.tint;
+        background: root.status == 1 ? Theme.warning : root.tint;
     }
     if root.status >= 2: Rectangle {
         x: 0;
@@ -117,9 +117,9 @@ component LiveButton inherits Rectangle {
     min-width: bt.preferred-width + 26px;
     border-radius: 8px;
     opacity: root.enabled ? 1 : 0.45;
-    background: root.variant == "accent" ? Theme.brand-gradient : root.variant == "danger" ? #F2555A.with-alpha(ta.has-hover ? 0.18 : 0.1) : (ta.has-hover && root.enabled ? #23262C : #1C1F24);
+    background: root.variant == "accent" ? Theme.brand-gradient : root.variant == "danger" ? Theme.destructive.with-alpha(ta.has-hover ? 0.18 : 0.1) : (ta.has-hover && root.enabled ? Theme.surface-hover : Theme.raised);
     border-width: root.variant == "accent" ? 0px : 1px;
-    border-color: root.variant == "danger" ? #F2555A.with-alpha(0.5) : #2A2D33;
+    border-color: root.variant == "danger" ? Theme.destructive.with-alpha(0.5) : Theme.border-hover;
     accessible-role: button;
     accessible-label: root.text;
     accessible-enabled: root.enabled;
@@ -132,7 +132,7 @@ component LiveButton inherits Rectangle {
         text: root.text;
         font-size: 12px;
         font-weight: Theme.weight-medium;
-        color: root.variant == "accent" ? #ffffff : root.variant == "danger" ? #F2555A : Theme.foreground;
+        color: root.variant == "accent" ? Theme.on-accent : root.variant == "danger" ? Theme.destructive : Theme.foreground;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
@@ -149,7 +149,7 @@ component Caps inherits Text {
     font-size: 10px;
     font-weight: Theme.weight-semibold;
     letter-spacing: 0.8px;
-    color: #5D636D;
+    color: Theme.caps-label;
 }
 
 // Subagent node (design: 286 wide, #121317, 1px #24272D, r10; selected = accent ring).
@@ -160,9 +160,9 @@ component SubNode inherits Rectangle {
     width: 340px;
     height: 116px;
     border-radius: 10px;
-    background: root.selected ? #15171c : #121317;
+    background: root.selected ? Theme.card-selected : Theme.card;
     border-width: root.selected ? 1.5px : 1px;
-    border-color: root.selected ? Theme.accent-fg.with-alpha(0.7) : (nta.has-hover ? #2E323A : #24272D);
+    border-color: root.selected ? Theme.accent-fg.with-alpha(0.7) : (nta.has-hover ? Theme.border-hover : Theme.border);
     drop-shadow-blur: root.selected ? 18px : 0px;
     drop-shadow-color: Theme.accent-fg.with-alpha(0.18);
     accessible-role: button;
@@ -198,7 +198,7 @@ component SubNode inherits Rectangle {
                 Text {
                     text: root.item.agent + " · " + ChatUi.elapsed(root.item.started-s, root.item.finished-s);
                     font-size: 10px;
-                    color: #6B717C;
+                    color: Theme.foreground-subtlest;
                     overflow: elide;
                 }
             }
@@ -226,15 +226,15 @@ component SubNode inherits Rectangle {
                 height: 18px;
                 width: min(316px, at.preferred-width + 12px);
                 border-radius: 4px;
-                background: #1C1F24;
+                background: Theme.raised;
                 border-width: 1px;
-                border-color: #2A2D33;
+                border-color: Theme.border-hover;
                 at := Text {
                     x: 6px;
                     width: parent.width - 12px;
                     text: root.item.activity != "" ? root.item.activity : (root.item.status == 0 ? @tr("thinking…") : (root.item.preview != "" ? root.item.preview : LiveStatus.label(root.item.status)));
                     font-size: 10px;
-                    color: #8A909A;
+                    color: Theme.muted;
                     vertical-alignment: center;
                     overflow: elide;
                 }
@@ -298,9 +298,9 @@ component SessionGroup inherits Rectangle {
         width: 320px;
         height: 196px;
         border-radius: 10px;
-        background: oa.has-hover ? #15171c : #121317;
+        background: oa.has-hover ? Theme.card-selected : Theme.card;
         border-width: root.g.open ? 1.5px : 1px;
-        border-color: root.g.open ? Theme.accent-fg.with-alpha(0.6) : #2A2D33;
+        border-color: root.g.open ? Theme.accent-fg.with-alpha(0.6) : Theme.border-hover;
         accessible-role: button;
         accessible-label: root.g.title;
         accessible-description: root.g.prompt;
@@ -335,7 +335,7 @@ component SessionGroup inherits Rectangle {
                     Text {
                         text: (root.g.open ? @tr("Open") + " · " : "") + @tr("Orchestrator") + " · " + root.g.agent-name + (root.model-name != "" ? " · " + root.model-name : "");
                         font-size: 10px;
-                        color: root.g.open ? Theme.accent-fg : #6B717C;
+                        color: root.g.open ? Theme.accent-fg : Theme.foreground-subtlest;
                         overflow: elide;
                     }
                 }
@@ -349,23 +349,29 @@ component SessionGroup inherits Rectangle {
             Rectangle {
                 vertical-stretch: 1;
                 border-radius: 6px;
-                background: #0E0F12;
+                background: Theme.well;
                 border-width: 1px;
-                border-color: #1F2227;
+                border-color: Theme.border;
                 VerticalLayout {
                     padding: 8px;
                     spacing: 4px;
                     Caps {
                         text: root.g.running ? @tr("PROCESSING") : @tr("LAST PROMPT");
-                        color: root.g.running ? #3DD68C : #5D636D;
+                        color: root.g.running ? Theme.success : Theme.caps-label;
                     }
-                    Text {
+                    prompt-flick := Flickable {
                         vertical-stretch: 1;
-                        text: root.g.prompt != "" ? root.g.prompt : @tr("No prompt yet");
-                        font-size: 11px;
-                        color: root.g.prompt != "" ? Theme.foreground-subtle : #6B717C;
-                        wrap: word-wrap;
-                        overflow: elide;
+                        min-height: 0;
+                        interactive: false;
+                        content-width: self.width;
+                        content-height: max(self.height, prompt-text.preferred-height);
+                        prompt-text := Text {
+                            width: prompt-flick.width;
+                            text: root.g.prompt != "" ? root.g.prompt : @tr("No prompt yet");
+                            font-size: 11px;
+                            color: root.g.prompt != "" ? Theme.foreground-subtle : Theme.foreground-subtlest;
+                            wrap: word-wrap;
+                        }
                     }
                 }
             }
@@ -373,20 +379,20 @@ component SessionGroup inherits Rectangle {
                 Text {
                     text: @tr("{0} of {1} subagents finished", root.g.total - root.g.active, root.g.total);
                     font-size: 10px;
-                    color: #6B717C;
+                    color: Theme.foreground-subtlest;
                     horizontal-stretch: 1;
                     overflow: elide;
                 }
                 Text {
                     text: @tr("{0} active", root.g.active);
                     font-size: 10px;
-                    color: #6B717C;
+                    color: Theme.foreground-subtlest;
                 }
             }
             Rectangle {
                 height: 4px;
                 border-radius: 2px;
-                background: #24272D;
+                background: Theme.border;
                 Rectangle {
                     x: 0;
                     width: root.g.total == 0 ? 0px : parent.width * (root.g.total - root.g.active) / root.g.total;
@@ -413,8 +419,8 @@ component SessionGroup inherits Rectangle {
         height: 100px;
         border-radius: 10px;
         border-width: 1px;
-        border-color: #24272D;
-        background: #0F1013;
+        border-color: Theme.border;
+        background: Theme.well;
         VerticalLayout {
             padding: 16px;
             spacing: 4px;
@@ -430,7 +436,7 @@ component SessionGroup inherits Rectangle {
                     ? @tr("When the orchestrator delegates part of a task, each subagent appears here live.")
                     : @tr("All {0} subagents finished. Their results are in the chat; new delegations appear here live.", root.g.total);
                 font-size: 11px;
-                color: #6B717C;
+                color: Theme.foreground-subtlest;
                 wrap: word-wrap;
             }
         }
@@ -462,7 +468,7 @@ export component OrchestraLive inherits Rectangle {
     property <length> start-x;
     property <length> start-y;
 
-    background: #0B0C0E;
+    background: Theme.canvas;
     accessible-role: AccessibleRole.groupbox;
     accessible-label: @tr("Orchestra");
     TouchArea { }
@@ -497,8 +503,9 @@ export component OrchestraLive inherits Rectangle {
                 }
                 Text {
                     text: @tr("Orchestra");
+                    font-family: Theme.display-font;
                     font-size: 15px;
-                    font-weight: Theme.weight-semibold;
+                    font-weight: 700;
                     color: Theme.foreground;
                     vertical-alignment: center;
                 }
@@ -507,7 +514,7 @@ export component OrchestraLive inherits Rectangle {
                     Rectangle {
                         width: 1px;
                         height: 16px;
-                        background: #2A2D33;
+                        background: Theme.border-hover;
                     }
                 }
                 VerticalLayout {
@@ -516,20 +523,20 @@ export component OrchestraLive inherits Rectangle {
                         height: 20px;
                         width: rp.preferred-width + 26px;
                         border-radius: 10px;
-                        background: #3DD68C.with-alpha(0.12);
+                        background: Theme.success.with-alpha(0.12);
                         Rectangle {
                             x: 9px;
                             width: 5px;
                             height: 5px;
                             border-radius: 2.5px;
-                            background: #3DD68C;
+                            background: Theme.success;
                         }
                         rp := Text {
                             x: 19px;
                             text: @tr("{0} / {1} running", ChatUi.fleet-running, root.max-conc);
                             font-size: 11px;
                             font-weight: Theme.weight-medium;
-                            color: #3DD68C;
+                            color: Theme.success;
                             vertical-alignment: center;
                         }
                     }
@@ -537,7 +544,7 @@ export component OrchestraLive inherits Rectangle {
                 Text {
                     text: ChatUi.fleet-sessions == 0 ? @tr("No session running") : @tr("{0} sessions active", ChatUi.fleet-sessions);
                     font-size: 12px;
-                    color: #6B717C;
+                    color: Theme.foreground-subtlest;
                     vertical-alignment: center;
                     overflow: elide;
                     horizontal-stretch: 1;
@@ -577,7 +584,7 @@ export component OrchestraLive inherits Rectangle {
             Rectangle {
                 y: parent.height - 1px;
                 height: 1px;
-                background: #1C1F24;
+                background: Theme.raised;
             }
         }
         HorizontalLayout {
@@ -636,7 +643,7 @@ export component OrchestraLive inherits Rectangle {
                         y: world.top;
                         text: @tr("No session is running. Open or start a session to see it here.");
                         font-size: 12px;
-                        color: #6B717C;
+                        color: Theme.foreground-subtlest;
                     }
                 }
                 // Legend chip (design: top-left, #121317, 1px #24272D, r8).
@@ -646,9 +653,9 @@ export component OrchestraLive inherits Rectangle {
                     height: 30px;
                     width: lg.preferred-width + 24px;
                     border-radius: 8px;
-                    background: #121317;
+                    background: Theme.card;
                     border-width: 1px;
-                    border-color: #24272D;
+                    border-color: Theme.border;
                     lg := HorizontalLayout {
                         x: 12px;
                         width: self.preferred-width;
@@ -661,13 +668,13 @@ export component OrchestraLive inherits Rectangle {
                                     width: 5px;
                                     height: 5px;
                                     border-radius: 2.5px;
-                                    background: #3DD68C;
+                                    background: Theme.success;
                                 }
                             }
                             Text {
                                 text: @tr("{0} running", ChatUi.fleet-running - ChatUi.fleet-waiting);
                                 font-size: 11px;
-                                color: #8A909A;
+                                color: Theme.muted;
                                 vertical-alignment: center;
                             }
                         }
@@ -679,13 +686,13 @@ export component OrchestraLive inherits Rectangle {
                                     width: 5px;
                                     height: 5px;
                                     border-radius: 2.5px;
-                                    background: #F5B14C;
+                                    background: Theme.warning;
                                 }
                             }
                             Text {
                                 text: @tr("{0} waiting", ChatUi.fleet-waiting);
                                 font-size: 11px;
-                                color: #8A909A;
+                                color: Theme.muted;
                                 vertical-alignment: center;
                             }
                         }
@@ -697,13 +704,13 @@ export component OrchestraLive inherits Rectangle {
                                     width: 5px;
                                     height: 5px;
                                     border-radius: 2.5px;
-                                    background: #6B717C;
+                                    background: Theme.foreground-subtlest;
                                 }
                             }
                             Text {
                                 text: @tr("max {0} concurrent", root.max-conc);
                                 font-size: 11px;
-                                color: #8A909A;
+                                color: Theme.muted;
                                 vertical-alignment: center;
                             }
                         }
@@ -716,9 +723,9 @@ export component OrchestraLive inherits Rectangle {
                     height: 26px;
                     width: 82px;
                     border-radius: 8px;
-                    background: #121317;
+                    background: Theme.card;
                     border-width: 1px;
-                    border-color: #24272D;
+                    border-color: Theme.border;
                     HorizontalLayout {
                         Rectangle {
                             width: 22px;
@@ -727,7 +734,7 @@ export component OrchestraLive inherits Rectangle {
                                 font-size: 12px;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
-                                color: zo.has-hover ? Theme.foreground : #8A909A;
+                                color: zo.has-hover ? Theme.foreground : Theme.muted;
                             }
                             zo := TouchArea {
                                 mouse-cursor: pointer;
@@ -740,7 +747,7 @@ export component OrchestraLive inherits Rectangle {
                             horizontal-stretch: 1;
                             text: round(root.zoom * 100) + "%";
                             font-size: 10px;
-                            color: #C9CCD2;
+                            color: Theme.foreground-subtle;
                             horizontal-alignment: center;
                             vertical-alignment: center;
                         }
@@ -751,7 +758,7 @@ export component OrchestraLive inherits Rectangle {
                                 font-size: 12px;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
-                                color: zi.has-hover ? Theme.foreground : #8A909A;
+                                color: zi.has-hover ? Theme.foreground : Theme.muted;
                             }
                             zi := TouchArea {
                                 mouse-cursor: pointer;
@@ -769,9 +776,9 @@ export component OrchestraLive inherits Rectangle {
                     width: 140px;
                     height: 80px;
                     border-radius: 8px;
-                    background: #121317;
+                    background: Theme.card;
                     border-width: 1px;
-                    border-color: #24272D;
+                    border-color: Theme.border;
                     clip: true;
                     property <float> k: 0.1;
                     for g[gi] in ChatUi.fleet: Rectangle {
@@ -803,11 +810,11 @@ export component OrchestraLive inherits Rectangle {
             // ---- Detail panel (design: 270 wide, left border) ----
             if root.has-sel: Rectangle {
                 width: 290px;
-                background: #0E0F12;
+                background: Theme.well;
                 Rectangle {
                     x: 0;
                     width: 1px;
-                    background: #1C1F24;
+                    background: Theme.raised;
                 }
                 VerticalLayout {
                     padding: 14px;
@@ -848,7 +855,7 @@ export component OrchestraLive inherits Rectangle {
                             Text {
                                 text: root.cur.id;
                                 font-size: 10px;
-                                color: #6B717C;
+                                color: Theme.foreground-subtlest;
                                 overflow: elide;
                             }
                         }
@@ -903,9 +910,9 @@ export component OrchestraLive inherits Rectangle {
                     // Live log (design: mono box). The hub streams one activity line; the latest answer follows.
                     Rectangle {
                         border-radius: 8px;
-                        background: #121317;
+                        background: Theme.card;
                         border-width: 1px;
-                        border-color: #24272D;
+                        border-color: Theme.border;
                         VerticalLayout {
                             padding: 10px;
                             spacing: 6px;
@@ -916,14 +923,14 @@ export component OrchestraLive inherits Rectangle {
                                 text: root.cur.activity;
                                 font-family: Theme.mono-font;
                                 font-size: 11px;
-                                color: #C9CCD2;
+                                color: Theme.foreground-subtle;
                                 wrap: word-wrap;
                             }
                             if root.cur.preview != "": Text {
                                 text: root.cur.preview;
                                 font-family: Theme.mono-font;
                                 font-size: 11px;
-                                color: root.cur.status == 2 ? #3DD68C : (root.cur.status == 3 ? #F2555A : #8A909A);
+                                color: root.cur.status == 2 ? Theme.success : (root.cur.status == 3 ? Theme.destructive : Theme.muted);
                                 wrap: word-wrap;
                                 overflow: elide;
                                 max-height: 150px;
@@ -932,7 +939,7 @@ export component OrchestraLive inherits Rectangle {
                                 text: root.cur.status == 0 ? @tr("thinking…") : LiveStatus.label(root.cur.status);
                                 font-family: Theme.mono-font;
                                 font-size: 11px;
-                                color: #6B717C;
+                                color: Theme.foreground-subtlest;
                             }
                         }
                     }

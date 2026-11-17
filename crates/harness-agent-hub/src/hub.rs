@@ -348,6 +348,7 @@ impl Hub {
         }
         // §9.6：额外的 Claude 账号作为独立 agent（各自 CLAUDE_CONFIG_DIR），放在 Claude Code 之后参与 failover。
         crate::accounts::apply(&mut config).await;
+        crate::agy_agents::apply(&mut config).await;
         // 自定义 API provider（§9.7）同样在启动时变成 agent，排在默认顺序末尾。
         crate::providers::apply(&mut config).await;
         let db_path = config.db_path();

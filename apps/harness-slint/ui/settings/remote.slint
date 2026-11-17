@@ -41,7 +41,7 @@ export global RemoteUi {
 }
 
 global RemoteLook {
-    out property <color> danger: #F2555A;
+    out property <color> danger: Theme.destructive;
     out property <color> offline: #3A3E45;
 }
 
@@ -211,8 +211,9 @@ export component RemotePage inherits VerticalLayout {
         spacing: 6px;
         Text {
             text: @tr("Remote");
+            font-family: Theme.display-font;
             font-size: 22px;
-            font-weight: Theme.weight-semibold;
+            font-weight: 700;
             color: Theme.foreground;
         }
         Text {

@@ -20,7 +20,7 @@ export struct FallbackRow {
 global AgentsLook {
     out property <color> rule: #1E2025;
     out property <color> seg-bg: #0E1013;
-    out property <color> seg-on-text: #B9C2FF;
+    out property <color> seg-on-text: Theme.accent-fg;
     out property <color> drag: #4A4F58;
     pure public function color-of(id: string) -> color {
         if id == "claude-code" { return Theme.agent-claude; }
@@ -954,8 +954,9 @@ export component AgentsPage inherits VerticalLayout {
         spacing: 5px;
         Text {
             text: root.tab == 0 ? @tr("Agents") : "API Providers";
+            font-family: Theme.display-font;
             font-size: 22px;
-            font-weight: Theme.weight-semibold;
+            font-weight: 700;
             color: Theme.foreground;
             accessible-role: AccessibleRole.text;
         }

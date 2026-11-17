@@ -382,6 +382,7 @@ pub(crate) fn load_turns(
                     usage: crate::store_chat::parse_json(r.get::<_, Option<String>>(12)?),
                     context_usage: crate::store_chat::parse_json(r.get::<_, Option<String>>(13)?),
                     origin: crate::store_chat::parse_json(r.get::<_, Option<String>>(14)?),
+                    thoughts: Vec::new(),
                 },
                 r.get::<_, Option<String>>(10)?,
             ))
@@ -464,6 +465,11 @@ fn apply_event(turn: &mut TurnView, marks: &mut Vec<ToolMark>, kind: &str, value
         "plan" => {
             if let Ok(entries) = serde_json::from_value(value) {
                 turn.plan = entries;
+            }
+        }
+        "thought" => {
+            if let Ok(thought) = serde_json::from_value(value) {
+                turn.thoughts.push(thought);
             }
         }
         _ => {}
