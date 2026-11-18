@@ -20,6 +20,7 @@ mod bus;
 pub mod catchup;
 pub mod config;
 mod context;
+pub mod decision;
 mod delegate;
 mod delegate_compact;
 mod delegate_coord;

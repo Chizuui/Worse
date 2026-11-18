@@ -85,7 +85,7 @@ pub struct Stats {
     pub communities: usize,
 }
 
-/// Counts of a `graph.json` (NetworkX node-link data: `nodes`, and `links` or `edges`); `None` when the
+/// Counts of a `graph.json` (`NetworkX` node-link data: `nodes`, and `links` or `edges`); `None` when the
 /// text is not such a graph.
 #[must_use]
 pub fn stats(graph_json: &str) -> Option<Stats> {
@@ -164,10 +164,12 @@ graph_stats).",
     };
     text.push_str(ask);
     if report {
-        text.push_str(&format!(
+        use std::fmt::Write as _;
+        let _ = write!(
+            text,
             " {OUT_DIR}/GRAPH_REPORT.md is the overview (central nodes, communities); read it only for a \
 broad architecture question."
-        ));
+        );
     }
     text.push_str(
         " The graph can be older than the code: check a file before you rely on a detail.",

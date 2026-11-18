@@ -455,3 +455,20 @@ export global GraphUi {
     callback open-report();
     callback set-give-agents(bool);
 }
+
+// Settings › Orchestra › Decision model (`harness_agent_hub::decision`): the API provider that picks the agent
+// and model of a delegation that names none.
+export global DecisionUi {
+    // API providers that can answer: id + "Label · model"
+    in property <[SelectOption]> providers;
+    // "" = off
+    in property <string> provider;
+    in property <string> provider-label;
+    in-out property <string> model;
+    in property <bool> delegation: true;
+    in property <string> note;
+    callback refresh();
+    callback set-provider(string);
+    callback set-model(string);
+    callback set-delegation(bool);
+}

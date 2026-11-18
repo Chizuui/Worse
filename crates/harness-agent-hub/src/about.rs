@@ -5,6 +5,7 @@
 //! This block names the servers attached to the session and what each is for.
 
 /// Which optional servers this session has.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Attached {
     /// `harness-delegate` with the `delegate` tool (top-level sessions).

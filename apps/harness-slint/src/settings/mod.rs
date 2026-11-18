@@ -7,6 +7,7 @@
 //! - Page-local state (form fields, query, recorder) lives here and is not persisted.
 
 pub mod agy;
+pub mod decision;
 mod docview;
 pub mod graph;
 pub mod keymap;

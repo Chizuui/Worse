@@ -236,7 +236,7 @@ pub(crate) fn tool_list(child: bool) -> Value {
             "description": "Hand a self-contained task to another AI coding agent managed by Harness (for example Codex, another Claude account, or an API model such as DeepSeek). Use this, not a built-in subagent/Task/Agent tool, whenever the user asks for a subagent. The subagent works in the same project folder in its own Harness session, which the user can watch live. The subagent does not see this conversation: put every needed detail (files, goal, constraints, expected output) in `task`. By default this call waits and returns the final answer. With `background: true it returns at once with the subagent's session id, so you can keep working or end your turn and send it more instructions with subagent_message. When it finishes, Harness delivers its answer to you automatically as a new message, so do not poll with subagent_wait; stopping your own turn does not stop the subagent. Up to 4 subagents can run at once. To send a follow-up to the same subagent, pass the session_id from its earlier result. Split work so subagents edit different files; they claim paths with claim_paths.",
             "inputSchema": {"type": "object", "properties": {
                 "task": {"type": "string", "description": "Complete instructions for the subagent."},
-                "agent": {"type": "string", "description": "Agent id from list_agents; omit to let Harness pick the first available agent."},
+                "agent": {"type": "string", "description": "Agent id from list_agents. Omit to let Harness pick: the user's decision model chooses the agent (and model) that suits the task when one is set, otherwise the first available agent."},
                 "title": {"type": "string", "description": "Short label shown in the Harness subagent panel."},
                 "session_id": {"type": "string", "description": "Continue an earlier subagent session instead of starting a new one."},
                 "background": {"type": "boolean", "description": "Return immediately; the answer is delivered to you as a new message when the subagent finishes."}
@@ -363,23 +363,40 @@ fn call(env: &DelegateEnv, out: &Out, params: &Value) -> Value {
     if result["background"].as_bool() == Some(true) {
         return tool_text(
             &format!(
-                "subagent {} ({}) started in the background (turn {}). Its answer is delivered to you as a new message when it finishes (no need to call subagent_wait); send more instructions with subagent_message.",
+                "subagent {} ({}) started in the background (turn {}). Its answer is delivered to you as a new message when it finishes (no need to call subagent_wait); send more instructions with subagent_message.{}",
                 result["sessionId"].as_str().unwrap_or(""),
                 result["agentName"].as_str().unwrap_or(""),
-                result["turnId"].as_str().unwrap_or("")
+                result["turnId"].as_str().unwrap_or(""),
+                routed_note(result)
             ),
             false,
         );
     }
-    answer_text(result)
+    let (text, is_error) = answer(result);
+    tool_text(&format!("{text}{}", routed_note(result)), is_error)
+}
+
+/// " [Picked by the decision model: <agent>, model <m>: <reason>]" when Harness's decision model chose the
+/// subagent of a `delegate` call that named none; empty otherwise.
+fn routed_note(result: &Value) -> String {
+    let route = &result["routedBy"];
+    if route["decisionModel"].as_bool() != Some(true) {
+        return String::new();
+    }
+    let mut note = "\n\n[Picked by the decision model".to_owned();
+    if let Some(model) = route["model"].as_str().filter(|m| !m.is_empty()) {
+        note.push_str(", model ");
+        note.push_str(model);
+    }
+    if let Some(reason) = route["reason"].as_str().filter(|r| !r.is_empty()) {
+        note.push_str(": ");
+        note.push_str(reason);
+    }
+    note.push(']');
+    note
 }
 
 /// Header line + answer of one finished subagent turn (blocking `delegate` and `subagent_wait`).
-fn answer_text(result: &Value) -> Value {
-    let (text, is_error) = answer(result);
-    tool_text(&text, is_error)
-}
-
 fn answer(result: &Value) -> (String, bool) {
     let outcome = result["outcome"].as_str().unwrap_or("failed");
     let mut text = format!(
@@ -545,5 +562,16 @@ mod tests {
                 assert_eq!(tool["_meta"]["antigravity/alwaysLoad"], true, "{tool}");
             }
         }
+    }
+
+    #[test]
+    fn a_routed_delegation_says_who_picked_and_why() {
+        use serde_json::json;
+        let routed = json!({"routedBy": {"decisionModel": true, "agent": "x", "model": "worker/strong", "reason": "review work"}});
+        assert_eq!(
+            super::routed_note(&routed),
+            "\n\n[Picked by the decision model, model worker/strong: review work]"
+        );
+        assert_eq!(super::routed_note(&json!({"sessionId": "s"})), "");
     }
 }

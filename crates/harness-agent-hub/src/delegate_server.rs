@@ -571,7 +571,21 @@ async fn delegate(
         .filter(|a| !a.is_empty())
         .map(AgentId::new);
     let mut role_line = String::new();
-    if let Some(team) = team(hub, parent).await {
+    let team = team(hub, parent).await;
+    // No agent named: the decision model picks one (and a model), when one is set. Its pick is checked like
+    // a named agent below; without a pick the rules decide as before.
+    let mut routed: Option<crate::decision::Choice> = None;
+    if agent.is_none() && args["session_id"].as_str().is_none_or(str::is_empty) {
+        let candidates = candidates(hub, team.as_deref(), &parent.active_agent).await;
+        match crate::decision::choose(&hub.ctx.config.home, &task, &candidates).await {
+            Ok(choice) => {
+                agent = Some(AgentId::new(choice.agent.clone()));
+                routed = Some(choice);
+            }
+            Err(reason) => tracing::debug!(%reason, "delegation picked by rule"),
+        }
+    }
+    if let Some(team) = team {
         let node = match &agent {
             Some(id) => team
                 .iter()
@@ -637,6 +651,11 @@ async fn delegate(
             if let Err(error) = hub.set_machine(summary.id.clone(), true).await {
                 tracing::warn!(session = %summary.id, %error, "subagent machine mode not applied");
             }
+            if let Some(model) = routed.as_ref().and_then(|choice| choice.model.clone()) {
+                if let Err(error) = hub.set_model(summary.id.clone(), model).await {
+                    tracing::warn!(session = %summary.id, %error, "the routed model was not applied");
+                }
+            }
             // §9.8.1：新子会话的第一轮附带协作说明。
             task = if role_line.is_empty() {
                 format!("{PREAMBLE}\n\n{task}")
@@ -663,13 +682,15 @@ async fn delegate(
             .subagents
             .get(&child)
             .map_or_else(|| parent.active_agent.clone(), |v| v.agent);
-        return Ok(json!({
+        let mut started = json!({
             "sessionId": child,
             "turnId": accepted.turn_id,
             "agent": agent,
             "agentName": hub.ctx.display_name(&agent),
             "background": true,
-        }));
+        });
+        note_route(&mut started, routed.as_ref());
+        return Ok(started);
     }
     let wait = async {
         loop {
@@ -707,7 +728,68 @@ async fn delegate(
         .subagents
         .coord
         .mark_reported(&parent.id, &child, &accepted.turn_id);
-    result(hub, &child, &accepted.turn_id).await
+    let mut answer = result(hub, &child, &accepted.turn_id).await?;
+    note_route(&mut answer, routed.as_ref());
+    Ok(answer)
+}
+
+/// Tells the delegating agent that the decision model picked the subagent, and why.
+fn note_route(result: &mut Value, routed: Option<&crate::decision::Choice>) {
+    let (Some(choice), Some(object)) = (routed, result.as_object_mut()) else {
+        return;
+    };
+    object.insert(
+        "routedBy".into(),
+        json!({
+            "decisionModel": true,
+            "agent": choice.agent,
+            "model": choice.model,
+            "reason": choice.reason,
+        }),
+    );
+}
+
+/// The agents a task without a named agent can go to: the available members of the Orchestra team with
+/// their roles and notes, or every available agent when no team applies. Each with the models it offers.
+async fn candidates(
+    hub: &Arc<Hub>,
+    team: Option<&[OrchestraNode]>,
+    caller: &AgentId,
+) -> Vec<crate::decision::Candidate> {
+    let list = hub.list_agents().await.unwrap_or_default();
+    let available: Vec<&harness_core_api::AgentInfo> = list
+        .iter()
+        .filter(|a| agent_state(a) == "available")
+        .collect();
+    let mut out = Vec::new();
+    for agent in available {
+        let node = team.and_then(|team| team.iter().find(|n| n.agent == agent.id));
+        if team.is_some() && node.is_none() {
+            continue;
+        }
+        let models = hub
+            .ctx
+            .advertised(&agent.id)
+            .await
+            .models
+            .unwrap_or_default()
+            .into_iter()
+            .map(|m| (m.id, m.name))
+            .collect();
+        out.push(crate::decision::Candidate {
+            id: agent.id.to_string(),
+            name: agent.display_name.clone(),
+            role: node.map(|n| n.role.label().to_owned()).unwrap_or_default(),
+            note: match node.and_then(|n| n.instructions.lines().next()) {
+                Some(note) if !note.trim().is_empty() => note.trim().to_owned(),
+                // Outside a team the delegating agent is a candidate too: say which one it is.
+                _ if &agent.id == caller => "the agent that is delegating this task".to_owned(),
+                _ => String::new(),
+            },
+            models,
+        });
+    }
+    out
 }
 
 /// Coordination note put before a new subagent's first task (§9.8.1).

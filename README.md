@@ -152,6 +152,9 @@ history and its own usage limits. Harness puts a single desktop app in front of 
   automatic digest of each session. A new session, or another agent, starts with what is pinned, what
   relates to the request and what the project's latest sessions did. One local file, word search, no
   embedding model ([docs](docs/specs/harness/local-memory.md)).
+- Decision model: a small, cheap model (any API provider, for example OpenRouter or Command Code API)
+  picks the agent and model of a delegated task that names none, instead of "the first available"
+  ([docs](docs/specs/harness/decision-model.md)).
 - [Graphify](https://github.com/Graphify-Labs/graphify) support: build the project's knowledge graph
   from Settings (code only, no model), and every agent gets the graph's query tools and a note on how to
   use them ([docs](docs/specs/harness/graphify.md)).

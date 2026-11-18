@@ -1,7 +1,7 @@
 import { Theme } from "../theme/tokens.slint";
 import { Icon, Icons, Button, IconButton, Divider, Card, SectionLabel, MenuShell, MenuItem } from "../components/controls.slint";
-import { TextArea, Switch, SelectOption } from "parts.slint";
-import { SettingsUi } from "globals.slint";
+import { TextArea, Switch, SelectOption, Select, TextField } from "parts.slint";
+import { SettingsUi, DecisionUi } from "globals.slint";
 
 export struct OrchNode {
     id: string,
@@ -871,6 +871,74 @@ export component OrchestraPage inherits VerticalLayout {
         Text {
             text: @tr("How Harness delegates work to subagents.");
             font-size: 13px;
+            color: Theme.muted;
+            wrap: word-wrap;
+        }
+    }
+    init => {
+        DecisionUi.refresh();
+    }
+    OCard {
+        title: "Decision model";
+        note: "Routes work to agents";
+        ORow {
+            label: "Decision model";
+            description: "A small, cheap model that decides for Harness: when a task is delegated without naming an agent, it picks the agent of the team (and one of that agent's models) that suits the task. One of your API providers, for example OpenRouter or Command Code API with a small model.";
+            VerticalLayout {
+                alignment: center;
+                Select {
+                    width: 240px;
+                    label: "Decision model";
+                    options: DecisionUi.providers;
+                    current: DecisionUi.provider;
+                    current-label: DecisionUi.provider-label;
+                    reset-label: "Off";
+                    placeholder: "Off";
+                    empty-text: "Add an API provider first (Agents › API Providers)";
+                    select(id) => {
+                        DecisionUi.set-provider(id);
+                    }
+                }
+            }
+        }
+        ODiv { }
+        ORow {
+            label: "Model";
+            description: "The model to ask. Empty uses the provider's own model. Pick a fast one: every decision is one short request.";
+            VerticalLayout {
+                alignment: center;
+                TextField {
+                    width: 240px;
+                    height: 32px;
+                    text <=> DecisionUi.model;
+                    placeholder: "the provider's model";
+                    label: "Decision model id";
+                    enabled: DecisionUi.provider != "";
+                    edited(text) => {
+                        DecisionUi.set-model(text);
+                    }
+                }
+            }
+        }
+        ODiv { }
+        ORow {
+            label: "Pick the subagent";
+            description: "For a delegate call without an agent. Off, or when the model does not answer in time, the first available subagent is used as before.";
+            VerticalLayout {
+                alignment: center;
+                Switch {
+                    label: "Pick the subagent";
+                    checked: DecisionUi.delegation;
+                    enabled: DecisionUi.provider != "";
+                    toggled(on) => {
+                        DecisionUi.set-delegation(on);
+                    }
+                }
+            }
+        }
+        if DecisionUi.note != "": Text {
+            text: DecisionUi.note;
+            font-size: 11px;
             color: Theme.muted;
             wrap: word-wrap;
         }

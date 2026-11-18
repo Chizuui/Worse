@@ -65,7 +65,7 @@ pub(crate) struct ProviderEntry {
 }
 
 impl ProviderEntry {
-    fn is_command_code(&self) -> bool {
+    pub(crate) fn is_command_code(&self) -> bool {
         self.kind == KIND_COMMAND_CODE
     }
 }
