@@ -148,6 +148,10 @@ history and its own usage limits. Harness puts a single desktop app in front of 
   Kimi, Z.ai GLM, Qwen, MiniMax, Together, Fireworks, Cerebras, NVIDIA NIM, Hugging Face, Vercel AI
   Gateway, OpenCode Zen, Ollama or LM Studio, and paste the key: the endpoint and a model are filled in,
   and "List models" shows the endpoint's own models to pick from.
+- Local memory shared by every agent and session: saved facts, preferences and decisions, plus an
+  automatic digest of each session. A new session, or another agent, starts with what is pinned, what
+  relates to the request and what the project's latest sessions did. One local file, word search, no
+  embedding model ([docs](docs/specs/harness/local-memory.md)).
 - Several API keys for one service (all Command Code keys; providers with the same endpoint and
   model) form a pool: new sessions and subagents take the keys in turn (round robin), and a key at
   its usage limit is skipped until it resets.

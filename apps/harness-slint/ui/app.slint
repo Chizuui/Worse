@@ -31,7 +31,7 @@ export { ScreenUi, ScreenAct }
 // Agent A's panel globals are reachable from Rust through this re-export.
 export * from "panels/globals.slint";
 import { SettingsShell, FallbackRow } from "settings/shell.slint";
-import { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow } from "settings/globals.slint";
+import { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow, RecallUi, RecallRow } from "settings/globals.slint";
 import { SelectOption, ConfirmDialog } from "settings/parts.slint";
 import { Labels } from "settings/labels.slint";
 import { AgentLogo, AgentMark } from "components/agent_logo.slint";
@@ -60,7 +60,7 @@ export { OrchestraUi, OrchNode, OrchEdge, OrchLink, OrchAgent, OrchConn }
 export { InboxUi, InboxSourceRow, InboxTicketRow, InboxTriggerRow, InboxNotice }
 export { SetupUi, SetupRow }
 export { ChatUi, FleetGroup, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, PlanBar, ChangeRow, PlanRow, GroupRow, ScheduleRow, WhiteboardUi, WbStroke, DockUi, OptionRow, GitUi, BranchRow, GraphRow }
-export { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow, SelectOption, FallbackRow, Labels }
+export { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow, SelectOption, FallbackRow, Labels, RecallUi, RecallRow }
 
 // Title bar drag handle: a plain press starts the move (Rust drags the window and still detects
 // double-clicks there). While the window is maximized the press only arms the drag — the native

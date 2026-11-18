@@ -392,3 +392,36 @@ export global ArchiveUi {
     callback delete(string);
     callback more();
 }
+
+// One entry of Harness's local memory (Settings › Memory › Recall): a saved memory or the digest of a session.
+export struct RecallRow {
+    id: string,
+    // "fact" | "preference" | "decision" | "howto" | "episode"
+    kind: string,
+    text: string,
+    // "3d ago · Claude Code · worse"
+    meta: string,
+    pinned: bool,
+}
+
+// The local memory shared by every agent and session (`harness_agent_hub::recall`).
+export global RecallUi {
+    in property <[RecallRow]> rows;
+    // live entries in the store, before the search and the filter
+    in property <int> total;
+    in property <string> note;
+    in-out property <string> query;
+    // "all" | "memories" | "sessions"
+    in-out property <string> filter: "all";
+    in property <bool> auto-recall: true;
+    in property <bool> auto-capture: true;
+    in-out property <string> draft;
+    in-out property <string> draft-kind: "fact";
+    in-out property <bool> draft-global;
+    callback refresh();
+    callback add();
+    callback forget(string);
+    callback pin(string, bool);
+    callback set-auto-recall(bool);
+    callback set-auto-capture(bool);
+}

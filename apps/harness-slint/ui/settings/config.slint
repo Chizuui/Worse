@@ -5,7 +5,7 @@
 import { ScrollView } from "std-widgets.slint";
 import { Theme } from "../theme/tokens.slint";
 import { Icons, IconButton, Segmented, MenuShell, MenuItem } from "../components/controls.slint";
-import { ConfigUi, DocUi, ResRow, FormField, SettingsUi } from "globals.slint";
+import { ConfigUi, DocUi, ResRow, FormField, SettingsUi, RecallUi, RecallRow } from "globals.slint";
 import { PageHeader, Group, SettingRow, Switch, TextField, TextArea, Select, SearchField, UnsupportedNotice, StatusLine } from "parts.slint";
 import { Labels } from "labels.slint";
 
@@ -1667,11 +1667,230 @@ component MemoryBody inherits VerticalLayout {
     property <string> selected-title: "Memory";
 }
 
+// One row of the local memory: kind, text, where it comes from; pin and forget on the right.
+component RecallItem inherits Rectangle {
+    in property <RecallRow> entry;
+    callback pin(bool);
+    callback forget;
+    property <color> tint: root.entry.kind == "episode" ? Theme.info : root.entry.kind == "preference" ? Theme.accent-fg : root.entry.kind == "decision" ? Theme.warning : Theme.icon-subtle;
+    border-radius: 8px;
+    background: ta.has-hover ? Theme.hover : Theme.hover.with-alpha(0);
+    ta := TouchArea { }
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 10px;
+        padding-top: 9px;
+        padding-bottom: 9px;
+        spacing: 10px;
+        VerticalLayout {
+            alignment: start;
+            width: 74px;
+            Pill {
+                text: root.entry.kind == "episode" ? "session" : root.entry.kind;
+                tint: root.tint;
+                small: true;
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 3px;
+            Text {
+                text: root.entry.text;
+                font-size: 12px;
+                color: Theme.foreground;
+                wrap: word-wrap;
+            }
+            Text {
+                text: root.entry.meta;
+                font-size: 10.5px;
+                color: Theme.icon-subtlest;
+                overflow: elide;
+            }
+        }
+        VerticalLayout {
+            alignment: start;
+            HorizontalLayout {
+                spacing: 6px;
+                if root.entry.kind != "episode": Btn {
+                    text: root.entry.pinned ? "Pinned" : "Pin";
+                    label: root.entry.pinned ? "Unpin memory" : "Pin memory";
+                    compact: true;
+                    primary: root.entry.pinned;
+                    clicked => {
+                        root.pin(!root.entry.pinned);
+                    }
+                }
+                Btn {
+                    text: "Forget";
+                    label: "Forget memory";
+                    compact: true;
+                    clicked => {
+                        root.forget();
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Settings › Memory › Recall: Harness's own local memory, shared by every agent and session.
+component RecallBody inherits VerticalLayout {
+    spacing: 16px;
+    Group {
+        SettingRow {
+            first: true;
+            title: "Recall in new sessions";
+            description: "A new session starts with your pinned memories, the memories related to the request and the latest sessions of the project, whichever agent runs it.";
+            Switch {
+                label: "Recall in new sessions";
+                checked: RecallUi.auto-recall;
+                toggled(on) => {
+                    RecallUi.set-auto-recall(on);
+                }
+            }
+        }
+        SettingRow {
+            title: "Remember each session";
+            description: "When a turn finishes, keep a short digest of the session: what was asked, how it ended, which files changed. Cut from the conversation, no model involved.";
+            Switch {
+                label: "Remember each session";
+                checked: RecallUi.auto-capture;
+                toggled(on) => {
+                    RecallUi.set-auto-capture(on);
+                }
+            }
+        }
+    }
+    // Add by hand.
+    DCard {
+        VerticalLayout {
+            padding: 14px;
+            spacing: 10px;
+            Text {
+                text: "Remember something";
+                font-size: 12.5px;
+                font-weight: Theme.weight-semibold;
+                color: Theme.foreground;
+            }
+            TextField {
+                height: 34px;
+                text <=> RecallUi.draft;
+                placeholder: "One fact, preference or decision, in a sentence or two";
+                label: "New memory";
+                accepted(text) => {
+                    RecallUi.add();
+                }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                Segmented {
+                    options: [
+                        { id: "fact", label: "Fact" },
+                        { id: "preference", label: "Preference" },
+                        { id: "decision", label: "Decision" },
+                        { id: "howto", label: "How-to" },
+                    ];
+                    current: RecallUi.draft-kind;
+                    chip-pad: 12px;
+                    select(id) => {
+                        RecallUi.draft-kind = id;
+                    }
+                }
+                Segmented {
+                    options: [{ id: "project", label: "This project" }, { id: "global", label: "Everywhere" }];
+                    current: RecallUi.draft-global ? "global" : "project";
+                    chip-pad: 12px;
+                    select(id) => {
+                        RecallUi.draft-global = id == "global";
+                    }
+                }
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Btn {
+                        text: "Remember";
+                        primary: true;
+                        enabled: RecallUi.draft != "";
+                        clicked => {
+                            RecallUi.add();
+                        }
+                    }
+                }
+            }
+            if RecallUi.note != "": Text {
+                text: RecallUi.note;
+                font-size: 11px;
+                color: Theme.muted;
+                wrap: word-wrap;
+            }
+        }
+    }
+    HorizontalLayout {
+        height: 34px;
+        spacing: 8px;
+        SearchField {
+            height: 34px;
+            placeholder: "Search the local memory…";
+            text <=> RecallUi.query;
+            edited(q) => {
+                RecallUi.refresh();
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Segmented {
+                options: [{ id: "all", label: "All" }, { id: "memories", label: "Memories" }, { id: "sessions", label: "Sessions" }];
+                current: RecallUi.filter;
+                chip-pad: 12px;
+                select(id) => {
+                    RecallUi.filter = id;
+                    RecallUi.refresh();
+                }
+            }
+        }
+    }
+    DCard {
+        VerticalLayout {
+            CardHead {
+                title: "Local memory";
+                sub: RecallUi.rows.length == RecallUi.total ? RecallUi.total + " stored" : RecallUi.rows.length + " of " + RecallUi.total + " shown";
+            }
+            Hairline { }
+            VerticalLayout {
+                padding: 6px;
+                spacing: 1px;
+                for item in RecallUi.rows: RecallItem {
+                    entry: item;
+                    pin(on) => {
+                        RecallUi.pin(item.id, on);
+                    }
+                    forget => {
+                        RecallUi.forget(item.id);
+                    }
+                }
+                if RecallUi.rows.length == 0: Text {
+                    height: 54px;
+                    text: RecallUi.query != "" ? "No matches" : "Nothing remembered yet. Agents save memories with the memory_add tool, and every finished session leaves a digest.";
+                    font-size: 12px;
+                    color: Theme.icon-subtlest;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}
+
 // Instructions (CLAUDE.md / AGENTS.md / GEMINI.md) and Memory (MEMORY.md): one document per target.
 export component DocPage inherits VerticalLayout {
     in property <bool> stacked;
     in property <bool> memory-enabled;
     callback set-memory-enabled(bool);
+    // Memory page: the Recall tab (Harness's own local memory) instead of a MEMORY.md document.
+    property <bool> recall: false;
     spacing: 20px;
     PageHeader {
         title: DocUi.kind == "memory" ? "Memory" : "Instructions";
@@ -1693,8 +1912,9 @@ export component DocPage inherits VerticalLayout {
                 agent-id: "harness";
                 dot: Theme.info;
                 text: "Global";
-                active: DocUi.scope == "user";
+                active: !root.recall && DocUi.scope == "user";
                 picked => {
+                    root.recall = false;
                     DocUi.select-scope("user");
                 }
             }
@@ -1702,15 +1922,27 @@ export component DocPage inherits VerticalLayout {
                 agent-id: "harness";
                 dot: Theme.accent-fg;
                 text: "Project";
-                active: DocUi.scope == "workspace";
+                active: !root.recall && DocUi.scope == "workspace";
                 picked => {
+                    root.recall = false;
                     DocUi.select-scope("workspace");
+                }
+            }
+            AgentChip {
+                agent-id: "harness";
+                dot: Theme.warning;
+                text: "Recall";
+                active: root.recall;
+                picked => {
+                    root.recall = true;
+                    RecallUi.refresh();
                 }
             }
         }
     }
     if DocUi.kind == "instructions": InstructionsBody { }
-    if DocUi.kind == "memory": MemoryBody {
+    if DocUi.kind == "memory" && root.recall: RecallBody { }
+    if DocUi.kind == "memory" && !root.recall: MemoryBody {
         memory-enabled: root.memory-enabled;
         set-memory-enabled(on) => {
             root.set-memory-enabled(on);

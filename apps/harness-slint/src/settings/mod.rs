@@ -10,6 +10,7 @@ pub mod agy;
 mod docview;
 pub mod keymap;
 mod presets;
+pub mod recall;
 mod values;
 mod worker;
 
