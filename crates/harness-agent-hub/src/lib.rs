@@ -4,6 +4,7 @@
 //! agent; [`pool::AgentPool`] owns agent CLI processes (spawned on demand, stopped when idle);
 //! [`quota::QuotaRegistry`] owns exhaustion state; [`store::Store`] is the single SQLite writer.
 
+pub mod about;
 mod accounts;
 pub mod acp;
 mod admin;

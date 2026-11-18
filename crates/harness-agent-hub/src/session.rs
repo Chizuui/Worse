@@ -933,6 +933,7 @@ impl SessionActor {
         };
         let mut notes_pushed = false;
         if fresh {
+            blocks.push(text_block(&self.about_block().await));
             blocks.push(text_block(&self.memory_block().await));
             if let Some(recall) = self.recall_block(&turn.user_text).await {
                 blocks.push(text_block(&recall));
@@ -1043,6 +1044,30 @@ impl SessionActor {
         .await
         .ok()
         .flatten()
+    }
+
+    /// What Harness is and which of its tool servers this session has.
+    async fn about_block(&self) -> String {
+        let child = self.ctx.subagents.is_child(&self.row.id);
+        let delegate = self.ctx.subagents.endpoint.get().is_some();
+        let computer = matches!(
+            self.ctx.config.helpers,
+            crate::helpers::HelperLaunch::SelfExe { .. }
+        );
+        let home = self.ctx.config.home.clone();
+        let workspace = self.row.workspace_path.clone();
+        let graph = tokio::task::spawn_blocking(move || {
+            crate::recall::Store::new(&home).config().graph
+                && crate::graphify::mcp_server(&workspace).is_some()
+        })
+        .await
+        .unwrap_or(false);
+        crate::about::block(crate::about::Attached {
+            delegate: delegate && !child,
+            child: delegate && child,
+            computer,
+            graph,
+        })
     }
 
     /// The note about the project's Graphify graph; `None` without a graph or with the switch off.
