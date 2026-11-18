@@ -5,19 +5,23 @@
 //!
 //! - While the agent writes: an estimate from the text that arrives, at four characters per token, over the
 //!   time text was actually arriving. No agent reports token counts in the middle of a turn. Shown with "≈".
-//! - After the turn: the exact figure for agents that report the output tokens of a prompt (ACP
-//!   `session/prompt` result `usage`: the built-in API agent, a Hermes gateway, and any other agent that
-//!   returns it). Agents that report nothing keep the estimate, still marked "≈".
+//! - After the turn: for agents that report the output tokens of a prompt (ACP `session/prompt` result
+//!   `usage`), those tokens over the time the model was working. Like Hermes (output tokens over API call
+//!   time), numerator and denominator cover the same work: the reported count includes thinking and tool
+//!   call arguments that never stream as answer text, so the time is the whole turn minus the time a tool
+//!   was running or waiting for an approval, not only the time answer text arrived. Agents that report
+//!   nothing keep the estimate, still marked "≈".
 //!
-//! The clock only runs while text arrives: a gap of more than two seconds (a tool is running, the agent waits
-//! for an approval) is not generation time.
+//! The live clock only runs while text arrives: a gap of more than two seconds (a tool is running, the agent
+//! waits for an approval) is not generation time.
 
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
 use slint::ComponentHandle;
 
-use crate::core::ItemId;
+use crate::core::{ItemId, ToolStatus};
 use crate::ui::{AppWindow, ChatUi};
 
 /// Characters per token of the estimate.
@@ -39,17 +43,33 @@ struct State {
     shown: Option<Instant>,
     /// Row of the answer being written; it gets the final figure.
     row: Option<ItemId>,
-    /// A finished turn whose exact token count may still arrive: its row and its streaming time.
+    /// When the running turn started.
+    started: Option<Instant>,
+    /// Tool rows of the running turn that are running or waiting for an approval.
+    tools: HashSet<ItemId>,
+    /// Since when at least one tool runs.
+    tools_since: Option<Instant>,
+    /// Time during which at least one tool ran.
+    tool_time: Duration,
+    /// A finished turn whose token count may still arrive: its row and the model's working time.
     awaiting: Option<(ItemId, Duration)>,
+}
+
+impl State {
+    fn close_tools(&mut self, now: Instant) {
+        if let Some(since) = self.tools_since.take() {
+            self.tool_time += now.duration_since(since);
+        }
+    }
 }
 
 thread_local! {
     static STATE: RefCell<State> = RefCell::default();
 }
 
-/// Tokens per second for `tokens` over `streaming`, or `None` when the burst was too short to say.
-fn rate(tokens: f64, streaming: Duration) -> Option<f64> {
-    (streaming >= MIN_STREAM && tokens > 0.0).then(|| tokens / streaming.as_secs_f64())
+/// Tokens per second for `tokens` over `time`, or `None` when the time was too short to say.
+fn rate(tokens: f64, time: Duration) -> Option<f64> {
+    (time >= MIN_STREAM && tokens > 0.0).then(|| tokens / time.as_secs_f64())
 }
 
 fn round(rate: f64) -> String {
@@ -65,28 +85,56 @@ fn estimated(chars: usize, streaming: Duration) -> Option<String> {
     rate(chars as f64 / CHARS_PER_TOKEN, streaming).map(|r| format!("≈ {} tok/s", round(r)))
 }
 
-/// Label of a reported count: "41 tok/s · 85 tokens".
-fn exact(tokens: u64, streaming: Duration) -> Option<String> {
-    rate(tokens as f64, streaming).map(|r| format!("{} tok/s · {tokens} tokens", round(r)))
+/// Label of a reported count over the model's working time: "41 tok/s · 85 output tokens".
+fn exact(tokens: u64, working: Duration) -> Option<String> {
+    rate(tokens as f64, working).map(|r| format!("{} tok/s · {tokens} output tokens", round(r)))
+}
+
+/// The model's working time of a turn: its wall time minus the time a tool ran.
+fn working(wall: Duration, tool_time: Duration) -> Duration {
+    wall.saturating_sub(tool_time)
 }
 
 /// A turn started: the count starts over.
 pub(crate) fn start(window: &AppWindow) {
     STATE.with(|cell| {
         let mut s = cell.borrow_mut();
-        s.chars = 0;
-        s.streaming = Duration::ZERO;
-        s.last = None;
-        s.shown = None;
-        s.row = None;
+        let awaiting = s.awaiting.take();
+        *s = State {
+            started: Some(Instant::now()),
+            awaiting,
+            ..State::default()
+        };
     });
-    window.global::<ChatUi>().set_speed(slint::SharedString::new());
+    window
+        .global::<ChatUi>()
+        .set_speed(slint::SharedString::new());
 }
 
 /// Another session is shown: nothing of the previous one is pending.
 pub(crate) fn reset(window: &AppWindow) {
     STATE.with(|cell| *cell.borrow_mut() = State::default());
-    window.global::<ChatUi>().set_speed(slint::SharedString::new());
+    window
+        .global::<ChatUi>()
+        .set_speed(slint::SharedString::new());
+}
+
+/// A tool row of the running turn appeared or changed status.
+pub(crate) fn tool(id: ItemId, status: ToolStatus) {
+    STATE.with(|cell| {
+        let mut s = cell.borrow_mut();
+        if s.started.is_none() {
+            return;
+        }
+        let now = Instant::now();
+        if matches!(status, ToolStatus::Running | ToolStatus::AwaitingPermission) {
+            if s.tools.insert(id) && s.tools.len() == 1 {
+                s.tools_since = Some(now);
+            }
+        } else if s.tools.remove(&id) && s.tools.is_empty() {
+            s.close_tools(now);
+        }
+    });
 }
 
 /// Text of the running turn arrived: answer text of `row`, or thinking text (`None`).
@@ -126,23 +174,29 @@ pub(crate) fn tick(window: &AppWindow) {
     }
 }
 
-/// The turn ended: the estimate for its answer row, which stays until an exact count arrives ([`reported`]).
+/// The turn ended: the estimate for its answer row, which stays until a reported count arrives ([`reported`]).
 pub(crate) fn finish(window: &AppWindow) -> Option<(ItemId, String)> {
-    window.global::<ChatUi>().set_speed(slint::SharedString::new());
+    window
+        .global::<ChatUi>()
+        .set_speed(slint::SharedString::new());
     STATE.with(|cell| {
         let mut s = cell.borrow_mut();
+        let now = Instant::now();
+        s.close_tools(now);
+        s.tools.clear();
+        let wall = s.started.take().map(|t| now.duration_since(t));
         let row = s.row.take()?;
-        let streaming = s.streaming;
-        s.awaiting = Some((row, streaming));
-        estimated(s.chars, streaming).map(|label| (row, label))
+        let time = wall.map_or(s.streaming, |wall| working(wall, s.tool_time));
+        s.awaiting = Some((row, time));
+        estimated(s.chars, s.streaming).map(|label| (row, label))
     })
 }
 
-/// The agent reported the output tokens of the turn that just ended: the exact figure for its answer row.
+/// The agent reported the output tokens of the turn that just ended: the reported figure for its answer row.
 pub(crate) fn reported(tokens: u64) -> Option<(ItemId, String)> {
     STATE.with(|cell| {
-        let (row, streaming) = cell.borrow_mut().awaiting.take()?;
-        exact(tokens, streaming).map(|label| (row, label))
+        let (row, time) = cell.borrow_mut().awaiting.take()?;
+        exact(tokens, time).map(|label| (row, label))
     })
 }
 
@@ -152,15 +206,34 @@ mod tests {
 
     #[test]
     fn estimate_uses_four_characters_per_token() {
-        // 800 characters in 5 s: 200 tokens, 40 a second.
-        assert_eq!(estimated(800, Duration::from_secs(5)).as_deref(), Some("≈ 40 tok/s"));
-        // Slow rates keep one decimal.
-        assert_eq!(estimated(60, Duration::from_secs(4)).as_deref(), Some("≈ 3.8 tok/s"));
+        assert_eq!(
+            estimated(800, Duration::from_secs(5)).as_deref(),
+            Some("≈ 40 tok/s")
+        );
+        assert_eq!(
+            estimated(60, Duration::from_secs(4)).as_deref(),
+            Some("≈ 3.8 tok/s")
+        );
     }
 
     #[test]
-    fn exact_shows_the_reported_count() {
-        assert_eq!(exact(85, Duration::from_secs(2)).as_deref(), Some("42 tok/s · 85 tokens"));
+    fn reported_tokens_are_divided_by_the_model_working_time() {
+        assert_eq!(
+            exact(85, Duration::from_secs(2)).as_deref(),
+            Some("42 tok/s · 85 output tokens")
+        );
+        let time = working(
+            Duration::from_millis(324_900),
+            Duration::from_millis(124_900),
+        );
+        assert_eq!(
+            exact(9303, time).as_deref(),
+            Some("47 tok/s · 9303 output tokens")
+        );
+        assert_eq!(
+            working(Duration::from_secs(3), Duration::from_secs(5)),
+            Duration::ZERO
+        );
     }
 
     #[test]
@@ -168,5 +241,6 @@ mod tests {
         assert_eq!(estimated(400, Duration::from_millis(100)), None);
         assert_eq!(estimated(0, Duration::from_secs(3)), None);
         assert_eq!(exact(0, Duration::from_secs(3)), None);
+        assert_eq!(exact(50, Duration::ZERO), None);
     }
 }

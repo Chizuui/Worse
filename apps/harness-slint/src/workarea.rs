@@ -179,12 +179,7 @@ pub fn restored_rect(window: &slint::Window, saved: Option<Rect>) -> Option<Rect
 /// Returns false on platforms without Win32 (the caller then only restores the saved rect).
 #[cfg(windows)]
 #[allow(unsafe_code)]
-pub fn place_dragged(
-    window: &slint::Window,
-    saved: Option<Rect>,
-    fraction: f64,
-    top: i32,
-) -> bool {
+pub fn place_dragged(window: &slint::Window, saved: Option<Rect>, fraction: f64, top: i32) -> bool {
     use windows_sys::Win32::Foundation::{POINT, RECT};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         SetWindowPlacement, SW_SHOWNORMAL, WINDOWPLACEMENT,

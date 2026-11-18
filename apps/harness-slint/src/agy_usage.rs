@@ -161,7 +161,8 @@ async fn fetch_one(client: &reqwest::Client, target: &str, id: &str, label: &str
                 None => {
                     let mut out = row(id, label, &error);
                     if error.starts_with("Login expired") && target != AGY_LIVE_TARGET {
-                        out.error = "Login expired; switch to this account once to refresh it".into();
+                        out.error =
+                            "Login expired; switch to this account once to refresh it".into();
                     }
                     out
                 }
@@ -364,7 +365,13 @@ mod tests {
             ("Gemini · weekly".to_owned(), 40.0, Some(now + 3600)),
             ("Claude · 5-hour".to_owned(), 90.0, Some(now - 60)),
         ];
-        let row = shown("agy:sek2", "Antigravity · Sek2", "Pro".into(), &bars, Some(now - 1500));
+        let row = shown(
+            "agy:sek2",
+            "Antigravity · Sek2",
+            "Pro".into(),
+            &bars,
+            Some(now - 1500),
+        );
         assert!(row.error.is_empty());
         assert_eq!(row.bars[1].1, 0.0);
         assert!(row.bars[0].2.starts_with("Resets in"));

@@ -178,7 +178,10 @@ fn parse_reset_from_text(text: &str) -> Option<i64> {
         }
     }
     let index = lower.find("resets ")?;
-    let token = lower.get(index + "resets ".len()..)?.split_whitespace().next()?;
+    let token = lower
+        .get(index + "resets ".len()..)?
+        .split_whitespace()
+        .next()?;
     parse_clock(token, chrono::Local::now())
 }
 
@@ -363,8 +366,20 @@ mod limit_text_tests {
     fn clock_reset_rolls_to_tomorrow_when_passed() {
         let now = Local.with_ymd_and_hms(2026, 11, 15, 12, 0, 0).unwrap();
         let at = parse_clock("10:40am", now).unwrap();
-        assert_eq!(at, Local.with_ymd_and_hms(2026, 11, 16, 10, 40, 0).unwrap().timestamp());
+        assert_eq!(
+            at,
+            Local
+                .with_ymd_and_hms(2026, 11, 16, 10, 40, 0)
+                .unwrap()
+                .timestamp()
+        );
         let pm = parse_clock("3pm", now).unwrap();
-        assert_eq!(pm, Local.with_ymd_and_hms(2026, 11, 15, 15, 0, 0).unwrap().timestamp());
+        assert_eq!(
+            pm,
+            Local
+                .with_ymd_and_hms(2026, 11, 15, 15, 0, 0)
+                .unwrap()
+                .timestamp()
+        );
     }
 }

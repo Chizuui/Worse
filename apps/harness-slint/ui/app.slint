@@ -670,7 +670,15 @@ component ChatRow inherits VerticalLayout {
     }
     // Assistant message: plain markdown on the panel (no bubble). A small agent line names who answered,
     // since one Harness session mixes agents.
-    if root.item.kind == 1: Rectangle {
+    if root.item.kind == 1: asst := Rectangle {
+        property <bool> select-mode;
+        property <length> select-width: 400px;
+        changed width => {
+            self.select-width = self.width;
+        }
+        init => {
+            self.select-width = self.width;
+        }
         // Screen readers (and the gate) read "<agent>: <raw text>".
         accessible-role: AccessibleRole.text;
         accessible-label: root.item.agent + ": " + root.item.text;
@@ -730,10 +738,41 @@ component ChatRow inherits VerticalLayout {
                         vertical-alignment: center;
                     }
                 }
-                MarkdownView {
+                if !asst.select-mode: MarkdownView {
                     blocks: root.item.blocks;
                     link(url) => {
                         root.link(url);
+                    }
+                }
+                if asst.select-mode: Rectangle {
+                    background: Theme.card;
+                    border-radius: Theme.radius-lg;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                    HorizontalLayout {
+                        padding: 12px;
+                        TextInput {
+                            width: asst.select-width - 24px;
+                            text: root.item.text;
+                            read-only: true;
+                            single-line: false;
+                            wrap: word-wrap;
+                            color: Theme.foreground;
+                            font-size: Theme.ui-base;
+                            selection-background-color: Theme.text-selection;
+                            accessible-role: none;
+                            init => {
+                                self.focus();
+                                self.select-all();
+                            }
+                            key-pressed(event) => {
+                                if event.text == Key.Escape {
+                                    asst.select-mode = false;
+                                    return accept;
+                                }
+                                reject
+                            }
+                        }
                     }
                 }
                 if root.item.changes.length > 0: ChangesCard {
@@ -751,6 +790,15 @@ component ChatRow inherits VerticalLayout {
                         opacity: ata.has-hover ? 1 : 0.0;
                         clicked => {
                             ChatUi.copy(root.item.text);
+                        }
+                    }
+                    MessageAction {
+                        icon: Icons.file-text;
+                        label: asst.select-mode ? @tr("Show formatted") : @tr("Select text");
+                        active: asst.select-mode;
+                        opacity: ata.has-hover || asst.select-mode ? 1 : 0.0;
+                        clicked => {
+                            asst.select-mode = !asst.select-mode;
                         }
                     }
                     if root.item.id == ChatUi.last-assistant: MessageAction {
@@ -2485,6 +2533,52 @@ component Composer inherits VerticalLayout {
                 Rectangle {
                     width: 4px;
                 }
+                if DockUi.research: Rectangle {
+                    y: (parent.height - self.height) / 2;
+                    height: 28px;
+                    width: research-row.preferred-width;
+                    border-radius: Theme.radius-md;
+                    background: rta.has-hover ? Theme.accent-soft.darker(0.1) : Theme.accent-soft;
+                    border-width: 1px;
+                    border-color: Theme.accent-line;
+                    accessible-role: button;
+                    accessible-label: "Deep research on, turn off";
+                    accessible-action-default => {
+                        DockUi.pick-option("mode", "harness:research");
+                    }
+                    research-row := HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 6px;
+                        Icon {
+                            y: (parent.height - self.height) / 2;
+                            source: Icons.globe;
+                            size: Theme.icon-sm;
+                            tint: Theme.accent-fg;
+                        }
+                        Text {
+                            text: "Deep research";
+                            font-size: Theme.ui-sm;
+                            color: Theme.accent-fg;
+                            vertical-alignment: center;
+                        }
+                        Icon {
+                            y: (parent.height - self.height) / 2;
+                            source: Icons.x;
+                            size: 12px;
+                            tint: Theme.accent-fg;
+                        }
+                    }
+                    rta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            DockUi.pick-option("mode", "harness:research");
+                        }
+                    }
+                }
+                if DockUi.research: Rectangle {
+                    width: 4px;
+                }
                 // Agent picker chip: agent-colour dot + name + chevron (design 01).
                 Rectangle {
                     y: (parent.height - self.height) / 2;
@@ -2653,6 +2747,17 @@ component Composer inherits VerticalLayout {
                 clicked => {
                     plus-menu.close();
                     ChatUi.annotate-chip(-1);
+                }
+            }
+            MenuItem {
+                text: "Deep research";
+                description: "Search the web and write a sourced report";
+                has-icon: true;
+                icon: Icons.globe;
+                checked: DockUi.research;
+                clicked => {
+                    plus-menu.close();
+                    DockUi.pick-option("mode", "harness:research");
                 }
             }
         }

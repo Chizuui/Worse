@@ -279,6 +279,8 @@ pub enum ContextItem {
     /// `#session` mention.
     #[serde(rename_all = "camelCase")]
     Session { session_id: SessionId },
+    /// Deep research mode for this turn: the hub adds the research instructions.
+    Research,
 }
 
 impl ContextItem {

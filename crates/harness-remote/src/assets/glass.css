@@ -98,10 +98,9 @@ body::before {
     linear-gradient(90deg, #000 0%, transparent 34%, transparent 66%, #000 100%);
   -webkit-mask-composite: source-in;
   mask-composite: intersect;
-  animation: lg-drift 26s linear infinite;
 }
-@keyframes lg-drift {
-  to { -webkit-mask-position: 0 126px, 0 0; mask-position: 0 126px, 0 0; }
+@media (max-width: 700px) {
+  body::before { opacity: 0.4; }
 }
 body > * { position: relative; z-index: 1; }
 
@@ -114,11 +113,13 @@ body > * { position: relative; z-index: 1; }
 #view-session .composer, #view-session .sheet, #view-session .perm,
 #view-pair .pair-card, #view-settings .set-card, #view-settings .set-searchbox,
 #view-list .hl-search, .toast {
-  background: var(--lg-pane);
-  -webkit-backdrop-filter: var(--lg-blur);
-  backdrop-filter: var(--lg-blur);
+  background: var(--lg-pane-strong);
   border: 1px solid var(--lg-rim);
   box-shadow: inset 0 1px 0 var(--lg-rim-top), inset 0 0 18px var(--lg-glow), var(--lg-shadow);
+}
+#view-session .sheet, .toast {
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
 }
 .bar, #view-session .session-bar, #view-pair .pair-bar, #view-settings .set-head, #view-list .hl-head {
   margin: calc(8px + env(safe-area-inset-top)) 10px 6px;
@@ -205,5 +206,5 @@ body > * { position: relative; z-index: 1; }
   #view-settings .set-card, .toast { background: var(--lg-pane-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  body::before, #view-pair .pair-hero::before { animation: none; }
+  #view-pair .pair-hero::before { animation: none; }
 }

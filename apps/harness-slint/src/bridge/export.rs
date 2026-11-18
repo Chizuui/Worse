@@ -4,8 +4,8 @@ use std::fmt::Write as _;
 use std::path::PathBuf;
 
 use harness_core_api::{
-    ContextItem, SessionDetail, ThoughtView, ToolCallStatus, ToolCallView, ToolContent, TurnSegment,
-    TurnView,
+    ContextItem, SessionDetail, ThoughtView, ToolCallStatus, ToolCallView, ToolContent,
+    TurnSegment, TurnView,
 };
 
 use super::UiState;
@@ -60,7 +60,13 @@ fn save(detail: &SessionDetail, names: &[(String, String)], start: Option<PathBu
 fn file_stem(title: &str) -> String {
     let stem: String = title
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == ' ' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == ' ' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect::<String>()
         .trim()
         .chars()
@@ -109,10 +115,14 @@ fn render_turn(out: &mut String, turn: &TurnView, name: &dyn Fn(&str) -> String)
             }
             ContextItem::Text { title, text } => format!(
                 "- Pasted text{}:\n\n{}",
-                title.as_deref().map(|t| format!(" ({t})")).unwrap_or_default(),
+                title
+                    .as_deref()
+                    .map(|t| format!(" ({t})"))
+                    .unwrap_or_default(),
                 fence(text, "")
             ),
             ContextItem::Session { session_id } => format!("- Session: `{}`", session_id.as_str()),
+            ContextItem::Research => "- Deep research mode".to_owned(),
         };
         let _ = writeln!(out, "{line}");
     }
@@ -128,7 +138,11 @@ fn render_turn(out: &mut String, turn: &TurnView, name: &dyn Fn(&str) -> String)
             attempt.attempt,
             attempt.status
         );
-        for thought in turn.thoughts.iter().filter(|t| t.attempt == attempt.attempt) {
+        for thought in turn
+            .thoughts
+            .iter()
+            .filter(|t| t.attempt == attempt.attempt)
+        {
             write_thought(out, thought);
         }
         if !attempt.partial_text.trim().is_empty() {
@@ -186,7 +200,11 @@ fn render_turn(out: &mut String, turn: &TurnView, name: &dyn Fn(&str) -> String)
                         write_thought(out, t);
                     }
                 }
-                if let Some(tool) = turn.tool_calls.iter().find(|t| &t.tool_call_id == tool_call_id) {
+                if let Some(tool) = turn
+                    .tool_calls
+                    .iter()
+                    .find(|t| &t.tool_call_id == tool_call_id)
+                {
                     write_tool(out, tool);
                 }
             }
@@ -243,7 +261,11 @@ fn write_tool(out: &mut String, tool: &ToolCallView) {
         None => "unknown",
     };
     let kind = tool.kind.as_deref().unwrap_or("tool");
-    let _ = writeln!(out, "**Tool call** ({kind}, {status}): {}\n", one_line(&tool.title));
+    let _ = writeln!(
+        out,
+        "**Tool call** ({kind}, {status}): {}\n",
+        one_line(&tool.title)
+    );
     if let Some(input) = tool.raw_input.as_deref().filter(|s| !s.trim().is_empty()) {
         let _ = writeln!(out, "Input:\n\n{}", fence(&pretty(input), "json"));
     }

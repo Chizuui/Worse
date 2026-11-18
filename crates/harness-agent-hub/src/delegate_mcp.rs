@@ -27,6 +27,8 @@ pub struct DelegateEnv {
     /// `HARNESS_DELEGATE_ROLE=child` (§9.8.1): only selects the tool list; the hub enforces the role itself.
     pub child: bool,
     pub router: bool,
+    /// `HARNESS_DELEGATE_COMPACT=1` (agy): small tool definitions, details in the instructions.
+    pub compact: bool,
 }
 
 impl std::fmt::Debug for DelegateEnv {
@@ -51,6 +53,7 @@ impl DelegateEnv {
             session: get("HARNESS_DELEGATE_SESSION")?,
             child: get("HARNESS_DELEGATE_ROLE").as_deref() == Some("child"),
             router: get("HARNESS_DELEGATE_ROLE").as_deref() == Some("router"),
+            compact: get("HARNESS_DELEGATE_COMPACT").as_deref() == Some("1"),
         })
     }
 }
@@ -95,15 +98,27 @@ pub fn serve(
                 if !env.child && !env.router {
                     result["instructions"] = json!(PARENT_INSTRUCTIONS);
                 }
+                if env.compact && !env.router {
+                    let base = result["instructions"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_owned();
+                    result["instructions"] =
+                        json!(format!("{base}\n\n{}", crate::delegate_compact::DETAILS)
+                            .trim()
+                            .to_owned());
+                }
                 reply(&out, &id, &result);
             }
             "ping" => reply(&out, &id, &json!({})),
             "tools/list" => {
-                let tools = if env.router {
+                let tools = always_loaded(if env.router {
                     router_tools()
+                } else if env.compact {
+                    crate::delegate_compact::tools(env.child)
                 } else {
                     tool_list(env.child)
-                };
+                });
                 reply(&out, &id, &json!({ "tools": tools }));
             }
             "tools/call" => {
@@ -138,6 +153,15 @@ fn reply(out: &Out, id: &Value, result: &Value) {
 }
 
 const PARENT_INSTRUCTIONS: &str = "You run inside Harness. Subagents in Harness are the user's other AI agents (for example Codex, DeepSeek or another Claude account), configured in the Harness Orchestra. Whenever the user asks you to deploy, spawn, use or ask a subagent, delegate work, or ask another agent or model, call this server's list_agents and delegate tools. Do not use your own built-in subagent, Task or Agent tool for that: it runs a copy of yourself, not the user's subagents.";
+
+/// Marks every tool `antigravity/alwaysLoad` so agy declares it up front instead of loading it on demand
+/// (agy lists on-demand tools only through a lookup it does not offer over ACP).
+fn always_loaded(mut tools: Value) -> Value {
+    for tool in tools.as_array_mut().into_iter().flatten() {
+        tool["_meta"] = json!({"antigravity/alwaysLoad": true});
+    }
+    tools
+}
 
 fn claim_tools() -> [Value; 2] {
     [
@@ -186,7 +210,7 @@ fn router_tools() -> Value {
     ])
 }
 
-fn tool_list(child: bool) -> Value {
+pub(crate) fn tool_list(child: bool) -> Value {
     let [claim, release] = claim_tools();
     if child {
         return json!([
@@ -505,4 +529,21 @@ fn exchange(
         }
     }
     serde_json::from_slice(&line).map_err(|e| std::io::Error::new(ErrorKind::InvalidData, e))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn every_tool_is_always_loaded_for_agy() {
+        for tools in [
+            super::tool_list(false),
+            super::tool_list(true),
+            super::router_tools(),
+        ] {
+            let tools = super::always_loaded(tools);
+            for tool in tools.as_array().into_iter().flatten() {
+                assert_eq!(tool["_meta"]["antigravity/alwaysLoad"], true, "{tool}");
+            }
+        }
+    }
 }

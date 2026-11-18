@@ -1481,11 +1481,15 @@ impl Adapter {
             .iter()
             .map(|id| {
                 let turn = detail.turns.iter().find(|t| &t.id == id);
-                let images = turn.map_or_else(Vec::new, |t| api::ContextItem::image_paths(&t.context));
+                let images =
+                    turn.map_or_else(Vec::new, |t| api::ContextItem::image_paths(&t.context));
                 if !images.is_empty() {
                     view.queued_images.insert(id.clone(), images);
                 }
-                (id.clone(), turn.map(|t| t.user_text.clone()).unwrap_or_default())
+                (
+                    id.clone(),
+                    turn.map(|t| t.user_text.clone()).unwrap_or_default(),
+                )
             })
             .collect();
         let id = detail.summary.id.0.clone();

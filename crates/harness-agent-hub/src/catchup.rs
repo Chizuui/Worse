@@ -16,6 +16,9 @@ pub const TOOL_BLOCK_BUDGET_CHARS: usize = 24_000;
 pub const TURN_TOOL_BUDGET_CHARS: usize = 4_000;
 /// Output of one tool call inside a verbatim turn.
 pub const TURN_TOOL_OUTPUT_CHARS: usize = 400;
+const CONDENSED_USER_CHARS: usize = 600;
+const CONDENSED_ASSISTANT_CHARS: usize = 1_500;
+const CONDENSED_TOOL_TITLES: usize = 12;
 
 /// What an interrupted (or previous) agent already ran or read.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -133,6 +136,31 @@ pub fn render_tools(tools: &[ToolDigest], budget: usize, output_chars: usize) ->
     rendered.concat()
 }
 
+fn condensed(turn: &ContextTurn) -> String {
+    let mut out = format!(
+        "[turn {}, {}] user: {}\nassistant: {}\n",
+        turn.seq,
+        turn.agent,
+        clip(&turn.user, CONDENSED_USER_CHARS),
+        clip_head_tail(turn.assistant.trim(), CONDENSED_ASSISTANT_CHARS)
+    );
+    if !turn.tools.is_empty() {
+        let titles: Vec<&str> = turn
+            .tools
+            .iter()
+            .take(CONDENSED_TOOL_TITLES)
+            .map(title_of)
+            .collect();
+        let more = turn.tools.len().saturating_sub(CONDENSED_TOOL_TITLES);
+        let _ = write!(out, "tools: {}", titles.join("; "));
+        if more > 0 {
+            let _ = write!(out, " (+{more} more)");
+        }
+        out.push('\n');
+    }
+    out
+}
+
 fn compact(turn: &ContextTurn) -> String {
     format!(
         "[turn {}, {}] user: {} / assistant: {}\n",
@@ -143,43 +171,37 @@ fn compact(turn: &ContextTurn) -> String {
     )
 }
 
-/// Renders turns within `budget`: newest verbatim, older compacted, oldest dropped with a note.
+/// Renders turns within `budget`: the newest verbatim (up to 60% of the budget, or the whole budget for the
+/// newest turn alone), then condensed turns (user request, head and tail of the answer, tool titles) up to
+/// 85%, then one-line turns; the oldest are dropped with a note.
 #[must_use]
 pub fn render_history(turns: &[ContextTurn], budget: usize) -> String {
-    let mut verbatim: Vec<String> = Vec::new();
+    let tiers: [(fn(&ContextTurn) -> String, usize); 3] = [
+        (full, budget / 10 * 6),
+        (condensed, budget / 100 * 85),
+        (compact, budget),
+    ];
+    let mut parts: Vec<String> = Vec::new();
     let mut used = 0usize;
-    let mut split = turns.len();
-    for (index, turn) in turns.iter().enumerate().rev() {
-        let text = full(turn);
-        if used + text.len() > budget {
-            break;
+    let mut next = turns.len();
+    for (render, cap) in tiers {
+        while next > 0 {
+            let text = render(&turns[next - 1]);
+            let first_fits = parts.is_empty() && used + text.len() <= budget;
+            if used + text.len() > cap && !first_fits {
+                break;
+            }
+            used += text.len();
+            parts.push(text);
+            next -= 1;
         }
-        used += text.len();
-        verbatim.push(text);
-        split = index;
     }
-    verbatim.reverse();
-    let mut compacted: Vec<String> = Vec::new();
-    let mut dropped = 0usize;
-    for turn in turns[..split].iter().rev() {
-        let line = compact(turn);
-        if used + line.len() > budget {
-            dropped = turns[..split].len() - compacted.len();
-            break;
-        }
-        used += line.len();
-        compacted.push(line);
-    }
-    compacted.reverse();
     let mut out = String::new();
-    if dropped > 0 {
-        let _ = writeln!(out, "({dropped} earlier turns omitted)");
+    if next > 0 {
+        let _ = writeln!(out, "({next} earlier turns omitted)");
     }
-    for line in compacted {
-        out.push_str(&line);
-    }
-    for text in verbatim {
-        out.push_str(&text);
+    for text in parts.iter().rev() {
+        out.push_str(text);
     }
     out
 }
@@ -276,6 +298,33 @@ mod tests {
         assert!(block.contains("do not run those tool calls again"));
         // No tools at all keeps the old wording.
         assert!(partial_block("agy", "x", &[]).contains("(none)"));
+    }
+
+    #[test]
+    fn older_turns_keep_a_condensed_answer_before_one_line_turns() {
+        let answer = format!("{}decided: use folds{}", "a".repeat(400), "b".repeat(6_000));
+        let turns: Vec<ContextTurn> = (0..30)
+            .map(|seq| ContextTurn {
+                seq,
+                agent: String::from("Codex"),
+                user: format!("request {seq}"),
+                assistant: answer.clone(),
+                tools: vec![digest(&format!("Read file-{seq}"), "out")],
+            })
+            .collect();
+        let budget = 60_000;
+        let text = render_history(&turns, budget);
+        assert!(text.len() <= budget, "{}", text.len());
+        assert!(text.contains("[turn 29] user:"), "newest turn is verbatim");
+        assert!(text.contains("decided: use folds\n") || text.contains("tools: Read file-"));
+        assert!(
+            text.contains("tools: Read file-"),
+            "condensed turns keep tool titles"
+        );
+        let first = text
+            .find("request 0")
+            .or_else(|| text.find("earlier turns omitted"));
+        assert!(first.is_some());
     }
 
     #[test]

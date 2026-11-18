@@ -186,6 +186,10 @@ async fn check_one(
                 _ => Some(format!("session {session_id} does not exist")),
             }
         }
+        ContextItem::Research => {
+            row.label = crate::research::LABEL.into();
+            None
+        }
     }
 }
 
@@ -323,6 +327,9 @@ pub(crate) async fn blocks(
                 out.push(
                     json!({"type": "text", "text": session_transcript(ctx, session_id).await}),
                 );
+            }
+            ContextItem::Research => {
+                out.push(json!({"type": "text", "text": crate::research::INSTRUCTIONS}));
             }
         }
     }

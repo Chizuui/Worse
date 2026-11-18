@@ -88,6 +88,7 @@ pub fn definitions(mode: &str, background: bool) -> Vec<Value> {
             &command_schema(background),
         ));
     }
+    out.extend(crate::web::definitions());
     out
 }
 
@@ -240,6 +241,7 @@ fn title_of(name: &str, args: &Value) -> (String, &'static str) {
             ),
             "execute",
         ),
+        other if crate::web::handles(other) => (crate::web::title(other, args), "fetch"),
         other => (other.to_owned(), "other"),
     }
 }
@@ -336,6 +338,12 @@ impl Ctx<'_> {
             "write_file" => self.write_file(args).await,
             "edit_file" => self.edit_file(args).await,
             "run_command" => self.run_command(args).await,
+            other if crate::web::handles(other) => {
+                match crate::web::run(&self.agent.http, other, args).await {
+                    Ok(text) => Outcome::ok(text),
+                    Err(text) => Outcome::err(text),
+                }
+            }
             other if McpSet::handles(other) => match self.mcp.call(other, args.clone()).await {
                 Ok(text) => Outcome::ok(text),
                 Err(text) => Outcome::err(text),

@@ -475,7 +475,11 @@ impl State {
         theme.set_code_size(f32::from(settings.appearance.code_font_size) * zoom);
         theme.set_reduce_motion(settings.appearance.reduce_motion);
         // "#7C8CFF" was the old default accent and is no longer offered: treat it as "use the default".
-        let accent = if settings.appearance.accent_color.eq_ignore_ascii_case("#7C8CFF") {
+        let accent = if settings
+            .appearance
+            .accent_color
+            .eq_ignore_ascii_case("#7C8CFF")
+        {
             "#C8F04A"
         } else {
             settings.appearance.accent_color.as_str()
@@ -1515,7 +1519,11 @@ pub fn patch_setting(path: &str, value: Value) {
 /// and repeats dropped, order kept.
 fn command_code_keys(text: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
-    for key in text.split(['\n', '\r', ',', ';']).map(str::trim).filter(|k| !k.is_empty()) {
+    for key in text
+        .split(['\n', '\r', ',', ';'])
+        .map(str::trim)
+        .filter(|k| !k.is_empty())
+    {
         if !out.iter().any(|k| k == key) {
             out.push(key.to_owned());
         }
@@ -1995,7 +2003,11 @@ fn wire(window: &AppWindow) {
                     .into_iter()
                     .enumerate()
                     .map(|(i, api_key)| api::AddProvider {
-                        label: if many { format!("{label} {}", i + 1) } else { label.clone() },
+                        label: if many {
+                            format!("{label} {}", i + 1)
+                        } else {
+                            label.clone()
+                        },
                         base_url: String::new(),
                         model: String::new(),
                         api_key,

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use harness_core_api::{
-    AgentId, ApiError, ApiResult, BackgroundTask, ErrorClass, EventKind, ToolCallStatus, TurnAttempt,
-    TurnId, TurnOrigin, TurnOutcome, TurnStatus, TurnView,
+    AgentId, ApiError, ApiResult, BackgroundTask, ErrorClass, EventKind, ToolCallStatus,
+    TurnAttempt, TurnId, TurnOrigin, TurnOutcome, TurnStatus, TurnView,
 };
 use serde_json::{json, Value};
 

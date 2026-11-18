@@ -217,7 +217,12 @@ pub fn install(window: &AppWindow) {
     ui.on_agent_color(|id| agent_color(id.as_str()));
     ui.on_line_count(|text| {
         let text = text.trim_end();
-        i32::try_from(if text.is_empty() { 0 } else { text.lines().count() }).unwrap_or(i32::MAX)
+        i32::try_from(if text.is_empty() {
+            0
+        } else {
+            text.lines().count()
+        })
+        .unwrap_or(i32::MAX)
     });
     ui.on_connect(|from, to| {
         edit(true, |s| {
@@ -434,11 +439,10 @@ fn render() {
         let mut candidates = Vec::new();
         for a in &order {
             for b in &s.graph.nodes {
-                let linked = s
-                    .graph
-                    .edges
-                    .iter()
-                    .any(|e| (e.from == a.id && e.to == b.id) || (e.from == b.id && e.to == a.id));
+                let linked =
+                    s.graph.edges.iter().any(|e| {
+                        (e.from == a.id && e.to == b.id) || (e.from == b.id && e.to == a.id)
+                    });
                 let seen = candidates
                     .iter()
                     .any(|c: &OrchConn| c.from_id == b.id.as_str() && c.to_id == a.id.as_str());
@@ -448,7 +452,9 @@ fn render() {
             }
         }
         sync(&ui.get_agents(), all, |m| ui.set_agents(m));
-        sync(&ui.get_connections(), connections, |m| ui.set_connections(m));
+        sync(&ui.get_connections(), connections, |m| {
+            ui.set_connections(m)
+        });
         sync(&ui.get_candidates(), candidates, |m| ui.set_candidates(m));
         let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
         for n in &s.graph.nodes {

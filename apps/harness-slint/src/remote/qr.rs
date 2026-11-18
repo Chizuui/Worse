@@ -59,7 +59,8 @@ mod tests {
 
     #[test]
     fn renders_a_pair_link() {
-        let image = image("https://harness.trycloudflare.com/p#t=00112233445566778899aabbccddeeff").expect("qr");
+        let image = image("https://harness.trycloudflare.com/p#t=00112233445566778899aabbccddeeff")
+            .expect("qr");
         assert!(image.size().width > 0 && image.size().width == image.size().height);
     }
 

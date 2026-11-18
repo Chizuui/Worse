@@ -41,6 +41,7 @@ export global DockUi {
     // Open picker menu: "" | "mode" | "model" | "effort" | "options" (UI-local).
     in-out property <string> picker-open;
     in property <bool> machine;
+    in property <bool> research;
     in-out property <length> menu-x;
     in-out property <length> menu-y;
     in-out property <length> menu-w;
@@ -104,7 +105,7 @@ export component PickerButton inherits HorizontalLayout {
         text: root.value;
         trailing-chevron: true;
         label: DockUi.picker-label(root.which) + ": " + root.value;
-        text-color: root.which == "mode" && DockUi.machine ? Theme.destructive : Theme.foreground-subtle;
+        text-color: root.which == "mode" && DockUi.machine ? Theme.destructive : root.which == "mode" && DockUi.research ? Theme.brand : Theme.foreground-subtle;
         enabled: !DockUi.options-locked && !DockUi.options-pending;
         clicked => {
             DockUi.picker-open = DockUi.picker-open == root.which ? "" : root.which;
@@ -256,6 +257,15 @@ component OptionSection inherits VerticalLayout {
             DockUi.picker-open = "";
         }
     }
+    if root.which == "mode": MenuItem {
+        text: "Deep research";
+        label: "mode-option Deep research";
+        checked: DockUi.research;
+        clicked => {
+            DockUi.pick-option("mode", "harness:research");
+            DockUi.picker-open = "";
+        }
+    }
 }
 
 component OptionItem inherits Rectangle {
@@ -396,6 +406,16 @@ export component PickerMenu inherits HorizontalLayout {
             checked: DockUi.machine;
             clicked => {
                 DockUi.pick-option("mode", "harness:machine");
+                DockUi.picker-open = "";
+            }
+        }
+        OptionItem {
+            text: "Deep research";
+            description: "Search the web and write a sourced report";
+            label: "mode-option Deep research";
+            checked: DockUi.research;
+            clicked => {
+                DockUi.pick-option("mode", "harness:research");
                 DockUi.picker-open = "";
             }
         }

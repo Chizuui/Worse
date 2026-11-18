@@ -832,6 +832,7 @@ impl ChatState {
                     self.chip_data.push(Chip::Paste(text));
                 }
                 ContextItem::Session { session_id } => self.add_session_chip(session_id.as_str()),
+                ContextItem::Research => {}
             }
         }
         self.last_draft = text.to_string();

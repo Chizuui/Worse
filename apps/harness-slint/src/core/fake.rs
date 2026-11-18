@@ -499,7 +499,8 @@ impl FakeCore {
                     super::FleetSession {
                         id: session.clone(),
                         title: s.summary.title.clone(),
-                        prompt: "Split the hub into smaller modules and keep the tests green".into(),
+                        prompt: "Split the hub into smaller modules and keep the tests green"
+                            .into(),
                         agent: s.sticky.clone(),
                         running: s.run.is_some(),
                         open: true,

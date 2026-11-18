@@ -14,7 +14,7 @@
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
-use harness_core_api::{FailureKind, MentionKind, MentionQuery, RetryHint};
+use harness_core_api::{ContextItem, FailureKind, MentionKind, MentionQuery, RetryHint};
 
 use super::{with_state, UiState};
 use crate::core::{ChatCall, Command, QueuedMessage, SessionId};
@@ -35,6 +35,12 @@ pub(super) struct DockState {
     effort_id: Option<String>,
     /// Config option id behind the model picker (`SessionOptions.model_id`; `None` = `session/set_model`).
     model_id: Option<String>,
+    /// Sessions in deep research mode: each composer message gets `ContextItem::Research`.
+    research: std::collections::HashSet<SessionId>,
+    /// Mode picker text without the research suffix.
+    mode_label: String,
+    /// Deep research chosen before the first message of a new chat.
+    draft_research: bool,
 }
 
 /// Picker values of one `Event::SessionOptions`.
@@ -213,10 +219,11 @@ impl UiState {
             return;
         };
         let draft = self.window.get_draft().to_string();
-        let (text, context) = crate::chat::prepare_send(&draft);
+        let (text, mut context) = crate::chat::prepare_send(&draft);
         if text.trim().is_empty() && context.is_empty() {
             return;
         }
+        self.add_research(&session, &mut context);
         self.window.set_draft(SharedString::new());
         self.send(Command::Steer {
             session,
@@ -238,6 +245,7 @@ impl UiState {
             dock.set_picker_open(SharedString::new());
             dock.set_machine(false);
             crate::machine_view::set_session(&self.window, None, false, "", "");
+            dock.set_research(self.active.is_none() && self.dock_state.draft_research);
             self.dock_state.effort_id = None;
             self.dock_state.model_id = None;
             return;
@@ -256,11 +264,11 @@ impl UiState {
             &self.sticky,
             &self.agent_name(&self.sticky),
         );
-        dock.set_mode_name(if o.machine {
-            sv("Machine")
+        let mode_label = if o.machine {
+            "Machine".to_owned()
         } else {
-            sv(&chosen_name(&o.modes, o.mode.as_deref()))
-        });
+            chosen_name(&o.modes, o.mode.as_deref())
+        };
         dock.set_model_name(sv(&chosen_name(&o.models, o.model.as_deref())));
         dock.set_effort_name(sv(&chosen_name(&o.efforts, o.effort.as_deref())));
         dock.set_options_locked(o.locked);
@@ -270,9 +278,55 @@ impl UiState {
         }
         self.dock_state.effort_id = o.effort_id;
         self.dock_state.model_id = o.model_id;
+        self.dock_state.mode_label = mode_label;
+        self.show_research();
     }
 
-    fn pick_option(&self, which: &str, id: &str) {
+    fn show_research(&self) {
+        let on = self
+            .active
+            .as_ref()
+            .map_or(self.dock_state.draft_research, |session| {
+                self.dock_state.research.contains(session)
+            });
+        let dock = self.dock();
+        dock.set_research(on);
+        let label = &self.dock_state.mode_label;
+        dock.set_mode_name(sv(&match (on, label.is_empty()) {
+            (false, _) => label.clone(),
+            (true, true) => "Deep research".to_owned(),
+            (true, false) => format!("{label} · Research"),
+        }));
+    }
+
+    pub(super) fn add_research(&mut self, session: &SessionId, context: &mut Vec<ContextItem>) {
+        if context.contains(&ContextItem::Research) {
+            self.dock_state.research.insert(session.clone());
+            self.show_research();
+        } else if self.dock_state.research.contains(session) {
+            context.push(ContextItem::Research);
+        }
+    }
+
+    pub(super) fn take_draft_research(&mut self, context: &mut Vec<ContextItem>) {
+        if std::mem::take(&mut self.dock_state.draft_research) {
+            context.push(ContextItem::Research);
+        }
+    }
+
+    fn pick_option(&mut self, which: &str, id: &str) {
+        if which == "mode" && id == "harness:research" {
+            match self.active.clone() {
+                Some(session) => {
+                    if !self.dock_state.research.remove(&session) {
+                        self.dock_state.research.insert(session);
+                    }
+                }
+                None => self.dock_state.draft_research = !self.dock_state.draft_research,
+            }
+            self.show_research();
+            return;
+        }
         let Some(session) = self.active.clone() else {
             return;
         };

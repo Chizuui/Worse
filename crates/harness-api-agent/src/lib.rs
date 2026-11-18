@@ -6,7 +6,11 @@
 //! The API key is only ever put into the `Authorization` header; it is never logged or echoed.
 
 mod background;
+mod compress;
+mod compress_tools;
 mod hermes;
+mod web;
+mod web_text;
 mod llm;
 mod mcp;
 mod project_docs;

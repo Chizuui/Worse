@@ -137,7 +137,9 @@ pub(super) fn refresh(ui: &DocUi, original: &str, path: &Path) {
     let entries: Vec<DocEntry> = all
         .iter()
         .enumerate()
-        .filter(|(_, s)| query.is_empty() || section_text(&lines, **s).to_lowercase().contains(&query))
+        .filter(|(_, s)| {
+            query.is_empty() || section_text(&lines, **s).to_lowercase().contains(&query)
+        })
         .map(|(i, s)| {
             let body = &lines[s.start..s.end];
             let title = body
@@ -145,7 +147,10 @@ pub(super) fn refresh(ui: &DocUi, original: &str, path: &Path) {
                 .find(|l| !l.trim().is_empty())
                 .map(|l| clean(l))
                 .unwrap_or_default();
-            let first_is_heading = body.iter().find(|l| !l.trim().is_empty()).is_some_and(|l| is_heading(l));
+            let first_is_heading = body
+                .iter()
+                .find(|l| !l.trim().is_empty())
+                .is_some_and(|l| is_heading(l));
             let detail = body
                 .iter()
                 .filter(|l| !l.trim().is_empty())
@@ -186,7 +191,10 @@ mod tests {
         assert_eq!(s.len(), 3);
         assert_eq!(entry_text(t, 1), "## A\n- a1");
         assert_eq!(replace_entry(t, 1, None), "intro\n\n## B\nb");
-        assert_eq!(replace_entry(t, 2, Some("## C")), "intro\n\n## A\n- a1\n## C");
+        assert_eq!(
+            replace_entry(t, 2, Some("## C")),
+            "intro\n\n## A\n- a1\n## C"
+        );
         let (n, i) = append_entry(t);
         assert_eq!(i, 3);
         assert!(n.ends_with("## New memory\n- "));

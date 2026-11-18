@@ -382,7 +382,8 @@ mod tests {
                 .replace("ping -n 30 127.0.0.1 >nul", "sleep 30")
                 .replace("exit /b ", "exit ");
             std::fs::write(&path, format!("#!/bin/sh\n{script}\n")).expect("write stub");
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).expect("chmod stub");
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+                .expect("chmod stub");
             path
         }
     }
@@ -425,13 +426,22 @@ mod tests {
     #[test]
     fn resolve_bin_appends_exe_only_when_needed() {
         if !cfg!(windows) {
-            assert_eq!(resolve_bin("/usr/bin/cloudflared"), PathBuf::from("/usr/bin/cloudflared"));
+            assert_eq!(
+                resolve_bin("/usr/bin/cloudflared"),
+                PathBuf::from("/usr/bin/cloudflared")
+            );
             return;
         }
         // Extensionless and not a file → `.exe` (e.g. `C:\tools\cftunnel`).
-        assert_eq!(resolve_bin(r"D:\harness-missing-cftunnel"), PathBuf::from(r"D:\harness-missing-cftunnel.exe"));
+        assert_eq!(
+            resolve_bin(r"D:\harness-missing-cftunnel"),
+            PathBuf::from(r"D:\harness-missing-cftunnel.exe")
+        );
         // Already has an extension → unchanged.
-        assert_eq!(resolve_bin(r"C:\tools\cftunnel.exe"), PathBuf::from(r"C:\tools\cftunnel.exe"));
+        assert_eq!(
+            resolve_bin(r"C:\tools\cftunnel.exe"),
+            PathBuf::from(r"C:\tools\cftunnel.exe")
+        );
         // An existing extensionless file is used as it is.
         let dir = temp_dir("resolve");
         let plain = dir.join("tunnel");

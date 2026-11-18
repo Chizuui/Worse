@@ -16,7 +16,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
-use slint::{ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, Timer, TimerMode, VecModel};
+use slint::{
+    ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, Timer, TimerMode, VecModel,
+};
 
 use crate::ui::{AppWindow, LiveUi, ScreenAct, ScreenUi};
 
@@ -63,16 +65,29 @@ struct Event {
 fn parse(line: &str) -> Option<Event> {
     let v: Value = serde_json::from_str(line).ok()?;
     let kind = v.get("kind")?.as_str()?.to_owned();
-    let (w, h) = (v.get("w").and_then(Value::as_f64), v.get("h").and_then(Value::as_f64));
-    let at = match (v.get("x").and_then(Value::as_f64), v.get("y").and_then(Value::as_f64), w, h) {
-        (Some(x), Some(y), Some(w), Some(h)) if w > 0.0 && h > 0.0 => {
-            Some(((x / w).clamp(0.0, 1.0) as f32, (y / h).clamp(0.0, 1.0) as f32))
-        }
+    let (w, h) = (
+        v.get("w").and_then(Value::as_f64),
+        v.get("h").and_then(Value::as_f64),
+    );
+    let at = match (
+        v.get("x").and_then(Value::as_f64),
+        v.get("y").and_then(Value::as_f64),
+        w,
+        h,
+    ) {
+        (Some(x), Some(y), Some(w), Some(h)) if w > 0.0 && h > 0.0 => Some((
+            (x / w).clamp(0.0, 1.0) as f32,
+            (y / h).clamp(0.0, 1.0) as f32,
+        )),
         _ => None,
     };
     Some(Event {
         kind,
-        text: v.get("text").and_then(Value::as_str).unwrap_or_default().to_owned(),
+        text: v
+            .get("text")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
         at,
         t: v.get("t").and_then(Value::as_u64).unwrap_or(0),
     })
@@ -94,7 +109,13 @@ pub(crate) fn install(_window: &AppWindow, home: &Path) {
 }
 
 /// The open session, its Machine mode and the agent at its controls changed (dock options).
-pub(crate) fn set_session(window: &AppWindow, session: Option<&str>, machine: bool, agent: &str, agent_name: &str) {
+pub(crate) fn set_session(
+    window: &AppWindow,
+    session: Option<&str>,
+    machine: bool,
+    agent: &str,
+    agent_name: &str,
+) {
     let screen = window.global::<ScreenUi>();
     screen.set_agent(agent.into());
     screen.set_agent_name(agent_name.into());
@@ -128,11 +149,13 @@ pub(crate) fn set_session(window: &AppWindow, session: Option<&str>, machine: bo
     }
     let weak = window.as_weak();
     STATE.with(|cell| {
-        cell.borrow().timer.start(TimerMode::Repeated, POLL, move || {
-            if let Some(window) = weak.upgrade() {
-                tick(&window);
-            }
-        });
+        cell.borrow()
+            .timer
+            .start(TimerMode::Repeated, POLL, move || {
+                if let Some(window) = weak.upgrade() {
+                    tick(&window);
+                }
+            });
     });
 }
 
@@ -168,7 +191,8 @@ fn tick(window: &AppWindow) {
     let mut shot = false;
     for event in &events {
         // Events read when a session is opened may be old: they fill the log but are not "live".
-        let recent = now_ms.saturating_sub(event.t) < u64::try_from(BUSY.as_millis()).unwrap_or(5000);
+        let recent =
+            now_ms.saturating_sub(event.t) < u64::try_from(BUSY.as_millis()).unwrap_or(5000);
         fresh |= recent;
         shot |= event.kind == "screenshot";
         if let Some((x, y)) = event.at {
@@ -176,7 +200,11 @@ fn tick(window: &AppWindow) {
             screen.set_py(y);
         }
         screen.set_kind(event.kind.as_str().into());
-        screen.set_caption(if recent { caption(event).into() } else { slint::SharedString::new() });
+        screen.set_caption(if recent {
+            caption(event).into()
+        } else {
+            slint::SharedString::new()
+        });
         STATE.with(|cell| {
             let mut s = cell.borrow_mut();
             s.log.push_front((event.kind.clone(), event.text.clone()));
@@ -287,7 +315,9 @@ mod tests {
         assert_eq!(e.at, Some((0.5, 0.5)));
         assert_eq!(e.t, 1_700_000_000_000);
         // No screenshot yet (w = h = 0): the action has no place on the picture.
-        let e = parse(r#"{"seq":1,"t":1,"kind":"move","text":"to 5, 5","w":0,"h":0,"x":5.0,"y":5.0}"#).unwrap();
+        let e =
+            parse(r#"{"seq":1,"t":1,"kind":"move","text":"to 5, 5","w":0,"h":0,"x":5.0,"y":5.0}"#)
+                .unwrap();
         assert_eq!(e.at, None);
         assert!(parse("not json").is_none());
         assert!(parse(r#"{"text":"no kind"}"#).is_none());

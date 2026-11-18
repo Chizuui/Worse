@@ -57,9 +57,7 @@ pub fn refresh() {
     });
     if due {
         // agy 账号列表先到，随后的 Claude 账号列表触发读取。
-        crate::bridge::send(crate::core::Command::AgyAccounts(
-            api::AgyAccountOp::List,
-        ));
+        crate::bridge::send(crate::core::Command::AgyAccounts(api::AgyAccountOp::List));
         crate::bridge::send(crate::core::Command::Accounts(
             crate::core::AccountsCall::List,
         ));

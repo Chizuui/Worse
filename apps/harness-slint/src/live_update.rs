@@ -246,10 +246,24 @@ mod tests {
 
     #[test]
     fn fingerprint_parses_back() {
-        assert_eq!(parse_fingerprint("1024-1700000000"), Some((1024, 1_700_000_000)));
+        assert_eq!(
+            parse_fingerprint("1024-1700000000"),
+            Some((1024, 1_700_000_000))
+        );
         assert_eq!(parse_fingerprint("7-0"), Some((7, 0)));
-        assert_eq!(parse_fingerprint("1024-1700000000").map(|(l, m)| fingerprint(l, Some(m))), Some("1024-1700000000".to_string()));
-        for bad in ["", "1024", "abc-1700000000", "1024-", "-1", "1024-1-2", "1.5-2"] {
+        assert_eq!(
+            parse_fingerprint("1024-1700000000").map(|(l, m)| fingerprint(l, Some(m))),
+            Some("1024-1700000000".to_string())
+        );
+        for bad in [
+            "",
+            "1024",
+            "abc-1700000000",
+            "1024-",
+            "-1",
+            "1024-1-2",
+            "1.5-2",
+        ] {
             assert_eq!(parse_fingerprint(bad), None, "{bad:?}");
         }
     }
@@ -262,7 +276,10 @@ mod tests {
 
     #[test]
     fn copy_name_uses_the_fingerprint() {
-        assert_eq!(copy_name("12-34"), format!("harness-slint-12-34{}", super::COPY_SUFFIX));
+        assert_eq!(
+            copy_name("12-34"),
+            format!("harness-slint-12-34{}", super::COPY_SUFFIX)
+        );
     }
 
     #[test]
@@ -271,7 +288,12 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp dir");
         let keep = "harness-slint-2-2.exe";
-        for name in [keep, "harness-slint-1-1.exe", "harness-slint-3-3.exe", "other.exe"] {
+        for name in [
+            keep,
+            "harness-slint-1-1.exe",
+            "harness-slint-3-3.exe",
+            "other.exe",
+        ] {
             std::fs::write(dir.join(name), b"x").expect("write");
         }
         cleanup_in(&dir, keep);

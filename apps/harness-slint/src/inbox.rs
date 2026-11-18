@@ -8,7 +8,8 @@ use slint::{ComponentHandle, ModelRc, SharedString, VecModel, Weak};
 
 use crate::core::{ChatCall, Command, Reply};
 use crate::ui::{
-    AppWindow, InboxNotice, InboxSourceRow, InboxTicketRow, InboxTriggerRow, InboxUi, SelectOption, SettingsUi,
+    AppWindow, InboxNotice, InboxSourceRow, InboxTicketRow, InboxTriggerRow, InboxUi, SelectOption,
+    SettingsUi,
 };
 
 #[derive(Default)]
@@ -345,16 +346,22 @@ fn notices(s: &State) -> Vec<Notice> {
         let item = format!("#{} {}", t.number, t.title);
         let (title, pill, tint) = match t.status {
             TicketStatus::Working => (format!("{name} working: {item}"), "working", 0x7C_8CFF),
-            TicketStatus::NeedsApproval => {
-                (format!("{name} needs permission: {item}"), "waiting", 0xF5_B14C)
-            }
+            TicketStatus::NeedsApproval => (
+                format!("{name} needs permission: {item}"),
+                "waiting",
+                0xF5_B14C,
+            ),
             TicketStatus::Review if t.shadow => {
                 (format!("Proposal ready: {item}"), "proposal", 0x5B_C0FF)
             }
             TicketStatus::Review if t.pending_post => {
                 (format!("Draft ready: {item}"), "draft", 0x5B_C0FF)
             }
-            TicketStatus::Review => (format!("{name} opened a pull request: {item}"), "review", 0x5B_C0FF),
+            TicketStatus::Review => (
+                format!("{name} opened a pull request: {item}"),
+                "review",
+                0x5B_C0FF,
+            ),
             TicketStatus::Done => (format!("{name} finished: {item}"), "done", 0x3D_D68C),
             TicketStatus::Failed => (format!("{name} failed: {item}"), "failed", 0xF2_555A),
             TicketStatus::Discarded => (format!("Discarded: {item}"), "", 0x6B_717C),
@@ -389,7 +396,10 @@ fn notices(s: &State) -> Vec<Notice> {
                 id: sv(&r.id),
                 chip: sv("i"),
                 tint: rgb(0x5B_C0FF),
-                title: sv(&format!("{}#{} {} by {}", r.repo, r.number, r.kind, r.author)),
+                title: sv(&format!(
+                    "{}#{} {} by {}",
+                    r.repo, r.number, r.kind, r.author
+                )),
                 meta: sv(&format!("{} · {}", r.repo, ago(r.received_at))),
                 pill: sv(if !r.accepted {
                     "ignored"
@@ -425,7 +435,11 @@ fn render_notices() {
             count(&|n| n.subagent),
             count(&|n| n.build),
         );
-        let filter = if s.filter.is_empty() { "all".to_owned() } else { s.filter.clone() };
+        let filter = if s.filter.is_empty() {
+            "all".to_owned()
+        } else {
+            s.filter.clone()
+        };
         let rows: Vec<InboxNotice> = list
             .into_iter()
             .filter(|n| match filter.as_str() {

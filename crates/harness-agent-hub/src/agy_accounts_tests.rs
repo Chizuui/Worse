@@ -187,10 +187,16 @@ fn refreshed_token_of_auto_imported_login_is_not_duplicated() {
 fn same_email_with_new_token_is_not_imported_again() {
     let store = MemStore::default();
     let mut file = AgyFile::default();
-    login(&store, br#"{"token":{"access_token":"a1"},"id_token_email":"me@example.com"}"#);
+    login(
+        &store,
+        br#"{"token":{"access_token":"a1"},"id_token_email":"me@example.com"}"#,
+    );
     save_live(&store, &mut file).unwrap();
     file.active = None;
-    login(&store, br#"{"token":{"access_token":"a2"},"id_token_email":"Me@Example.com"}"#);
+    login(
+        &store,
+        br#"{"token":{"access_token":"a2"},"id_token_email":"Me@Example.com"}"#,
+    );
     let sek = file.add("Sek2", 0).unwrap();
     begin_sign_in(&store, &mut file, &sek).unwrap();
     assert_eq!(file.accounts.len(), 2);

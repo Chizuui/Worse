@@ -19,7 +19,10 @@ const PREFIX: &str = "agy-account-";
 
 /// The account an agent is pinned to, if it is an account agent.
 pub(crate) fn account_of(agent: &AgentId) -> Option<&str> {
-    agent.as_str().strip_prefix(PREFIX).filter(|id| !id.is_empty())
+    agent
+        .as_str()
+        .strip_prefix(PREFIX)
+        .filter(|id| !id.is_empty())
 }
 
 /// Adds an agent per Antigravity account after the base agy agent.
@@ -89,7 +92,11 @@ pub(crate) async fn ensure_account(ctx: &HubCtx, agent: &AgentId) -> Result<(), 
     if file.active.as_deref() == Some(account.as_str()) {
         return Ok(());
     }
-    for other in ctx.specs.keys().filter(|id| is_agy(ctx, id) && *id != agent) {
+    for other in ctx
+        .specs
+        .keys()
+        .filter(|id| is_agy(ctx, id) && *id != agent)
+    {
         if ctx.pool.runtime_state(other).await == AgentRuntimeState::Busy {
             return Err(format!(
                 "Antigravity is busy on another account; wait for it to finish before using {name}"
@@ -112,7 +119,9 @@ pub(crate) async fn ensure_account(ctx: &HubCtx, agent: &AgentId) -> Result<(), 
     })
     .await
     .map_err(|e| e.to_string())??;
-    accounts::save(&home, &file).await.map_err(|e| e.to_string())?;
+    accounts::save(&home, &file)
+        .await
+        .map_err(|e| e.to_string())?;
     tracing::info!("agy: switched login for a pinned account agent");
     Ok(())
 }

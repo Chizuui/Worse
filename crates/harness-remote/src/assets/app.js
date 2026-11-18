@@ -89,6 +89,12 @@ const state = {
   backoff: BACKOFF_MIN,
   retryTimer: 0,
   stale: false,
+  follow: true,
+  hidden: 0,
+  omitted: 0,
+  reveal: 0,
+  tail: 60,
+  research: loadResearch(),
 };
 
 /* ---------- formatting ---------- */
@@ -411,7 +417,7 @@ function scheduleListRefresh() {
 /* ---------- markdown-lite ---------- */
 
 const INLINE_RE =
-  /(!\[[^\]\n]*\]\((?:https?:\/\/)[^)\s]+\))|(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\[[^\]\n]+\]\((?:https?:\/\/|mailto:)[^)\s]+\))|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g;
+  /(!\[[^\]\n]*\]\((?:https?:\/\/)[^)\s]+\))|(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\[[^\]\n]+\]\((?:https?:\/\/|mailto:)[^)\s]+\))|(\*[^\s*](?:[^*\n]*[^\s*])?\*)|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g;
 
 function link(label, href) {
   const a = el('a', null, label);
@@ -445,6 +451,8 @@ function inlineInto(parent, text) {
     } else if (m[4]) {
       const cut = token.indexOf('](');
       parent.appendChild(link(token.slice(1, cut), token.slice(cut + 2, -1)));
+    } else if (m[5]) {
+      parent.appendChild(el('em', null, token.slice(1, -1)));
     } else {
       parent.appendChild(link(token, token));
     }
@@ -488,9 +496,16 @@ function textInto(parent, text) {
   let buf = [];
   const flush = () => {
     if (!buf.length) return;
-    const chunk = buf.join('\n');
+    const chunk = buf.join('\n').replace(/^\n+|\n+$/g, '');
     buf = [];
     if (chunk.trim()) inlineInto(parent, chunk);
+  };
+  const block = (cls, body) => {
+    flush();
+    const node = el('div', cls);
+    inlineInto(node, body);
+    parent.appendChild(node);
+    return node;
   };
   let i = 0;
   while (i < lines.length) {
@@ -505,8 +520,31 @@ function textInto(parent, text) {
       tableInto(parent, rows);
       continue;
     }
-    buf.push(lines[i]);
+    const line = lines[i];
     i += 1;
+    const heading = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*$/.exec(line);
+    if (heading) {
+      block('md-h md-h' + Math.min(heading[1].length, 3), heading[2]);
+      continue;
+    }
+    if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      flush();
+      parent.appendChild(el('hr'));
+      continue;
+    }
+    const item = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(line);
+    if (item) {
+      const node = block('md-li', item[3]);
+      node.style.marginLeft = Math.min(4, Math.floor(item[1].length / 2)) * 14 + 'px';
+      node.dataset.mark = /\d/.test(item[2]) ? item[2] : '•';
+      continue;
+    }
+    const quote = /^\s*>\s?(.*)$/.exec(line);
+    if (quote) {
+      block('md-quote', quote[1]);
+      continue;
+    }
+    buf.push(line);
   }
   flush();
 }
@@ -538,6 +576,7 @@ function newTurn(id) {
     segments: [],
     tools: new Map(),
     article: null,
+    blocks: null,
     dirty: false,
   };
 }
@@ -574,50 +613,106 @@ function getTurn(id) {
   return turn;
 }
 
+const TURN_PAGE = 30;
+const TAIL_FIRST = 60;
+const FLUSH_MS = 90;
+
 let renderQueued = false;
+let flushedAt = 0;
 function markDirty(turn) {
   turn.dirty = true;
   if (renderQueued) return;
   renderQueued = true;
-  requestAnimationFrame(() => {
-    renderQueued = false;
+  const wait = Math.max(0, FLUSH_MS - (performance.now() - flushedAt));
+  setTimeout(() => {
+    requestAnimationFrame(() => {
+      renderQueued = false;
+      flushedAt = performance.now();
+      flushTurns();
+    });
+  }, wait);
+}
+
+function stickToBottom(box) {
+  box.scrollTop = box.scrollHeight;
+}
+
+function scrollAnchor(box) {
+  for (const node of box.querySelectorAll('article.turn')) {
+    if (node.offsetTop + node.offsetHeight > box.scrollTop) {
+      return { id: node.dataset.turn, offset: node.offsetTop - box.scrollTop, fromBottom: box.scrollHeight - box.scrollTop };
+    }
+  }
+  return { id: '', offset: 0, fromBottom: box.scrollHeight - box.scrollTop };
+}
+
+function restoreAnchor(box, anchor) {
+  let node = null;
+  for (const article of box.querySelectorAll('article.turn')) {
+    if (article.dataset.turn === anchor.id) node = article;
+  }
+  box.scrollTop = node ? node.offsetTop - anchor.offset : box.scrollHeight - anchor.fromBottom;
+}
+
+function earlierButton() {
+  let btn = $('#earlier');
+  if (state.hidden <= 0 && state.omitted <= 0) {
+    if (btn) btn.remove();
+    return null;
+  }
+  if (!btn) {
+    btn = el('button', 'earlier', 'Show earlier messages');
+    btn.id = 'earlier';
+    btn.type = 'button';
+    btn.addEventListener('click', () => showEarlier().catch(() => undefined));
+  }
+  return btn;
+}
+
+async function showEarlier() {
+  const box = $('#turns');
+  const anchor = scrollAnchor(box);
+  state.follow = false;
+  if (state.hidden > 0) {
+    state.hidden = Math.max(0, state.hidden - TURN_PAGE);
     flushTurns();
-  });
+  } else if (state.omitted > 0 && state.sessionId) {
+    state.tail *= 3;
+    state.reveal = TURN_PAGE;
+    await openSession(state.sessionId);
+  }
+  restoreAnchor(box, anchor);
 }
 
 function flushTurns() {
   const box = $('#turns');
-  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 160;
-  for (const id of state.order) {
+  const more = earlierButton();
+  if (more && box.firstChild !== more) box.insertBefore(more, box.firstChild);
+  let anchor = more;
+  state.order.forEach((id, index) => {
     const turn = state.turns.get(id);
-    if (!turn) continue;
-    const visible = turn.status !== 'queued' || turn.segments.length > 0;
+    if (!turn) return;
+    const visible = index >= state.hidden && (turn.status !== 'queued' || turn.segments.length > 0);
     if (!visible) {
       if (turn.article) {
         turn.article.remove();
         turn.article = null;
+        turn.blocks = null;
       }
-      continue;
+      return;
     }
     if (!turn.article || turn.dirty) {
-      const article = renderTurn(turn);
-      if (turn.article) turn.article.replaceWith(article);
-      turn.article = article;
+      patchTurn(turn);
       turn.dirty = false;
     }
-  }
-  let anchor = null;
-  for (const id of state.order) {
-    const article = state.turns.get(id) && state.turns.get(id).article;
-    if (!article) continue;
     const want = anchor ? anchor.nextSibling : box.firstChild;
-    if (want !== article) box.insertBefore(article, want);
-    anchor = article;
-  }
+    if (want !== turn.article) box.insertBefore(turn.article, want);
+    anchor = turn.article;
+  });
   for (const pending of state.optimistic) {
     if (pending.node.parentNode !== box || pending.node !== box.lastChild) box.appendChild(pending.node);
   }
-  if (nearBottom) box.scrollTop = box.scrollHeight;
+  if (state.follow) stickToBottom(box);
   updateBusy();
 }
 
@@ -634,19 +729,25 @@ function userBubble(text, attachments) {
   return bubble;
 }
 
-function renderTurn(turn) {
-  const article = el('article', 'turn');
-  article.dataset.turn = turn.id;
-  if (turn.userText) article.appendChild(userBubble(turn.userText));
+function agentBubble(text) {
+  const bubble = el('div', 'bubble agent');
+  const body = el('div', 'msg-body');
+  mdInto(body, text);
+  bubble.appendChild(body);
+  return bubble;
+}
+
+function turnBlocks(turn) {
+  const blocks = [];
+  const note = (key, cls, text) => blocks.push({ key, sig: cls + '|' + text, make: () => el('div', cls, text) });
+  if (turn.userText) blocks.push({ key: 'user', sig: turn.userText, make: () => userBubble(turn.userText) });
   let textBuf = '';
+  let count = 0;
   const flushText = () => {
     if (!textBuf) return;
-    const bubble = el('div', 'bubble agent');
-    const body = el('div', 'msg-body');
-    mdInto(body, textBuf);
-    bubble.appendChild(body);
-    article.appendChild(bubble);
+    const text = textBuf;
     textBuf = '';
+    blocks.push({ key: 'text' + count++, sig: text, make: () => agentBubble(text) });
   };
   for (const seg of turn.segments) {
     if (seg.type === 'text') {
@@ -654,21 +755,47 @@ function renderTurn(turn) {
     } else if (seg.type === 'tool') {
       flushText();
       const tool = turn.tools.get(seg.id);
-      if (tool) article.appendChild(toolCard(tool));
+      if (tool) blocks.push({ key: 'tool:' + seg.id, sig: tool, make: () => toolCard(tool) });
     } else if (seg.type === 'steer') {
       flushText();
-      article.appendChild(userBubble(seg.text));
+      const text = seg.text;
+      blocks.push({ key: 'steer' + count++, sig: text, make: () => userBubble(text) });
     }
   }
   flushText();
-  if (turn.status === 'running' && !turn.segments.length) article.appendChild(el('div', 'note', 'working…'));
-  for (const note of turn.notes) article.appendChild(el('div', 'note' + (note.err ? ' err' : ''), note.text));
-  if (turn.error) article.appendChild(el('div', 'note err', turn.error));
-  else if (turn.status === 'failed' && !turn.notes.some((n) => n.err)) article.appendChild(el('div', 'note err', 'Turn failed'));
-  else if (turn.status === 'cancelled') article.appendChild(el('div', 'note', 'Stopped'));
-  else if (turn.status === 'interrupted') article.appendChild(el('div', 'note', 'Interrupted'));
-  else if (turn.status === 'paused') article.appendChild(el('div', 'note', 'Paused: every agent is out of quota'));
-  return article;
+  if (turn.status === 'running' && !turn.segments.length) note('working', 'note', 'working…');
+  turn.notes.forEach((item, i) => note('note' + i, 'note' + (item.err ? ' err' : ''), item.text));
+  if (turn.error) note('end', 'note err', turn.error);
+  else if (turn.status === 'failed' && !turn.notes.some((n) => n.err)) note('end', 'note err', 'Turn failed');
+  else if (turn.status === 'cancelled') note('end', 'note', 'Stopped');
+  else if (turn.status === 'interrupted') note('end', 'note', 'Interrupted');
+  else if (turn.status === 'paused') note('end', 'note', 'Paused: every agent is out of quota');
+  return blocks;
+}
+
+function patchTurn(turn) {
+  if (!turn.article) {
+    turn.article = el('article', 'turn');
+    turn.article.dataset.turn = turn.id;
+    turn.blocks = null;
+  }
+  const article = turn.article;
+  const previous = turn.blocks || new Map();
+  const next = new Map();
+  let anchor = null;
+  for (const block of turnBlocks(turn)) {
+    const old = previous.get(block.key);
+    const node = old && old.sig === block.sig ? old.node : block.make();
+    if (old && old.node !== node && old.node.open && 'open' in node) node.open = true;
+    next.set(block.key, { sig: block.sig, node });
+    const want = anchor ? anchor.nextSibling : article.firstChild;
+    if (want !== node) article.insertBefore(node, want);
+    anchor = node;
+  }
+  while (anchor ? anchor.nextSibling : article.firstChild) {
+    article.removeChild(anchor ? anchor.nextSibling : article.firstChild);
+  }
+  turn.blocks = next;
 }
 
 const TOOL_STATUS = { pending: 'pending', inProgress: 'running', completed: 'done', failed: 'failed' };
@@ -737,6 +864,9 @@ async function openSession(id) {
     // attachments belong to the composer of the session they were picked in
     state.attachments = [];
     renderAttachments();
+    state.tail = TAIL_FIRST;
+    state.reveal = 0;
+    state.follow = true;
   }
   state.sessionId = id;
   state.opening = id;
@@ -744,7 +874,7 @@ async function openSession(id) {
   if (!state.agents.size) await loadAgents().catch(() => undefined);
   let detail;
   try {
-    detail = await rpc('open_session', { sessionId: id });
+    detail = await rpc('open_session', { sessionId: id, tail: state.tail });
   } catch (err) {
     if (state.opening === id) state.opening = null;
     if (err instanceof Unauthorized) return;
@@ -753,7 +883,7 @@ async function openSession(id) {
     return;
   }
   if (state.sessionId !== id) return;
-  applyDetail(detail);
+  applyDetail(detail, isSame);
   const buffered = state.buffer;
   state.opening = null;
   state.buffer = [];
@@ -761,9 +891,13 @@ async function openSession(id) {
   loadPickers();
 }
 
-function applyDetail(detail) {
+function applyDetail(detail, keep) {
+  const box = $('#turns');
+  const anchor = scrollAnchor(box);
+  const shown = keep ? state.order.length - state.hidden : 0;
   state.summary = detail.summary || null;
   state.eventSeq = detail.eventSeq || 0;
+  state.omitted = detail.omittedTurns || 0;
   state.turns = new Map();
   state.order = [];
   state.perms = new Map();
@@ -777,6 +911,8 @@ function applyDetail(detail) {
     state.turns.set(view.id, turnFromView(view));
     state.order.push(view.id);
   }
+  state.hidden = Math.max(0, state.order.length - Math.max(TURN_PAGE, shown) - state.reveal);
+  state.reveal = 0;
   const queued = new Set(detail.queue || []);
   state.queue = (detail.queue || []).map((turnId) => ({
     turnId,
@@ -791,8 +927,12 @@ function applyDetail(detail) {
   renderQueue();
   renderSubagents();
   flushTurns();
-  const box = $('#turns');
-  box.scrollTop = box.scrollHeight;
+  if (keep && !state.follow) {
+    restoreAnchor(box, anchor);
+  } else {
+    state.follow = true;
+    stickToBottom(box);
+  }
 }
 
 function renderHeader() {
@@ -983,6 +1123,40 @@ function selectedName(select) {
   return opt ? opt.textContent : '';
 }
 
+const RESEARCH_KEY = 'harness.research';
+function loadResearch() {
+  try {
+    const list = JSON.parse(localStorage.getItem(RESEARCH_KEY) || '[]');
+    return new Set(Array.isArray(list) ? list : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function researchOn() {
+  return Boolean(state.sessionId && state.research.has(state.sessionId));
+}
+
+function toggleResearch() {
+  if (!state.sessionId) return;
+  if (!state.research.delete(state.sessionId)) state.research.add(state.sessionId);
+  try {
+    localStorage.setItem(RESEARCH_KEY, JSON.stringify([...state.research].slice(-200)));
+  } catch (_) {}
+  syncChip();
+  openSheet('main');
+}
+
+function researchCard() {
+  const row = el('button', 'sheet-card sheet-link');
+  row.type = 'button';
+  row.setAttribute('aria-pressed', researchOn() ? 'true' : 'false');
+  row.appendChild(el('span', 'sheet-link-label', 'Deep research'));
+  row.appendChild(el('span', 'sheet-link-value' + (researchOn() ? ' on' : ''), researchOn() ? 'On' : 'Off'));
+  row.addEventListener('click', toggleResearch);
+  return row;
+}
+
 function syncChip() {
   const model = selectedName($('#model-sel'));
   const effort = selectedName($('#effort-sel'));
@@ -991,7 +1165,8 @@ function syncChip() {
   $('#chip-model').textContent = model || mode || agentName(state.summary && state.summary.activeAgent);
   effortNode.textContent = model || mode ? effort : '';
   effortNode.hidden = !effortNode.textContent;
-  $('#model-chip').title = [model, effort, mode].filter(Boolean).join(' · ');
+  $('#model-chip').title = [model, effort, mode, researchOn() ? 'Deep research' : ''].filter(Boolean).join(' · ');
+  $('#model-chip').classList.toggle('research', researchOn());
 }
 
 const SHEET_TITLES = { mode: 'Mode', model: 'Select model', effort: 'Effort' };
@@ -1130,7 +1305,7 @@ function openSheet(view) {
       if (sheetUsable(kind)) list.appendChild(navCard(kind));
     }
     if (sheetUsable('agent')) list.appendChild(agentLink());
-    if (!list.childNodes.length) return;
+    list.appendChild(researchCard());
   } else if (sheetView === 'agent') {
     if (!sheetUsable('agent')) {
       openSheet('main');
@@ -1186,11 +1361,11 @@ async function loadPickers() {
   const effortOption = findOption(config, 'effort', ['thought_level', 'effort']);
   configIds.model = modelOption ? modelOption.id : null;
   configIds.effort = effortOption ? effortOption.id : null;
-  const a = fillPicker($('#mode-sel'), modes);
-  const b = fillPicker($('#model-sel'), hasModels ? models : optionList(modelOption));
-  const c = fillPicker($('#effort-sel'), optionList(effortOption));
+  fillPicker($('#mode-sel'), modes);
+  fillPicker($('#model-sel'), hasModels ? models : optionList(modelOption));
+  fillPicker($('#effort-sel'), optionList(effortOption));
   syncChip();
-  $('#pickers').hidden = !(a || b || c || sheetUsable('agent'));
+  $('#pickers').hidden = false;
 }
 
 async function changeOption(kind, value) {
@@ -1427,9 +1602,11 @@ async function sendMessage(text, items) {
   state.optimistic.push(pending);
   const box = $('#turns');
   box.appendChild(node);
-  box.scrollTop = box.scrollHeight;
+  state.follow = true;
+  stickToBottom(box);
   try {
     const context = await buildContext(items || []);
+    if (state.research.has(sessionId)) context.push({ type: 'research' });
     await rpc('send_message', { sessionId, text, agent: null, clientMessageId, context });
     if (!wsLive() && state.sessionId === sessionId) setTimeout(() => openSession(sessionId), 500);
     return true;
@@ -1542,9 +1719,20 @@ function scheduleReconnect() {
   }, delay);
 }
 
+const RESYNC_MS = 4000;
+let resyncTimer = 0;
+let resyncedAt = 0;
 function resyncView() {
-  if (state.view === 'session' && state.sessionId) openSession(state.sessionId);
-  else if (state.view === 'list') scheduleListRefresh();
+  if (state.view === 'list') {
+    scheduleListRefresh();
+    return;
+  }
+  if (state.view !== 'session' || !state.sessionId || resyncTimer) return;
+  resyncTimer = setTimeout(() => {
+    resyncTimer = 0;
+    resyncedAt = Date.now();
+    if (state.view === 'session' && state.sessionId) openSession(state.sessionId);
+  }, Math.max(0, RESYNC_MS - (Date.now() - resyncedAt)));
 }
 
 /* ---------- events ---------- */
@@ -1802,6 +1990,19 @@ function bindUi() {
       connect();
     }
   });
+  const turnsBox = $('#turns');
+  turnsBox.addEventListener(
+    'scroll',
+    () => {
+      state.follow = turnsBox.scrollHeight - turnsBox.scrollTop - turnsBox.clientHeight < 80;
+    },
+    { passive: true },
+  );
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => {
+      if (state.follow) stickToBottom(turnsBox);
+    }).observe(turnsBox);
+  }
   setInterval(tickElapsed, 1000);
 }
 

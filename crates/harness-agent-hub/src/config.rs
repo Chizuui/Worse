@@ -124,8 +124,12 @@ impl HubConfig {
             agents,
             default_fallback_order,
             key_pools: Vec::new(),
-            rotate_keys: !std::env::var("HARNESS_KEY_ROTATION")
-                .is_ok_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "off" | "0" | "false")),
+            rotate_keys: !std::env::var("HARNESS_KEY_ROTATION").is_ok_and(|v| {
+                matches!(
+                    v.trim().to_ascii_lowercase().as_str(),
+                    "off" | "0" | "false"
+                )
+            }),
             agent_idle_timeout,
             helpers,
             event_capacity: 4096,

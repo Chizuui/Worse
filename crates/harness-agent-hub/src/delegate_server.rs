@@ -607,44 +607,45 @@ async fn delegate(
         .chars()
         .take(60)
         .collect::<String>();
-    let (child, send_agent) =
-        if let Some(id) = args["session_id"].as_str().filter(|s| !s.is_empty()) {
-            {
-                let child = SessionId::new(id);
-                let known = hub.ctx.subagents.get(&child);
-                if known.as_ref().map(|v| &v.parent_id) != Some(&parent.id) {
-                    return Err(format!("{id} is not a subagent of this session"));
-                }
-                (child, agent)
+    let (child, send_agent) = if let Some(id) =
+        args["session_id"].as_str().filter(|s| !s.is_empty())
+    {
+        {
+            let child = SessionId::new(id);
+            let known = hub.ctx.subagents.get(&child);
+            if known.as_ref().map(|v| &v.parent_id) != Some(&parent.id) {
+                return Err(format!("{id} is not a subagent of this session"));
             }
-        } else {
-            {
-                let request = CreateSession {
-                    workspace_path: parent.workspace_path.clone(),
-                    workspace_identity: Some(parent.workspace_key.clone()),
-                    title: Some(title.clone()),
-                    agent,
-                    worktree: None,
-                };
-                let summary = hub
-                    .create_child_session(request, &parent.id)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                // New subagents start in Machine mode (every permission request is approved), so they
-                // never stop to ask (user request 2026-11-05). The user can turn it off in the subagent's
-                // session.
-                if let Err(error) = hub.set_machine(summary.id.clone(), true).await {
-                    tracing::warn!(session = %summary.id, %error, "subagent machine mode not applied");
-                }
-                // §9.8.1：新子会话的第一轮附带协作说明。
-                task = if role_line.is_empty() {
-                    format!("{PREAMBLE}\n\n{task}")
-                } else {
-                    format!("{PREAMBLE}\n\n{role_line}\n\n{task}")
-                };
-                (summary.id, None)
+            (child, agent)
+        }
+    } else {
+        {
+            let request = CreateSession {
+                workspace_path: parent.workspace_path.clone(),
+                workspace_identity: Some(parent.workspace_key.clone()),
+                title: Some(title.clone()),
+                agent,
+                worktree: None,
+            };
+            let summary = hub
+                .create_child_session(request, &parent.id)
+                .await
+                .map_err(|e| e.to_string())?;
+            // New subagents start in Machine mode (every permission request is approved), so they
+            // never stop to ask (user request 2026-11-05). The user can turn it off in the subagent's
+            // session.
+            if let Err(error) = hub.set_machine(summary.id.clone(), true).await {
+                tracing::warn!(session = %summary.id, %error, "subagent machine mode not applied");
             }
-        };
+            // §9.8.1：新子会话的第一轮附带协作说明。
+            task = if role_line.is_empty() {
+                format!("{PREAMBLE}\n\n{task}")
+            } else {
+                format!("{PREAMBLE}\n\n{role_line}\n\n{task}")
+            };
+            (summary.id, None)
+        }
+    };
     let mut events = hub.ctx.events.subscribe();
     let accepted = hub
         .send_message(SendMessage {

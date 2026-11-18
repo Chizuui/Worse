@@ -93,7 +93,11 @@ impl Fleet {
                 true
             }
             EventKind::AgentSwitched { to, .. } => {
-                self.entries.entry(session).or_default().agent.clone_from(&to.0);
+                self.entries
+                    .entry(session)
+                    .or_default()
+                    .agent
+                    .clone_from(&to.0);
                 true
             }
             EventKind::SubagentUpdated { subagent } => {
@@ -101,7 +105,10 @@ impl Fleet {
                 self.children
                     .insert(subagent.session_id.0.clone(), parent.clone());
                 let list = &mut self.entries.entry(parent).or_default().subagents;
-                match list.iter_mut().find(|s| s.session_id == subagent.session_id) {
+                match list
+                    .iter_mut()
+                    .find(|s| s.session_id == subagent.session_id)
+                {
                     Some(slot) => *slot = subagent.clone(),
                     None => list.insert(0, subagent.clone()),
                 }
@@ -118,9 +125,8 @@ impl Fleet {
             .filter_map(|id| {
                 let entry = self.entries.get(id);
                 let is_open = open == Some(id.as_str());
-                let busy = entry.is_some_and(|e| {
-                    e.running || e.subagents.iter().any(|s| s.status.is_active())
-                });
+                let busy = entry
+                    .is_some_and(|e| e.running || e.subagents.iter().any(|s| s.status.is_active()));
                 let child = self.children.contains_key(id);
                 if !(is_open || (busy && !child)) {
                     return None;

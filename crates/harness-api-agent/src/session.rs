@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 use serde_json::{json, Value};
 use tokio_util::sync::CancellationToken;
 
+use crate::compress::Folds;
+use crate::compress_tools;
 use crate::llm;
 use crate::mcp::McpSet;
 use crate::project_docs;
@@ -16,15 +18,15 @@ use crate::{Agent, Reply};
 const EMPTY_RETRIES: u32 = 2;
 /// Sent after a response was cut off at `max_tokens`.
 const CUT_OFF_NOTE: &str = "[Harness] Your last response hit the output limit and was cut off; any tool call in it was dropped. Continue the task: keep your reasoning short and split large edits into several smaller edit_file calls.";
-/// Rough history budget in characters (~100k tokens); older turns are dropped first.
-const HISTORY_CHARS: usize = 400_000;
 /// Images kept in the history; older ones are replaced by a short note.
 const KEEP_IMAGES: usize = 4;
 
 pub struct Session {
     pub cwd: String,
-    /// Chat messages without the system message.
+    /// Chat messages without the system message, folded ones included.
     pub messages: Vec<Value>,
+    /// Folded ranges of `messages`; the model sees their summaries instead.
+    pub folds: Folds,
     pub mode: String,
     mcp_specs: Vec<Value>,
     mcp: Option<McpSet>,
@@ -48,6 +50,7 @@ impl Session {
         Self {
             cwd,
             messages: Vec::new(),
+            folds: Folds::default(),
             mode: "default".into(),
             mcp_specs,
             mcp: None,
@@ -70,7 +73,7 @@ impl Session {
         if let Some(dir) = path.parent() {
             let _ = tokio::fs::create_dir_all(dir).await;
         }
-        let body = json!({"cwd": self.cwd, "mode": self.mode, "messages": self.messages});
+        let body = json!({"cwd": self.cwd, "mode": self.mode, "messages": self.messages, "context": self.folds.to_json()});
         let tmp = path.with_extension("json.tmp");
         if tokio::fs::write(&tmp, body.to_string()).await.is_ok() {
             let _ = tokio::fs::rename(&tmp, &path).await;
@@ -95,6 +98,7 @@ impl Session {
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
+        session.folds = Folds::from_json(value.get("context"));
         Some(session)
     }
 
@@ -104,7 +108,10 @@ impl Session {
             .iter()
             .filter_map(|m| {
                 let role = m.get("role").and_then(Value::as_str)?;
-                let text = llm::content_text(m.get("content"))?;
+                let mut text = llm::content_text(m.get("content"))?;
+                if let Some(at) = text.find("\n\n[Harness context]") {
+                    text.truncate(at);
+                }
                 match role {
                     "user" => Some((true, text)),
                     "assistant" if !text.is_empty() => Some((false, text)),
@@ -114,24 +121,9 @@ impl Session {
             .collect()
     }
 
-    /// Drops the oldest turns (whole user→… groups) until the history fits the budget.
+    /// Folds (then, as a last resort, drops) the oldest messages until the visible history fits the budget.
     fn trim(&mut self) {
-        let size = |messages: &[Value]| messages.iter().map(llm::message_size).sum::<usize>();
-        while size(&self.messages) > HISTORY_CHARS {
-            let next_user = self
-                .messages
-                .iter()
-                .enumerate()
-                .skip(1)
-                .find(|(_, m)| m.get("role").and_then(Value::as_str) == Some("user"))
-                .map(|(i, _)| i);
-            match next_user {
-                Some(i) => {
-                    self.messages.drain(..i);
-                }
-                None => break,
-            }
-        }
+        self.folds.fit(&mut self.messages);
     }
 }
 
@@ -194,6 +186,9 @@ fn system_prompt(agent: &Agent, session: &Session, instructions: &str) -> String
          re-read files, re-run commands or repeat searches whose results you already have.\n\
          - Stop early: answer as soon as you have enough evidence; do not verify what the task did not ask for.\n\
          - Think briefly: decide the next step in a sentence or two, then act; do not restate the task.\n\
+         Long sessions: fold finished work you no longer need verbatim with context_compress; folded ranges \
+         appear as [Harness folded context fN] summaries, and context_search or context_decompress bring \
+         details back.\n\
          When the task is done, stop and report.\n\
          Keep answers concise and reply in the user's language.",
         label = agent.provider.label,
@@ -266,11 +261,21 @@ pub async fn run_turn(
         set.start_eager().await;
         session.mcp = Some(set);
     }
+    let user = if user.as_str().is_some_and(|t| t.trim() == "/compact") {
+        json!(compress_tools::COMPACT_PROMPT)
+    } else {
+        user
+    };
     session
         .messages
         .push(json!({"role": "user", "content": user}));
     llm::prune_images(&mut session.messages, KEEP_IMAGES);
     session.trim();
+    if let Some(note) = compress_tools::nudge(&mut session.folds, &session.messages) {
+        if let Some(last) = session.messages.last_mut() {
+            compress_tools::append_note(last, &note);
+        }
+    }
     let mut input_tokens = 0;
     let mut output_tokens = 0;
     let mut cached_read = 0;
@@ -284,12 +289,14 @@ pub async fn run_turn(
     let system_as_user = agent.system_as_user().await;
     loop {
         let mut tool_defs = tools::definitions(&session.mode, agent.async_tasks());
+        tool_defs.extend(compress_tools::definitions());
         if let Some(mcp) = &session.mcp {
             tool_defs.extend(mcp.definitions().await);
         }
+        session.trim();
         let messages = request_messages(
             &system_prompt(agent, session, &instructions),
-            &session.messages,
+            &session.folds.view(&session.messages),
             system_as_user,
         );
         let completion = llm::complete(agent, id, &messages, &tool_defs, token).await?;
@@ -365,6 +372,8 @@ pub async fn run_turn(
             for call in &completion.tool_calls {
                 let text = if token.is_cancelled() {
                     "Error: cancelled".to_owned()
+                } else if compress_tools::handles(&call.name) {
+                    compress_tools::run(agent, id, &mut session.folds, &session.messages, call)
                 } else {
                     ctx.run(call).await
                 };
@@ -373,6 +382,11 @@ pub async fn run_turn(
         }
         session.always = always;
         session.messages.extend(results);
+        if let Some(note) = compress_tools::nudge(&mut session.folds, &session.messages) {
+            if let Some(last) = session.messages.last_mut() {
+                compress_tools::append_note(last, &note);
+            }
+        }
         let images = images.into_inner().unwrap_or_default();
         if !images.is_empty() {
             let mut parts = vec![json!({"type": "text", "text": "Images returned by read_file:"})];

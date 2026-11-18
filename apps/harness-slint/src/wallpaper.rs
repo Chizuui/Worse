@@ -217,7 +217,9 @@ fn arm(window: &AppWindow, after_ms: u32) {
 fn tick(window: &AppWindow) {
     // Hidden or unfocused window, or reduced motion: hold the frame and look again later.
     let clock = window.global::<ArtClock>();
-    let paused = !clock.get_visible() || !clock.get_focused() || window.global::<Theme>().get_reduce_motion();
+    let paused = !clock.get_visible()
+        || !clock.get_focused()
+        || window.global::<Theme>().get_reduce_motion();
     if paused {
         arm(window, 500);
         return;
@@ -232,9 +234,18 @@ fn tick(window: &AppWindow) {
             return None;
         }
         let at = u64::try_from(started.elapsed().as_millis()).unwrap_or(0) % total;
-        let index = s.ends.partition_point(|end| *end <= at).min(s.frames.len() - 1);
-        let floor = if crate::gpu_rendering() { MIN_DELAY_MS } else { CPU_FRAME_MS };
-        let wait = u32::try_from(s.ends[index] - at).unwrap_or(MIN_DELAY_MS).max(floor);
+        let index = s
+            .ends
+            .partition_point(|end| *end <= at)
+            .min(s.frames.len() - 1);
+        let floor = if crate::gpu_rendering() {
+            MIN_DELAY_MS
+        } else {
+            CPU_FRAME_MS
+        };
+        let wait = u32::try_from(s.ends[index] - at)
+            .unwrap_or(MIN_DELAY_MS)
+            .max(floor);
         let frame = (index != s.shown).then(|| {
             s.shown = index;
             (s.frames[index].wall.clone(), s.frames[index].frost.clone())
@@ -246,7 +257,9 @@ fn tick(window: &AppWindow) {
     };
     if let Some((wall, _frost)) = frame {
         // Only the wallpaper moves: panels show a flat veil over an animation (see `Frost`).
-        window.global::<Look>().set_wallpaper(Image::from_rgba8(wall));
+        window
+            .global::<Look>()
+            .set_wallpaper(Image::from_rgba8(wall));
     }
     arm(window, wait);
 }
@@ -256,10 +269,14 @@ fn tick(window: &AppWindow) {
 fn load(path: &Path, blur: u16) -> Result<Vec<Frame>, String> {
     let size = std::fs::metadata(path).map_err(|e| e.to_string())?.len();
     if size > MAX_FILE {
-        return Err(format!("the file is larger than {} MB", MAX_FILE / (1024 * 1024)));
+        return Err(format!(
+            "the file is larger than {} MB",
+            MAX_FILE / (1024 * 1024)
+        ));
     }
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-    let format = image::guess_format(&bytes).map_err(|_| "not an image this app can read".to_owned())?;
+    let format =
+        image::guess_format(&bytes).map_err(|_| "not an image this app can read".to_owned())?;
     let animated = match format {
         ImageFormat::Gif => true,
         ImageFormat::WebP => WebPDecoder::new(Cursor::new(&bytes)).is_ok_and(|d| d.has_animation()),
@@ -284,7 +301,12 @@ fn load(path: &Path, blur: u16) -> Result<Vec<Frame>, String> {
 }
 
 /// All frames at `width`, or `None` when they would take more than the budget.
-fn animation(bytes: &[u8], format: ImageFormat, width: u32, blur: u16) -> Result<Option<Vec<Frame>>, String> {
+fn animation(
+    bytes: &[u8],
+    format: ImageFormat,
+    width: u32,
+    blur: u16,
+) -> Result<Option<Vec<Frame>>, String> {
     let frames = match format {
         ImageFormat::Gif => GifDecoder::new(Cursor::new(bytes))
             .map_err(|e| e.to_string())?
@@ -318,7 +340,9 @@ fn compose(image: &RgbaImage, max_width: u32, blur: u16, delay_ms: u32) -> Frame
     let wanted = if blur == 0 {
         max_width
     } else {
-        (max_width * 6 / (6 + u32::from(blur))).max(480).min(max_width)
+        (max_width * 6 / (6 + u32::from(blur)))
+            .max(480)
+            .min(max_width)
     };
     let mut wall = fit(image, wanted);
     flatten(&mut wall);
@@ -368,7 +392,9 @@ mod tests {
     use super::*;
 
     fn gradient(w: u32, h: u32) -> RgbaImage {
-        RgbaImage::from_fn(w, h, |x, y| image::Rgba([(x % 256) as u8, (y % 256) as u8, 128, 255]))
+        RgbaImage::from_fn(w, h, |x, y| {
+            image::Rgba([(x % 256) as u8, (y % 256) as u8, 128, 255])
+        })
     }
 
     #[test]
@@ -404,11 +430,15 @@ mod tests {
         let mut bytes = Vec::new();
         {
             let mut encoder = image::codecs::gif::GifEncoder::new(&mut bytes);
-            encoder.set_repeat(image::codecs::gif::Repeat::Infinite).unwrap();
+            encoder
+                .set_repeat(image::codecs::gif::Repeat::Infinite)
+                .unwrap();
             for n in 0..3u8 {
                 let frame = RgbaImage::from_pixel(8, 8, image::Rgba([n * 80, 0, 0, 255]));
                 let delay = image::Delay::from_numer_denom_ms(120, 1);
-                encoder.encode_frame(image::Frame::from_parts(frame, 0, 0, delay)).unwrap();
+                encoder
+                    .encode_frame(image::Frame::from_parts(frame, 0, 0, delay))
+                    .unwrap();
             }
         }
         let dir = std::env::temp_dir().join(format!("harness-wallpaper-{}", std::process::id()));
@@ -424,7 +454,8 @@ mod tests {
 
     #[test]
     fn unreadable_files_are_errors() {
-        let dir = std::env::temp_dir().join(format!("harness-wallpaper-bad-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("harness-wallpaper-bad-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("note.txt");
         std::fs::write(&path, b"not an image").unwrap();

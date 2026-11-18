@@ -394,6 +394,9 @@ Worse Harness stands on the shoulders of these projects. Thank you to their auth
   protocol behind the Harness MCP registry and built-in servers.
 - [Zed](https://github.com/zed-industries/zed): the editor that introduced ACP and the original ACP
   adapters.
+- [billion-context](https://github.com/ranxianglei/billion-context) by ranxianglei (MIT): the
+  reversible, model-driven context folding (compress, decompress, search, status) that the Harness
+  API agent's context compaction is modelled on.
 
 **Agents Harness integrates with** (used as external tools, not bundled)
 - [Claude Code](https://github.com/anthropics/claude-code) by Anthropic

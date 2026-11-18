@@ -365,7 +365,8 @@ impl UiState {
         self.refresh_sessions();
         self.session_opened(items, summary.unread);
         self.reset_dock();
-        if let Some((text, context)) = self.pending_send.take() {
+        if let Some((text, mut context)) = self.pending_send.take() {
+            self.add_research(&summary.id, &mut context);
             self.send_message(summary.id.clone(), text, context);
         }
     }
@@ -627,6 +628,9 @@ impl UiState {
             } => self.open_session(&session, &items, sticky, &queued, paused),
             Event::ItemAdded { session, id, item } => {
                 if self.is_active(&session) {
+                    if let Item::Tool { status, .. } = &item {
+                        crate::speed::tool(id, *status);
+                    }
                     self.push_item(id, &item);
                 }
             }
@@ -657,6 +661,7 @@ impl UiState {
                 status,
             } => {
                 if self.is_active(&session) {
+                    crate::speed::tool(id, status);
                     self.update_row(id, |row| row.status = tool_status(status));
                 }
             }
@@ -1127,7 +1132,7 @@ fn wire_callbacks(window: &AppWindow) {
     window.on_send_draft(|text| {
         with_state(|s| {
             // 长粘贴并入正文；文件、图片、会话 chip 作为 ACP 上下文（src/chat），并记录提示词历史。
-            let (text, context) = crate::chat::prepare_send(&text);
+            let (text, mut context) = crate::chat::prepare_send(&text);
             if text.trim().is_empty() && context.is_empty() {
                 return;
             }
@@ -1136,8 +1141,10 @@ fn wire_callbacks(window: &AppWindow) {
                 return;
             }
             if let Some(session) = s.active.clone() {
+                s.add_research(&session, &mut context);
                 s.send_message(session, text, context);
             } else {
+                s.take_draft_research(&mut context);
                 s.pending_send = Some((text, context));
                 s.new_session(false, None);
             }

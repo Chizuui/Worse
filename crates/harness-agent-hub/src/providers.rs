@@ -249,7 +249,11 @@ pub(crate) async fn apply(config: &mut HubConfig) {
         config.agents.push(spec);
     }
     config.key_pools = pools(&file.providers);
-    if file.rotation.as_deref().is_some_and(|r| r.eq_ignore_ascii_case("off")) {
+    if file
+        .rotation
+        .as_deref()
+        .is_some_and(|r| r.eq_ignore_ascii_case("off"))
+    {
         config.rotate_keys = false;
     }
 }
@@ -292,10 +296,14 @@ pub(crate) fn pools(entries: &[ProviderEntry]) -> Vec<Vec<AgentId>> {
 
 /// The pool a session asked for `agent` rotates over, if any. The built-in Command Code agent stands for the
 /// pool of Command Code keys.
-pub(crate) fn pool_of<'a>(pools: &'a [Vec<AgentId>], agent: &AgentId) -> Option<(usize, &'a [AgentId])> {
+pub(crate) fn pool_of<'a>(
+    pools: &'a [Vec<AgentId>],
+    agent: &AgentId,
+) -> Option<(usize, &'a [AgentId])> {
     pools.iter().enumerate().find_map(|(i, pool)| {
         let member = pool.contains(agent)
-            || (agent.as_str() == COMMAND_CODE && pool.iter().all(|a| is_command_code_agent(a.as_str())));
+            || (agent.as_str() == COMMAND_CODE
+                && pool.iter().all(|a| is_command_code_agent(a.as_str())));
         member.then_some((i, pool.as_slice()))
     })
 }
@@ -336,24 +344,35 @@ pub(crate) async fn add(
         "" => false,
         KIND_COMMAND_CODE => true,
         other => {
-            return Err(ApiError::InvalidArgument(format!("unknown provider kind {other}")));
+            return Err(ApiError::InvalidArgument(format!(
+                "unknown provider kind {other}"
+            )));
         }
     };
     // A Command Code key has no endpoint or model of its own: the CLI knows both.
     let (base_url, model) = if command_code {
         if request.api_key.trim().is_empty() {
-            return Err(ApiError::InvalidArgument("the API key must not be empty".into()));
+            return Err(ApiError::InvalidArgument(
+                "the API key must not be empty".into(),
+            ));
         }
         (String::new(), String::new())
     } else {
-        (clean_base_url(&request.base_url)?, clean_model(&request.model)?)
+        (
+            clean_base_url(&request.base_url)?,
+            clean_model(&request.model)?,
+        )
     };
     let mut file = load(&config.home).await?;
     let taken = |id: &str| {
         file.providers.iter().any(|e| e.id == id)
             || config.agents.iter().any(|a| a.id.as_str() == id)
     };
-    let prefix = if command_code { COMMAND_CODE_PREFIX } else { ID_PREFIX };
+    let prefix = if command_code {
+        COMMAND_CODE_PREFIX
+    } else {
+        ID_PREFIX
+    };
     let stem = format!("{prefix}{}", slug(&label));
     let mut id = stem.clone();
     let mut n = 2;
@@ -367,7 +386,11 @@ pub(crate) async fn add(
         base_url,
         model,
         api_key: request.api_key.trim().to_owned(),
-        kind: if command_code { KIND_COMMAND_CODE.into() } else { String::new() },
+        kind: if command_code {
+            KIND_COMMAND_CODE.into()
+        } else {
+            String::new()
+        },
     };
     file.providers.push(entry.clone());
     save(&config.home, &file).await?;
@@ -391,7 +414,11 @@ pub(crate) async fn update(
         entry.label = clean_label(label)?;
     }
     // A Command Code key keeps its empty endpoint and model.
-    if let Some(url) = request.base_url.as_ref().filter(|_| !entry.is_command_code()) {
+    if let Some(url) = request
+        .base_url
+        .as_ref()
+        .filter(|_| !entry.is_command_code())
+    {
         entry.base_url = clean_base_url(url)?;
     }
     if let Some(model) = request.model.as_ref().filter(|_| !entry.is_command_code()) {
@@ -460,7 +487,10 @@ mod tests {
     #[test]
     fn one_command_code_key_is_still_a_pool_but_one_provider_is_not() {
         // A single key matters: a session asked for the built-in agent then uses that key.
-        let pools = pools(&[entry("command-code-a", "", "", KIND_COMMAND_CODE), entry("api-one", "https://x/v1", "m", "")]);
+        let pools = pools(&[
+            entry("command-code-a", "", "", KIND_COMMAND_CODE),
+            entry("api-one", "https://x/v1", "m", ""),
+        ]);
         assert_eq!(pools.len(), 1);
         assert_eq!(ids(&pools[0]), ["command-code-a"]);
     }

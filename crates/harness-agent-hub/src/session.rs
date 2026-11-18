@@ -26,6 +26,7 @@ use crate::quota::{format_utc, AgentErrorInfo};
 use crate::store::{self, HandleRow, SessionRow, ToolMark};
 use crate::util::{new_id, now_ms, now_secs};
 
+mod agy_guard;
 mod background;
 mod chat;
 mod queue;
@@ -977,6 +978,11 @@ impl SessionActor {
             )
             .await,
         );
+        if let Some(hint) =
+            crate::agy_delegate::hint(&self.ctx, agent, &self.row.id, fresh, &turn.user_text)
+        {
+            blocks.push(text_block(hint));
+        }
         let mut user = None;
         if let Some((name, input)) = crate::hub_chat::skill_call(&turn.user_text) {
             if let Some(skill) = crate::hub_chat::harness_skills(&self.ctx)
@@ -1159,6 +1165,8 @@ impl SessionActor {
                         .push(mark);
                 }
                 self.append_event(&turn_id, "tool_call", payload).await;
+                let guard = crate::agy_delegate::builtin_spawn(&tool.title, None)
+                    .map(|_| (turn_id.clone(), agent.clone(), tool.clone()));
                 let event = if kind == "tool_call" {
                     EventKind::ToolCall {
                         turn_id,
@@ -1173,6 +1181,9 @@ impl SessionActor {
                     }
                 };
                 self.emit(event);
+                if let Some((turn_id, agent, tool)) = guard {
+                    self.guard_agy_spawn(&turn_id, &agent, &tool).await;
+                }
             }
             "current_mode_update" | "config_option_update" => {
                 self.on_agent_option_update(&agent, update).await;

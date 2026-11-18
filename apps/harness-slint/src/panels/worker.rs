@@ -296,7 +296,13 @@ impl Worker {
         self.terminal = None;
         self.frame_due = None;
         view::diff(&self.window, DiffView::default());
-        view::search(&self.window, Vec::new(), false, String::new(), String::new());
+        view::search(
+            &self.window,
+            Vec::new(),
+            false,
+            String::new(),
+            String::new(),
+        );
         if !was_open {
             return;
         }

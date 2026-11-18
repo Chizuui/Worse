@@ -27,7 +27,11 @@ enum Focus {
     /// The agent read lines `from..=to` (1-based); `to == 0` means "around `from`".
     Read { from: u32, to: u32 },
     /// The agent wrote `new` (replacing `old` when known); `line` is the agent's own location, if any.
-    Edit { new: String, old: Option<String>, line: u32 },
+    Edit {
+        new: String,
+        old: Option<String>,
+        line: u32,
+    },
     /// The user opened the file from a chat chip.
     Open { line: u32 },
 }
@@ -64,7 +68,11 @@ pub(crate) struct RowFile {
 
 /// File and line range a tool call touched, from its content and locations only (no disk access, so loading a
 /// long session stays cheap).
-pub(crate) fn row_file(kind: Option<&str>, content: &[ToolContent], locations: &[ToolLocation]) -> RowFile {
+pub(crate) fn row_file(
+    kind: Option<&str>,
+    content: &[ToolContent],
+    locations: &[ToolLocation],
+) -> RowFile {
     for item in content {
         if let ToolContent::Diff {
             path,
@@ -244,8 +252,15 @@ pub(crate) fn clear(window: &AppWindow) {
 
 /// A running tool call reported content or locations: remember it as the latest target and, when following,
 /// show it.
-pub(crate) fn touch(window: &AppWindow, kind: Option<&str>, content: &[ToolContent], locations: &[ToolLocation]) {
-    let Some(target) = STATE.with(|cell| target_of(&cell.borrow().workspace, kind, content, locations)) else {
+pub(crate) fn touch(
+    window: &AppWindow,
+    kind: Option<&str>,
+    content: &[ToolContent],
+    locations: &[ToolLocation],
+) {
+    let Some(target) =
+        STATE.with(|cell| target_of(&cell.borrow().workspace, kind, content, locations))
+    else {
         return;
     };
     let follow = window.global::<LiveUi>().get_follow();
@@ -275,7 +290,12 @@ pub(crate) fn touch(window: &AppWindow, kind: Option<&str>, content: &[ToolConte
     }
 }
 
-fn target_of(workspace: &Path, kind: Option<&str>, content: &[ToolContent], locations: &[ToolLocation]) -> Option<Target> {
+fn target_of(
+    workspace: &Path,
+    kind: Option<&str>,
+    content: &[ToolContent],
+    locations: &[ToolLocation],
+) -> Option<Target> {
     for item in content {
         if let ToolContent::Diff {
             path,
@@ -373,7 +393,9 @@ fn render(window: &AppWindow, target: Option<&Target>) {
     live.set_name(name.as_str().into());
     live.set_action(view.action.into());
     live.set_note(view.note.as_str().into());
-    live.set_cols(i32::try_from(view.lines.iter().map(|l| cells(&l.text)).max().unwrap_or(0)).unwrap_or(0));
+    live.set_cols(
+        i32::try_from(view.lines.iter().map(|l| cells(&l.text)).max().unwrap_or(0)).unwrap_or(0),
+    );
     live.set_lines(ModelRc::new(VecModel::from(view.lines)));
     live.set_focus(i32::try_from(view.focus).unwrap_or(0));
     let epoch = STATE.with(|cell| {
@@ -397,7 +419,9 @@ fn build(path: &Path, focus: &Focus) -> View {
         Ok(meta) if meta.len() > MAX_BYTES => {
             return note_only("file too large to show");
         }
-        Ok(_) => std::fs::read(path).ok().map(|b| String::from_utf8_lossy(&b).into_owned()),
+        Ok(_) => std::fs::read(path)
+            .ok()
+            .map(|b| String::from_utf8_lossy(&b).into_owned()),
         Err(_) => None,
     };
     let lang = path
@@ -413,7 +437,12 @@ fn build(path: &Path, focus: &Focus) -> View {
             let (action, from, to, note) = match focus {
                 Focus::Read { from, to } => {
                     let to = if *to >= *from { *to } else { *from };
-                    ("read", *from as usize, to as usize, lines_note(*from as usize, to as usize))
+                    (
+                        "read",
+                        *from as usize,
+                        to as usize,
+                        lines_note(*from as usize, to as usize),
+                    )
                 }
                 Focus::Open { line } => ("open", *line as usize, *line as usize, String::new()),
                 Focus::Edit { new, old, line } => match find_block(&file, new) {
@@ -423,10 +452,13 @@ fn build(path: &Path, focus: &Focus) -> View {
                     }
                     None => match old.as_deref().and_then(|o| find_block(&file, o)) {
                         Some(start) => {
-                            let end = start + old.as_deref().map_or(1, |o| o.lines().count().max(1)) - 1;
+                            let end =
+                                start + old.as_deref().map_or(1, |o| o.lines().count().max(1)) - 1;
                             ("pending", start, end, lines_note(start, end))
                         }
-                        None if *line > 0 => ("edit", *line as usize, *line as usize, String::new()),
+                        None if *line > 0 => {
+                            ("edit", *line as usize, *line as usize, String::new())
+                        }
                         None => return snippet(new, &lang, "not found in the file"),
                     },
                 },
@@ -438,7 +470,9 @@ fn build(path: &Path, focus: &Focus) -> View {
 
 /// Width of a line in character cells (wide East Asian characters take two).
 fn cells(text: &str) -> usize {
-    text.chars().map(|c| if u32::from(c) >= 0x1100 { 2 } else { 1 }).sum()
+    text.chars()
+        .map(|c| if u32::from(c) >= 0x1100 { 2 } else { 1 })
+        .sum()
 }
 
 fn lines_note(from: usize, to: usize) -> String {
@@ -487,7 +521,14 @@ fn line_row(no: usize, text: &str, lang: &str, mark: i32) -> LiveLine {
     }
 }
 
-fn window_view(file: &[&str], lang: &str, action: &'static str, from: usize, to: usize, note: String) -> View {
+fn window_view(
+    file: &[&str],
+    lang: &str,
+    action: &'static str,
+    from: usize,
+    to: usize,
+    note: String,
+) -> View {
     let from = from.clamp(1, file.len().max(1));
     let to = to.clamp(from, file.len().max(from));
     let start = from.saturating_sub(BEFORE).max(1);
@@ -500,7 +541,11 @@ fn window_view(file: &[&str], lang: &str, action: &'static str, from: usize, to:
     };
     let lines = (start..=end)
         .map(|no| {
-            let m = if (from..=to).contains(&no) && mark != 0 { mark } else { 0 };
+            let m = if (from..=to).contains(&no) && mark != 0 {
+                mark
+            } else {
+                0
+            };
             line_row(no, file.get(no - 1).copied().unwrap_or_default(), lang, m)
         })
         .collect();
@@ -559,11 +604,20 @@ mod tests {
             path: "src/lib.rs".into(),
             line,
         };
-        assert_eq!(row_file(Some("edit"), &[diff.clone()], &[loc(Some(10))]).range, "L10–11");
+        assert_eq!(
+            row_file(Some("edit"), &[diff.clone()], &[loc(Some(10))]).range,
+            "L10–11"
+        );
         assert_eq!(row_file(Some("edit"), &[diff], &[]).range, "+2 −1");
         let read = row_file(Some("read"), &[text("   5→x\n   6→y")], &[loc(None)]);
-        assert_eq!((read.path.as_str(), read.line, read.range.as_str()), ("src/lib.rs", 5, "L5–6"));
-        assert_eq!(row_file(Some("execute"), &[text("ok")], &[]), RowFile::default());
+        assert_eq!(
+            (read.path.as_str(), read.line, read.range.as_str()),
+            ("src/lib.rs", 5, "L5–6")
+        );
+        assert_eq!(
+            row_file(Some("execute"), &[text("ok")], &[]),
+            RowFile::default()
+        );
     }
 
     #[test]
@@ -583,7 +637,12 @@ mod tests {
         assert_eq!(view.lines.first().map(|l| l.no), Some(120));
         assert_eq!(view.lines.len(), 402 - 120 + 1);
         assert_eq!(view.lines[view.focus].no, 200);
-        let marked: Vec<i32> = view.lines.iter().filter(|l| l.mark == 1).map(|l| l.no).collect();
+        let marked: Vec<i32> = view
+            .lines
+            .iter()
+            .filter(|l| l.mark == 1)
+            .map(|l| l.no)
+            .collect();
         assert_eq!(marked, vec![200, 201, 202]);
     }
 }

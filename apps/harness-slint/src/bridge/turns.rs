@@ -305,10 +305,20 @@ const PEEK_LINES: usize = 6;
 /// The first changed lines of a tool card (removed / added rows of its diffs), for the collapsed row; "…" when
 /// there are more.
 fn peek_parts(parts: &[ToolPart]) -> Vec<ToolPart> {
-    let changed: Vec<&ToolPart> = parts.iter().filter(|p| p.kind == 2 || p.kind == 3).collect();
-    let mut out: Vec<ToolPart> = changed.iter().take(PEEK_LINES).map(|p| (*p).clone()).collect();
+    let changed: Vec<&ToolPart> = parts
+        .iter()
+        .filter(|p| p.kind == 2 || p.kind == 3)
+        .collect();
+    let mut out: Vec<ToolPart> = changed
+        .iter()
+        .take(PEEK_LINES)
+        .map(|p| (*p).clone())
+        .collect();
     if changed.len() > PEEK_LINES {
-        out.push(part(6, &format!("{} more lines", changed.len() - PEEK_LINES)));
+        out.push(part(
+            6,
+            &format!("{} more lines", changed.len() - PEEK_LINES),
+        ));
     }
     out
 }
@@ -666,7 +676,10 @@ impl UiState {
         ui.set_now_s(now_s());
         let running = items.iter().filter(|s| s.status.is_active()).count();
         ui.set_subagents_running(i32::try_from(running).unwrap_or(i32::MAX));
-        let waiting = items.iter().filter(|s| matches!(s.status, SubagentStatus::NeedsApproval)).count();
+        let waiting = items
+            .iter()
+            .filter(|s| matches!(s.status, SubagentStatus::NeedsApproval))
+            .count();
         ui.set_subagents_waiting(i32::try_from(waiting).unwrap_or(i32::MAX));
         let rows: Vec<SubagentRow> = items
             .iter()
@@ -1684,14 +1697,23 @@ mod tests {
     fn trail_keeps_the_steps_before_the_current_one() {
         let mut trail = Trail::default();
         assert!(trail.note("Read a.rs").is_empty());
-        assert!(trail.note("Read a.rs").is_empty(), "the same step reported twice counts once");
+        assert!(
+            trail.note("Read a.rs").is_empty(),
+            "the same step reported twice counts once"
+        );
         assert_eq!(trail.note("Grep x"), vec!["Read a.rs"]);
         assert_eq!(trail.note("Edit a.rs"), vec!["Grep x", "Read a.rs"]);
         assert_eq!(trail.steps, 3);
         // Thinking (no activity): the last finished step leads.
         assert_eq!(trail.note(""), vec!["Edit a.rs", "Grep x", "Read a.rs"]);
-        assert_eq!(trail.note("cargo test"), vec!["Edit a.rs", "Grep x", "Read a.rs"]);
-        assert_eq!(trail.note("Read b.rs"), vec!["cargo test", "Edit a.rs", "Grep x"]);
+        assert_eq!(
+            trail.note("cargo test"),
+            vec!["Edit a.rs", "Grep x", "Read a.rs"]
+        );
+        assert_eq!(
+            trail.note("Read b.rs"),
+            vec!["cargo test", "Edit a.rs", "Grep x"]
+        );
         assert_eq!(trail.steps, 5);
     }
 }

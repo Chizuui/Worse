@@ -273,7 +273,9 @@ impl HubCtx {
         session: &SessionId,
     ) -> Value {
         let mut servers = vec![self.memory_mcp_server(cwd, session)];
-        if let Some(delegate) = self.delegate_mcp_server(session) {
+        if let Some(delegate) =
+            self.delegate_mcp_server(session, crate::agy_ops::is_agy(self, agent))
+        {
             servers.push(delegate);
         }
         if matches!(
@@ -306,7 +308,7 @@ impl HubCtx {
     }
 
     /// ACP `McpServer` entry of `harness-delegate` (§9.8): top-level sessions only, so delegation is one level deep.
-    fn delegate_mcp_server(&self, session: &SessionId) -> Option<Value> {
+    fn delegate_mcp_server(&self, session: &SessionId, compact: bool) -> Option<Value> {
         let endpoint = self.subagents.endpoint.get()?;
         // §9.8.1：子会话也拿到该服务器，但只是 child 角色（notify_parent / claim_paths），仍不能再委派。
         let role = if self.routers.is_router(session) {
@@ -325,7 +327,8 @@ impl HubCtx {
                 {"name": "HARNESS_DELEGATE_ADDR", "value": endpoint.addr},
                 {"name": "HARNESS_DELEGATE_TOKEN", "value": endpoint.token},
                 {"name": "HARNESS_DELEGATE_SESSION", "value": session.as_str()},
-                {"name": "HARNESS_DELEGATE_ROLE", "value": role}
+                {"name": "HARNESS_DELEGATE_ROLE", "value": role},
+                {"name": "HARNESS_DELEGATE_COMPACT", "value": if compact { "1" } else { "0" }}
             ]
         }))
     }

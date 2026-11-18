@@ -14,12 +14,10 @@ mod files;
 mod gitui;
 mod highlight;
 mod import;
-mod live;
-mod machine_view;
-mod speed;
-mod wallpaper;
 mod inbox;
+mod live;
 mod live_update;
+mod machine_view;
 mod markdown;
 mod orchestra;
 mod panels;
@@ -28,6 +26,8 @@ mod release_update;
 mod remote;
 mod settings;
 mod setup;
+mod speed;
+mod wallpaper;
 mod workarea;
 
 #[allow(
@@ -198,7 +198,9 @@ fn select_renderer() {
         Ok("skia" | "gpu") => &["skia", "skia-software", "femtovg", "software"],
         Ok("skia-software" | "cpu") => &["skia-software", "skia", "femtovg", "software"],
         // No override: Settings › General › GPU rendering decides (off by default).
-        _ if gpu_rendering_setting(&harness_home()) => &["skia", "skia-software", "femtovg", "software"],
+        _ if gpu_rendering_setting(&harness_home()) => {
+            &["skia", "skia-software", "femtovg", "software"]
+        }
         _ => &["skia-software", "skia", "femtovg", "software"],
     };
     for &renderer in order {
@@ -208,7 +210,10 @@ fn select_renderer() {
             .select()
         {
             Ok(()) => {
-                GPU_RENDERING.store(renderer == "skia" || renderer == "femtovg", std::sync::atomic::Ordering::Relaxed);
+                GPU_RENDERING.store(
+                    renderer == "skia" || renderer == "femtovg",
+                    std::sync::atomic::Ordering::Relaxed,
+                );
                 return;
             }
             Err(error) => eprintln!("harness-slint: {renderer} renderer unavailable: {error}"),
@@ -237,7 +242,10 @@ fn gpu_rendering_setting(base: &Path) -> bool {
         .filter(|dir| dir.join(relocation::DATA_MARKER).exists())
         .unwrap_or_else(|| base.to_path_buf());
     read(&data_dir.join(harness_settings::SETTINGS_FILE))
-        .and_then(|v| v.pointer("/general/gpuRendering").and_then(serde_json::Value::as_bool))
+        .and_then(|v| {
+            v.pointer("/general/gpuRendering")
+                .and_then(serde_json::Value::as_bool)
+        })
         .unwrap_or(false)
 }
 

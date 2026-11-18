@@ -107,10 +107,16 @@ The core reports only a subagent's current activity (`SubagentView.activity`). T
   was actually arriving ("≈ 96 tok/s"). No agent reports token counts in the middle of a turn. The figure is
   removed when no text arrived for two seconds.
 - After the turn, the answer row carries the turn's figure. When the agent reported the output tokens of the
-  prompt (`TurnView.usage`, from the ACP `session/prompt` result) it is exact ("89 tok/s · 280 tokens");
-  otherwise the estimate stays, marked "≈".
-- Only time during which text arrives counts: a gap of more than two seconds is a tool or an approval, not
-  generation.
+  prompt (`TurnView.usage`, from the ACP `session/prompt` result) it shows those tokens over the model's
+  working time ("89 tok/s · 280 output tokens"); otherwise the estimate stays, marked "≈".
+- The model's working time is the turn's wall time minus the time at least one tool row was running or
+  waiting for an approval. The reported count covers every model call of the turn, including thinking and
+  tool call arguments that never stream as answer text, so dividing it by the time answer text arrived gave
+  impossible rates (2026-11-18: 9303 tokens over about 1.2 s of text, "7613 tok/s", in a 325 s turn with 103
+  tool calls). Hermes pairs the same two quantities per API call (output tokens over call duration); an ACP
+  agent reports one total per prompt, so the turn is the unit here.
+- For the live estimate only time during which text arrives counts: a gap of more than two seconds is a tool
+  or an approval, not generation.
 
 ## 5. Computer use, live
 

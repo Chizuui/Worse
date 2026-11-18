@@ -172,9 +172,8 @@ fn serve(rx: mpsc::Receiver<Cmd>) {
                         let addr = started.local_addr().to_string();
                         snapshot().devices = started.devices();
                         started.set_public_host(host_of(&snapshot().public_url));
-                        started.set_settings_view(std::sync::Arc::new(
-                            settings_view::DesktopSettings,
-                        ));
+                        started
+                            .set_settings_view(std::sync::Arc::new(settings_view::DesktopSettings));
                         handle = Some(started);
                         set_server(ServerState::Up { addr });
                     }

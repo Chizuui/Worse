@@ -150,7 +150,8 @@ fn pause() {
 /// Moves the pointer to (x, y) along a short eased path instead of jumping there, so a person watching the
 /// screen can follow what the agent does. `HARNESS_MACHINE_GLIDE=0` restores the jump.
 fn glide(input: &mut Enigo, x: i32, y: i32) -> Result<(), String> {
-    let jump = std::env::var("HARNESS_MACHINE_GLIDE").is_ok_and(|v| v == "0" || v.eq_ignore_ascii_case("false"));
+    let jump = std::env::var("HARNESS_MACHINE_GLIDE")
+        .is_ok_and(|v| v == "0" || v.eq_ignore_ascii_case("false"));
     if let (false, Ok((sx, sy))) = (jump, input.location()) {
         let (dx, dy) = (f64::from(x - sx), f64::from(y - sy));
         let distance = dx.hypot(dy);
@@ -161,7 +162,11 @@ fn glide(input: &mut Enigo, x: i32, y: i32) -> Result<(), String> {
                 let t = f64::from(i) / f64::from(steps);
                 let e = t * t * (3.0 - 2.0 * t);
                 input
-                    .move_mouse(sx + (dx * e).round() as i32, sy + (dy * e).round() as i32, Coordinate::Abs)
+                    .move_mouse(
+                        sx + (dx * e).round() as i32,
+                        sy + (dy * e).round() as i32,
+                        Coordinate::Abs,
+                    )
                     .map_err(|e| e.to_string())?;
                 std::thread::sleep(each);
             }
@@ -177,12 +182,18 @@ fn glide(input: &mut Enigo, x: i32, y: i32) -> Result<(), String> {
 fn glide_plan(distance: f64) -> (i32, Duration) {
     let total_ms = (120.0 + distance * 0.2).clamp(120.0, 360.0);
     let steps = (total_ms / 16.0).round().clamp(6.0, 24.0) as i32;
-    (steps, Duration::from_micros((total_ms * 1000.0 / f64::from(steps)) as u64))
+    (
+        steps,
+        Duration::from_micros((total_ms * 1000.0 / f64::from(steps)) as u64),
+    )
 }
 
 /// First characters of typed text for the live view (one line, no more than 60 characters).
 fn typed_preview(text: &str) -> String {
-    let flat: String = text.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
+    let flat: String = text
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
     let mut out: String = flat.chars().take(60).collect();
     if flat.chars().count() > 60 {
         out.push('…');
@@ -270,7 +281,8 @@ impl Server {
         let (w, h) = image.dimensions();
         let rgb = if w > MIRROR_WIDTH {
             let height = ((u64::from(h) * u64::from(MIRROR_WIDTH) / u64::from(w)) as u32).max(1);
-            image::DynamicImage::ImageRgba8(image::imageops::thumbnail(image, MIRROR_WIDTH, height)).into_rgb8()
+            image::DynamicImage::ImageRgba8(image::imageops::thumbnail(image, MIRROR_WIDTH, height))
+                .into_rgb8()
         } else {
             image::DynamicImage::ImageRgba8(image.clone()).into_rgb8()
         };
@@ -346,7 +358,11 @@ impl Server {
             .map_err(|e| e.to_string())?;
         self.shot = image.dimensions();
         self.mirror(&image);
-        self.emit("screenshot", None, &format!("{}x{} px", image.width(), image.height()));
+        self.emit(
+            "screenshot",
+            None,
+            &format!("{}x{} px", image.width(), image.height()),
+        );
         let (mx, my) = (
             chosen.x().map_err(|e| e.to_string())?,
             chosen.y().map_err(|e| e.to_string())?,
@@ -420,7 +436,11 @@ impl Server {
         let (tx, ty) = self.map(num(args, "to_x")?, num(args, "to_y")?)?;
         let from = (num(args, "x")?, num(args, "y")?);
         let to = (num(args, "to_x")?, num(args, "to_y")?);
-        self.emit("drag", Some(from), &format!("from {}, {} to {}, {}", from.0, from.1, to.0, to.1));
+        self.emit(
+            "drag",
+            Some(from),
+            &format!("from {}, {} to {}, {}", from.0, from.1, to.0, to.1),
+        );
         glide(self.input()?, x, y)?;
         pause();
         self.emit("drop", Some(to), &format!("at {}, {}", to.0, to.1));

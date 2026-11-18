@@ -80,7 +80,7 @@ pub(crate) async fn call(
             let request: ListSessions = parse(params)?;
             out(core.list_sessions(request).await)
         }
-        "open_session" => out(core.open_session(session(params)?).await),
+        "open_session" => open_session(core, params).await,
         "list_modes" => out(core.list_modes(session(params)?).await),
         "list_models" => out(core.list_models(session(params)?).await),
         "list_config_options" => out(core.list_config_options(session(params)?).await),
@@ -174,6 +174,33 @@ pub(crate) async fn call(
         }
         other => Err(format!("method not allowed: {other}")),
     }
+}
+
+async fn open_session(core: &dyn HarnessCore, mut params: Value) -> Result<Value, String> {
+    let tail = params
+        .as_object_mut()
+        .and_then(|object| object.remove("tail"))
+        .and_then(|value| value.as_u64());
+    let detail = out(core.open_session(session(params)?).await)?;
+    Ok(tail_turns(detail, tail))
+}
+
+fn tail_turns(mut detail: Value, tail: Option<u64>) -> Value {
+    let Some(keep) = tail.map(|n| usize::try_from(n).unwrap_or(usize::MAX)) else {
+        return detail;
+    };
+    let mut omitted = 0;
+    if let Some(turns) = detail.get_mut("turns").and_then(Value::as_array_mut) {
+        turns.sort_by_key(|turn| turn.get("seq").and_then(Value::as_u64).unwrap_or(0));
+        if turns.len() > keep {
+            omitted = turns.len() - keep;
+            turns.drain(..omitted);
+        }
+    }
+    if let Some(object) = detail.as_object_mut() {
+        object.insert("omittedTurns".to_owned(), Value::from(omitted));
+    }
+    detail
 }
 
 fn out<T: serde::Serialize>(result: ApiResult<T>) -> Result<Value, String> {
