@@ -538,6 +538,7 @@ fn main() -> ExitCode {
     let first_run_done = initial.setup.first_run_done;
     settings::install(&window, settings_tx, initial, &data_dir);
     settings::recall::install(&window, &data_dir, &workspace_dir);
+    settings::graph::install(&window, &data_dir, &workspace_dir);
     // §9.10：首次启动检查与 Set up agents 对话框。
     setup::install(&window, first_run_done);
     chat::install(&window, files_tx.clone(), &workspace_dir, &data_dir);

@@ -152,6 +152,9 @@ history and its own usage limits. Harness puts a single desktop app in front of 
   automatic digest of each session. A new session, or another agent, starts with what is pinned, what
   relates to the request and what the project's latest sessions did. One local file, word search, no
   embedding model ([docs](docs/specs/harness/local-memory.md)).
+- [Graphify](https://github.com/Graphify-Labs/graphify) support: build the project's knowledge graph
+  from Settings (code only, no model), and every agent gets the graph's query tools and a note on how to
+  use them ([docs](docs/specs/harness/graphify.md)).
 - Several API keys for one service (all Command Code keys; providers with the same endpoint and
   model) form a pool: new sessions and subagents take the keys in turn (round robin), and a key at
   its usage limit is skipped until it resets.

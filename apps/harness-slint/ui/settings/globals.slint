@@ -425,3 +425,33 @@ export global RecallUi {
     callback set-auto-recall(bool);
     callback set-auto-capture(bool);
 }
+
+// Settings › Memory › Graph: the project's Graphify knowledge graph (`harness_agent_hub::graphify`).
+export global GraphUi {
+    // the `graphify` command was found
+    in property <bool> installed;
+    // the `graphify-mcp` command was found (agents then get the graph's tools)
+    in property <bool> mcp;
+    in property <string> cli-path;
+    in property <string> install-command;
+    // "uv" | "pipx" | "" (nothing here can install it: the command is only shown)
+    in property <string> installer;
+    in property <string> project;
+    in property <bool> has-graph;
+    // "1,204 nodes · 3,310 links · 18 communities · updated 2h ago"
+    in property <string> summary;
+    in property <bool> has-html;
+    in property <bool> has-report;
+    // a build or an install is running
+    in property <bool> busy;
+    // last lines of the running or finished command
+    in property <string> log;
+    in property <string> note;
+    in property <bool> give-agents: true;
+    callback refresh();
+    callback build();
+    callback install();
+    callback open-html();
+    callback open-report();
+    callback set-give-agents(bool);
+}

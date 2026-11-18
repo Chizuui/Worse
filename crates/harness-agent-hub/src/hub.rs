@@ -304,6 +304,16 @@ impl HubCtx {
             // 叠加配置损坏时不能让轮次失败：只记录告警并仅传 harness-memory（spec §9.1.4）。
             Err(error) => tracing::warn!(%error, "ignoring unreadable MCP overlay"),
         }
+        // The project's Graphify graph, unless the user already configured a server of that name.
+        let named = |server: &Value| {
+            server.get("name").and_then(Value::as_str) == Some(crate::graphify::MCP_NAME)
+        };
+        if !servers.iter().any(named) && crate::recall::Store::new(&self.config.home).config().graph
+        {
+            if let Some(graph) = crate::graphify::mcp_server(cwd) {
+                servers.push(graph);
+            }
+        }
         Value::Array(servers)
     }
 

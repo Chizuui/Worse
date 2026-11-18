@@ -8,6 +8,7 @@
 
 pub mod agy;
 mod docview;
+pub mod graph;
 pub mod keymap;
 mod presets;
 pub mod recall;

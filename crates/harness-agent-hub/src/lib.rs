@@ -28,6 +28,7 @@ mod error;
 mod failure;
 mod files;
 mod gh;
+pub mod graphify;
 pub mod helpers;
 mod hub;
 mod hub_chat;

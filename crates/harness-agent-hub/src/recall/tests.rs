@@ -255,24 +255,33 @@ fn expired_memories_are_not_live() {
 #[test]
 fn config_defaults_on_and_round_trips() {
     let (store, home) = store();
-    assert_eq!(
-        store.config(),
-        Config {
-            recall: true,
-            capture: true
-        }
-    );
+    assert_eq!(store.config(), Config::default());
+    assert!(store.config().recall && store.config().capture && store.config().graph);
     store
         .set_config(Config {
             recall: false,
-            capture: true,
+            ..Config::default()
         })
         .unwrap();
     assert_eq!(
         store.config(),
         Config {
             recall: false,
-            capture: true
+            ..Config::default()
+        }
+    );
+    // A file written before the graph switch existed still reads, with the switch on.
+    fs::write(
+        home.join("memory").join("config.json"),
+        "{\"recall\":true,\"capture\":false}",
+    )
+    .unwrap();
+    assert_eq!(
+        store.config(),
+        Config {
+            recall: true,
+            capture: false,
+            graph: true
         }
     );
     let _ = fs::remove_dir_all(home);

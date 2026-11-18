@@ -937,6 +937,9 @@ impl SessionActor {
             if let Some(recall) = self.recall_block(&turn.user_text).await {
                 blocks.push(text_block(&recall));
             }
+            if let Some(graph) = self.graph_block().await {
+                blocks.push(text_block(&graph));
+            }
             if let Some(notes) = self.notes_block().await {
                 blocks.push(text_block(&notes));
                 notes_pushed = true;
@@ -1036,6 +1039,21 @@ impl SessionActor {
                 query: &request,
                 now: crate::recall::now_ms(),
             }))
+        })
+        .await
+        .ok()
+        .flatten()
+    }
+
+    /// The note about the project's Graphify graph; `None` without a graph or with the switch off.
+    async fn graph_block(&self) -> Option<String> {
+        let home = self.ctx.config.home.clone();
+        let workspace = self.row.workspace_path.clone();
+        tokio::task::spawn_blocking(move || {
+            if !crate::recall::Store::new(&home).config().graph {
+                return None;
+            }
+            crate::graphify::prompt_block(&workspace, crate::recall::now_ms())
         })
         .await
         .ok()

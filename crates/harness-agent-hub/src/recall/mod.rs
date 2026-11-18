@@ -180,6 +180,9 @@ pub struct Config {
     pub recall: bool,
     /// Write an episode when a turn completes.
     pub capture: bool,
+    /// Give agents the project's Graphify graph when there is one ([`crate::graphify`]): its MCP server and a
+    /// note in the first prompt.
+    pub graph: bool,
 }
 
 impl Default for Config {
@@ -187,6 +190,7 @@ impl Default for Config {
         Self {
             recall: true,
             capture: true,
+            graph: true,
         }
     }
 }
