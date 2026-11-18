@@ -314,8 +314,7 @@ impl Store {
         let mut out = String::new();
         // A crash can leave the file without a final newline: start on a fresh line so the torn record does
         // not swallow this one.
-        let needs_newline =
-            fs::read(self.log_path()).is_ok_and(|bytes| bytes.last().is_some_and(|b| *b != b'\n'));
+        let needs_newline = ends_without_newline(&self.log_path());
         if needs_newline {
             out.push('\n');
         }
@@ -504,6 +503,19 @@ impl Store {
         }])?;
         Ok(true)
     }
+}
+
+/// True when the file has content that does not end in a newline (only its last byte is read).
+fn ends_without_newline(path: &Path) -> bool {
+    use std::io::{Read, Seek, SeekFrom};
+    let Ok(mut file) = fs::File::open(path) else {
+        return false;
+    };
+    if file.seek(SeekFrom::End(-1)).is_err() {
+        return false;
+    }
+    let mut last = [0u8; 1];
+    file.read_exact(&mut last).is_ok() && last[0] != b'\n'
 }
 
 /// The memories a session in `project` may see: the global ones and that project's.
