@@ -426,8 +426,34 @@ export global RecallUi {
     callback set-auto-capture(bool);
 }
 
+// One node of the graph picture.
+export struct GraphNode {
+    // position in the unit square
+    x: float,
+    y: float,
+    label: string,
+    // community index, for the colour
+    tone: int,
+    degree: int,
+    // always shows its name (the most connected nodes)
+    named: bool,
+}
+
 // Settings › Memory › Graph: the project's Graphify knowledge graph (`harness_agent_hub::graphify`).
 export global GraphUi {
+    // ---- the picture: the most connected nodes of the graph ----
+    in property <[GraphNode]> view-nodes;
+    // SVG path of the links, in a 1000 × 532 box
+    in property <string> view-links;
+    // the links of the selected node
+    in property <string> view-focus;
+    in property <int> view-selected: -1;
+    // "client.py · src/client.py · 23 links · connects to …"
+    in property <string> view-detail;
+    // "The 160 most connected of 4,210 nodes"
+    in property <string> view-note;
+    callback view-select(int);
+
     // the `graphify` command was found
     in property <bool> installed;
     // the `graphify-mcp` command was found (agents then get the graph's tools)

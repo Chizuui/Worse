@@ -9,9 +9,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use harness_agent_hub::{graphify, recall};
-use slint::ComponentHandle;
+use slint::{ComponentHandle, ModelRc, VecModel};
 
-use crate::ui::{AppWindow, GraphUi};
+use super::graph_view::{self, View};
+use crate::ui::{AppWindow, GraphNode, GraphUi};
 
 /// Lines of command output kept for the page.
 const LOG_LINES: usize = 14;
@@ -25,8 +26,15 @@ struct Ctx {
     busy: Arc<AtomicBool>,
 }
 
+thread_local! {
+    /// The picture on screen, for selecting a node.
+    static VIEW: std::cell::RefCell<View> = std::cell::RefCell::default();
+}
+
 /// What the page shows, gathered off the UI thread.
 struct State {
+    /// The picture of the graph, when there is one.
+    view: Option<View>,
     cli: Option<PathBuf>,
     mcp: bool,
     installer: &'static str,
@@ -50,6 +58,13 @@ pub fn install(window: &AppWindow, home: &Path, workspace: &Path) {
 
     let c = ctx.clone();
     ui.on_refresh(move || refresh(&c, None));
+
+    let weak = window.as_weak();
+    ui.on_view_select(move |index| {
+        if let Some(window) = weak.upgrade() {
+            select(&window.global::<GraphUi>(), index);
+        }
+    });
 
     let c = ctx.clone();
     ui.on_build(move || {
@@ -163,7 +178,9 @@ fn summary(stats: graphify::Stats, updated: Option<&str>) -> String {
 
 fn gather(ctx: &Ctx) -> State {
     let files = graphify::paths(&ctx.workspace);
-    let graph_summary = std::fs::read_to_string(&files.graph).ok().map(|text| {
+    let graph_text = std::fs::read_to_string(&files.graph).ok();
+    let view = graph_text.as_deref().and_then(graph_view::build);
+    let graph_summary = graph_text.map(|text| {
         let updated = std::fs::metadata(&files.graph)
             .and_then(|m| m.modified())
             .ok()
@@ -175,6 +192,7 @@ fn gather(ctx: &Ctx) -> State {
         )
     });
     State {
+        view,
         cli: graphify::cli(),
         mcp: graphify::mcp_cli().is_some(),
         installer: installer_name(),
@@ -214,7 +232,64 @@ fn refresh(ctx: &Ctx, note: Option<String>) {
             if let Some(note) = note {
                 ui.set_note(note.into());
             }
+            show_view(&ui, state.view.unwrap_or_default());
         });
+    });
+}
+
+/// Puts the picture on the page (an empty one clears it).
+fn show_view(ui: &GraphUi<'_>, view: View) {
+    let nodes: Vec<GraphNode> = view
+        .nodes
+        .iter()
+        .map(|n| GraphNode {
+            x: n.x,
+            y: n.y,
+            label: n.label.as_str().into(),
+            tone: n.community,
+            degree: i32::try_from(n.degree).unwrap_or(i32::MAX),
+            named: n.named,
+        })
+        .collect();
+    ui.set_view_nodes(ModelRc::new(VecModel::from(nodes)));
+    ui.set_view_links(graph_view::links_path(&view).into());
+    ui.set_view_focus("".into());
+    ui.set_view_selected(-1);
+    ui.set_view_detail("".into());
+    ui.set_view_note(
+        if view.total_nodes > view.nodes.len() {
+            format!(
+                "The {} most connected of {} nodes",
+                view.nodes.len(),
+                grouped(view.total_nodes)
+            )
+        } else {
+            String::new()
+        }
+        .into(),
+    );
+    VIEW.with(|cell| *cell.borrow_mut() = view);
+}
+
+/// A node was clicked (`-1`: empty space): light up its links and say what it connects to.
+fn select(ui: &GraphUi<'_>, index: i32) {
+    VIEW.with(|cell| {
+        let view = cell.borrow();
+        match usize::try_from(index)
+            .ok()
+            .filter(|i| *i < view.nodes.len())
+        {
+            Some(i) => {
+                ui.set_view_selected(index);
+                ui.set_view_focus(graph_view::focus_path(&view, i).into());
+                ui.set_view_detail(graph_view::detail(&view, i).into());
+            }
+            None => {
+                ui.set_view_selected(-1);
+                ui.set_view_focus("".into());
+                ui.set_view_detail("".into());
+            }
+        }
     });
 }
 

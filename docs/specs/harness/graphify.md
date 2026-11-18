@@ -33,6 +33,14 @@ Rust executable. Harness uses the tool when it is installed, and offers to insta
   read each time). A server the user already configured under the name `graphify` in the MCP page is kept
   and not doubled.
 
+- **Picture.** Below the card the page draws the graph itself (`apps/harness-slint/src/settings/graph_view.rs`,
+  `GraphCanvas`): the 160 most connected nodes and the links among them (at most 700), coloured by community,
+  sized by their number of links, the 14 most connected ones named. Positions come from a small
+  Fruchterman–Reingold layout computed in the app, started from one cluster per community, so the picture is
+  the same every time. Click a node: its links light up, the rest dims, and a line says where it is defined
+  and what it connects to. Drag moves the picture; Ctrl + wheel and the buttons zoom (the plain wheel scrolls
+  the page). "Open graph" still opens Graphify's own `graph.html` with everything in it.
+
 Not done, on purpose: `graphify install`. It writes a skill, a `CLAUDE.md` / `AGENTS.md` section and Claude
 Code hooks into the user's agent settings. Harness's own prompt block carries the same guidance for every
 agent without touching those files. Also not done: the semantic pass over documents, papers and images (it
@@ -43,10 +51,13 @@ after a turn (the note tells the agent to run `graphify update .` after it chang
 
 - Unit tests: `graphify::tests` (graph statistics from node-link JSON with `links` or `edges`, the note for
   each combination of installed programs, the paths), `settings::graph::tests` (the summary line).
+  `settings::graph_view::tests`: the most connected nodes are kept and stay inside the box, the layout is the
+  same on every run, link paths and the detail line follow the links.
 - In the app under Xvfb with **stand-ins** for `graphify` and `graphify-mcp` (scripts that write a graph in
   Graphify's layout): the Graph tab finds the tool, "Build graph" runs it and shows its output and
   "42 nodes · 96 links · 3 communities", and a new session is started with the `graphify` server attached
-  and both notes in its first prompt.
+  and both notes in its first prompt. The picture with a 300-node stand-in graph of six communities:
+  drawn, a node clicked, its links lit and its detail line shown.
 
 Not verified: the real Graphify. It could not be installed in the environment this was written in, so the
 commands and file layout follow its source (version 0.9.112: `cli.py` `update`, `watch.py` `_rebuild_code`,

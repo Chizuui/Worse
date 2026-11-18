@@ -5,7 +5,7 @@
 import { ScrollView } from "std-widgets.slint";
 import { Theme } from "../theme/tokens.slint";
 import { Icons, IconButton, Segmented, MenuShell, MenuItem } from "../components/controls.slint";
-import { ConfigUi, DocUi, ResRow, FormField, SettingsUi, RecallUi, RecallRow, GraphUi } from "globals.slint";
+import { ConfigUi, DocUi, ResRow, FormField, SettingsUi, RecallUi, RecallRow, GraphUi, GraphNode } from "globals.slint";
 import { PageHeader, Group, SettingRow, Switch, TextField, TextArea, Select, SearchField, UnsupportedNotice, StatusLine } from "parts.slint";
 import { Labels } from "labels.slint";
 
@@ -1884,6 +1884,168 @@ component RecallBody inherits VerticalLayout {
     }
 }
 
+// The picture of the project graph: nodes coloured by community, sized by their links. Drag to move, Ctrl +
+// wheel or the buttons to zoom, click a node to light up its links.
+component GraphCanvas inherits Rectangle {
+    property <float> zoom: 1;
+    property <length> pan-x;
+    property <length> pan-y;
+    property <length> grab-x;
+    property <length> grab-y;
+    pure function tone(i: int) -> color {
+        if i < 0 { return #8a909a; }
+        if mod(i, 8) == 0 { return #c8f04a; }
+        if mod(i, 8) == 1 { return #6aa8ff; }
+        if mod(i, 8) == 2 { return #ff9d5c; }
+        if mod(i, 8) == 3 { return #b58cff; }
+        if mod(i, 8) == 4 { return #4fd1c5; }
+        if mod(i, 8) == 5 { return #ff7a90; }
+        if mod(i, 8) == 6 { return #f2c94c; }
+        return #9fb3c8;
+    }
+    function set-zoom(next: float) {
+        root.zoom = clamp(next, 0.6, 4);
+    }
+    height: 440px;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: Theme.border;
+    background: Theme.dark ? #0a0b0d : #f7f6f2;
+    clip: true;
+    // Behind the nodes: drag pans, the wheel zooms, a click on empty space clears the selection.
+    TouchArea {
+        mouse-cursor: self.pressed ? grabbing : grab;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.grab-x = root.pan-x - self.mouse-x;
+                root.grab-y = root.pan-y - self.mouse-y;
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.pan-x = root.grab-x + self.mouse-x;
+                root.pan-y = root.grab-y + self.mouse-y;
+            }
+        }
+        clicked => {
+            GraphUi.view-select(-1);
+        }
+        scroll-event(event) => {
+            // Ctrl + wheel zooms; the plain wheel is left to the page, so the canvas does not trap scrolling.
+            if event.modifiers.control {
+                root.set-zoom(root.zoom * (event.delta-y > 0 ? 1.15 : 0.87));
+                return accept;
+            }
+            reject
+        }
+    }
+    stage := Rectangle {
+        x: (parent.width - self.width) / 2 + root.pan-x;
+        y: (parent.height - self.height) / 2 + root.pan-y;
+        width: parent.width * root.zoom;
+        height: parent.height * root.zoom;
+        // A Path keeps its aspect ratio inside its element; the nodes use the same fit, so they sit on the
+        // ends of the links at any size. The box is 1000 × 532 (`graph_view.rs`).
+        property <float> fit: min(self.width / 1000px, self.height / 532px);
+        property <length> left: (self.width - 1000px * self.fit) / 2;
+        property <length> top: (self.height - 532px * self.fit) / 2;
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: 1000;
+            viewbox-height: 532;
+            commands: GraphUi.view-links;
+            stroke: Theme.dark ? #ffffff24 : #1a1b1d24;
+            stroke-width: 1px;
+            fill: transparent;
+        }
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: 1000;
+            viewbox-height: 532;
+            commands: GraphUi.view-focus;
+            stroke: Theme.accent-fg;
+            stroke-width: 1.6px;
+            fill: transparent;
+        }
+        for n[i] in GraphUi.view-nodes: dot := Rectangle {
+            property <length> r: clamp(3px + sqrt(n.degree) * 1.2px, 4px, 15px);
+            property <bool> lit: GraphUi.view-selected == i || nta.has-hover;
+            x: stage.left + n.x * 1000px * stage.fit - self.r;
+            y: stage.top + n.y * 532px * stage.fit - self.r;
+            width: self.r * 2;
+            height: self.r * 2;
+            border-radius: self.r;
+            background: root.tone(n.tone);
+            border-width: self.lit ? 2px : 0px;
+            border-color: Theme.foreground;
+            opacity: GraphUi.view-selected < 0 || self.lit || n.named ? 1 : 0.55;
+            accessible-role: button;
+            accessible-label: "graph node " + n.label;
+            accessible-action-default => {
+                GraphUi.view-select(i);
+            }
+            nta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    GraphUi.view-select(i);
+                }
+            }
+            if n.named || dot.lit: Text {
+                x: dot.width + 4px;
+                y: (dot.height - self.height) / 2;
+                text: n.label;
+                font-size: dot.lit ? 11.5px : 10.5px;
+                font-weight: dot.lit ? 600 : 400;
+                color: dot.lit ? Theme.foreground : Theme.foreground-subtle;
+                accessible-role: none;
+            }
+        }
+    }
+    // Zoom buttons.
+    HorizontalLayout {
+        x: 10px;
+        y: parent.height - 38px;
+        width: 108px;
+        height: 28px;
+        spacing: 6px;
+        Btn {
+            text: "−";
+            label: "Zoom out";
+            compact: true;
+            clicked => {
+                root.set-zoom(root.zoom * 0.8);
+            }
+        }
+        Btn {
+            text: "+";
+            label: "Zoom in";
+            compact: true;
+            clicked => {
+                root.set-zoom(root.zoom * 1.25);
+            }
+        }
+        Btn {
+            text: "Fit";
+            label: "Fit the graph";
+            compact: true;
+            clicked => {
+                root.zoom = 1;
+                root.pan-x = 0px;
+                root.pan-y = 0px;
+            }
+        }
+    }
+    Text {
+        x: parent.width - self.width - 12px;
+        y: parent.height - 24px;
+        text: GraphUi.view-note;
+        font-size: 10.5px;
+        color: Theme.icon-subtlest;
+    }
+}
+
 // Settings › Memory › Graph: build and share the project's Graphify knowledge graph.
 component GraphBody inherits VerticalLayout {
     spacing: 16px;
@@ -2018,6 +2180,16 @@ component GraphBody inherits VerticalLayout {
                     }
                 }
             }
+        }
+    }
+    if GraphUi.view-nodes.length > 0: VerticalLayout {
+        spacing: 8px;
+        GraphCanvas { }
+        Text {
+            text: GraphUi.view-detail != "" ? GraphUi.view-detail : "Click a node to see what it connects to. Drag to move, Ctrl + wheel or the buttons to zoom. Colours are the graph's communities.";
+            font-size: 11.5px;
+            color: GraphUi.view-detail != "" ? Theme.foreground : Theme.muted;
+            wrap: word-wrap;
         }
     }
 }

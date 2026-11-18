@@ -10,6 +10,7 @@ pub mod agy;
 pub mod decision;
 mod docview;
 pub mod graph;
+mod graph_view;
 pub mod keymap;
 mod presets;
 pub mod recall;
