@@ -89,6 +89,17 @@ without it. The pieces that show an agent at work (thinking line, tool spinners,
 A focused or hovered window also counts as visible: X11 without a window manager reports the window as
 occluded at startup.
 
+### 3.6 Rounded window on Windows 11
+
+With the custom title bar ("Use Windows title bar" off) the window is frameless, and Windows 11 draws a
+frameless window square and without a shadow. `apps/harness-slint/src/window_frame.rs` asks DWM for the normal
+look through winit's window attributes: `CornerPreference::Round` (DWM rounds and anti-aliases the corners,
+and squares them again while the window is maximized or snapped) and the undecorated shadow. The frame follows
+the app's theme (`set_theme` on the winit window), so the thin border DWM draws is dark in the dark theme; this
+does not touch winit's record of the system theme that Slint reads for "System". The radius is DWM's own
+(8 px), not configurable. Windows 10 has no corner preference and stays square. With the Windows title bar on,
+Windows 11 rounds the window by itself.
+
 ## 4. Team strip
 
 A session that delegated work shows, above the composer, one lane per subagent that is still working: agent,
@@ -186,7 +197,12 @@ it does not load Harness's MCP servers.
   installs `cmd`; that is the Windows shell's name, so the long name is used.
 - **Keys.** A `providers.json` entry of kind `command-code` is one API key. It becomes agent
   `command-code-<name>` ("Command Code · <name>") that runs the CLI with `COMMAND_CODE_API_KEY`. The dialog's
-  "Command Code keys" preset takes one key per line.
+  "Command Code CLI" preset takes one key per line.
+- **Without the CLI.** Command Code also serves an OpenAI-compatible Provider API,
+  `https://api.commandcode.ai/provider/v1` (Bearer key, the same key as the CLI; every plan except Go;
+  https://commandcode.ai/docs/provider). The "Command Code API" preset makes it a plain API provider for
+  Harness's own agent. Claude models answer only on its `/messages` route, so they are not available there;
+  the default model is `deepseek/deepseek-v4-flash`.
 - **Key pools** (`crates/harness-agent-hub/src/providers.rs`, `HubCtx::rotated`). All Command Code keys form a
   pool; so do providers that share endpoint and model. A new session asked for a pool member, or for the
   built-in Command Code agent, gets the pool's next member that is installed and not at its usage limit. This
@@ -195,6 +211,29 @@ it does not load Harness's MCP servers.
 - **Limits.** A usage limit mid-turn fails over to the next agent in the fallback order, where the keys sit
   next to each other; the rotation skips an exhausted key until it resets.
 - **Off switch.** `"rotation": "off"` in `providers.json`, or `HARNESS_KEY_ROTATION=off`.
+- **Saving several keys.** The dialog sends one add per key and each runs in its own task. Every
+  read-modify-write of `providers.json` now holds one lock (`providers::WRITE`); before, concurrent adds read
+  the same file and only one of them survived, so a paste of several keys could keep just one.
+
+## 7a. Provider presets
+
+`Add provider` opens on a grid of providers (`apps/harness-slint/src/settings/presets.rs`). Picking one fills
+the name, the endpoint and a default model; the user pastes a key ("Get a key ↗" opens the provider's key
+page) and saves. The endpoint stays editable ("Edit"), and "Several keys" takes one key per line, saved as
+numbered providers with the same endpoint and model, which makes them a round-robin pool.
+
+- **Presets.** Command Code API, OpenRouter, OpenAI, DeepSeek, Gemini (its OpenAI-compatible endpoint), xAI,
+  Mistral, Groq, Kimi, Z.ai GLM, Qwen (Model Studio international), MiniMax, Together, Fireworks, Cerebras,
+  NVIDIA NIM, Hugging Face, Vercel AI Gateway, OpenCode Zen, Ollama and LM Studio (local, no key), the Hermes
+  gateway, the Command Code CLI keys, and "Other endpoint". Endpoints follow each provider's documentation and
+  the provider tables of hermes-agent (`hermes_cli/auth.py`) and oh-my-pi
+  (`packages/catalog/src/provider-models/openai-compat.ts`). Providers whose main API is not Chat Completions
+  for Harness's purposes (Anthropic, Nous Portal with its OAuth-only login) are left out.
+- **Models.** Model ids change often, so a default is only filled where the documentation names a current
+  one; elsewhere the field is empty. "List models" asks the endpoint (`GET <endpoint>/models` with the first
+  key) and shows its ids; typing filters them, a click picks one. A local preset lists its models as soon as it
+  is picked. OpenAI's `{"data": [{"id"}]}`, Ollama's `{"models": [{"name"}]}` and a bare list are read.
+- **Marks.** A preset without a logo shows its first letter.
 
 ## 8. Measurements
 
@@ -239,7 +278,11 @@ Verified by running the real app under a virtual X server:
 - Generation speed with an agent that streams at a steady pace: the live estimate, the exact figure when the
   agent reports tokens, the estimate when it does not, and nothing with the setting off.
 - Unit tests: `live::`, `wallpaper::`, `machine_view::`, `computer_mcp::`, `speed::`, `bridge::turns::`,
-  `harness-api-agent hermes::`, `harness-agent-hub providers::`.
+  `settings::presets::`, `harness-api-agent hermes::`, `harness-agent-hub providers::` (six concurrent adds
+  keep all six entries; the same test fails without the lock).
+- Provider presets in the app, against a stand-in server on LM Studio's port: the grid, picking LM Studio
+  (models listed without a key), picking a model, two keys saved as "LM Studio 1" and "LM Studio 2", "List
+  models" sending the first key, the Command Code API preset's filled form.
 - The Windows build: cross-compiled from Linux (`cargo xwin build --release --target x86_64-pc-windows-msvc
   -p harness-slint --bins`; cargo-xwin 0.23.1 with clang-cl and lld-link 18) and run under Wine 9.0 with CPU
   rendering: start through the shadow copy, the Appearance and Agents pages, a wallpaper picked in the Windows
@@ -253,7 +296,10 @@ Not verified:
 - GPU rendering (`general.gpuRendering`), Direct3D on Windows included: the switch selects the renderer that
   was the default before; no GPU was available to run it.
 - A real Hermes gateway and a real Command Code key (`COMMAND_CODE_API_KEY` in ACP mode follows the CLI's
-  documentation of its headless login).
+  documentation of its headless login), and any real provider behind a preset: no key was sent to a provider.
+  Default model ids come from documentation and may be renamed; "List models" shows what an endpoint serves.
+- Rounded corners on Windows 11 (section 3.6): Wine has no DWM, so the corner preference and the frame theme
+  were only type-checked for the Windows target.
 - The wallpaper file picker on Linux (GTK). The Windows dialog was driven under Wine; the settings write behind
   both is the same one the tests use.
 - New interface strings are English only; the Chinese translation falls back to English for them.

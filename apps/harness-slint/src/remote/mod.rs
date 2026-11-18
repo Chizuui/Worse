@@ -503,7 +503,7 @@ fn wire(window: &AppWindow) {
 }
 
 /// Opens an `https://` link in the default browser.
-fn open_url(url: &str) {
+pub(crate) fn open_url(url: &str) {
     if !(url.starts_with("https://") || url.starts_with("http://")) {
         return;
     }

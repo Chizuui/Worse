@@ -144,6 +144,10 @@ history and its own usage limits. Harness puts a single desktop app in front of 
 **Agents and accounts**
 - Built-in adapters for Claude Code, Codex, Antigravity (`agy`) and Command Code, plus custom API
   providers and Hermes gateways.
+- Provider presets: pick Command Code API, OpenRouter, OpenAI, DeepSeek, Gemini, xAI, Mistral, Groq,
+  Kimi, Z.ai GLM, Qwen, MiniMax, Together, Fireworks, Cerebras, NVIDIA NIM, Hugging Face, Vercel AI
+  Gateway, OpenCode Zen, Ollama or LM Studio, and paste the key: the endpoint and a model are filled in,
+  and "List models" shows the endpoint's own models to pick from.
 - Several API keys for one service (all Command Code keys; providers with the same endpoint and
   model) form a pool: new sessions and subagents take the keys in turn (round robin), and a key at
   its usage limit is skipped until it resets.
@@ -235,9 +239,10 @@ The same executable also serves helper modes selected by a leading flag (`--api-
 | Claude Code | [`claude-agent-acp`](https://github.com/agentclientprotocol/claude-agent-acp) | `npm i -g @agentclientprotocol/claude-agent-acp`, signed-in `claude` |
 | Codex | [`codex-acp`](https://github.com/agentclientprotocol/codex-acp) | `npm i -g @agentclientprotocol/codex-acp`, signed-in `codex` |
 | Antigravity | `agy acp` | Antigravity CLI 1.5+, signed in by running `agy` |
-| Command Code | `command-code acp` | `npm i -g command-code`, then `command-code login`, or API keys in Settings → Agents → API providers → "Command Code keys" |
+| Command Code | `command-code acp` | `npm i -g command-code`, then `command-code login`, or API keys with the "Command Code CLI" preset (Settings → Agents → API providers → Add provider) |
+| Command Code API | built-in `harness-api-agent` against `https://api.commandcode.ai/provider/v1` | a Command Code key with the "Command Code API" preset; no CLI needed (Claude models are not served on this endpoint) |
 | Hermes Agent | built-in `harness-api-agent` against the gateway's API server | `hermes gateway` with `API_SERVER_KEY`; add it with the "Hermes gateway" preset |
-| Any OpenAI-compatible API (DeepSeek, …) | built-in `harness-api-agent` | provider URL and API key in Settings → Providers |
+| Any OpenAI-compatible API (OpenRouter, DeepSeek, Ollama, …) | built-in `harness-api-agent` | a preset and its key in Settings → Agents → API providers → Add provider, or "Other endpoint" with a URL |
 
 A Hermes gateway is a whole agent, not a model: it runs its own tools on its host. Harness sends the
 message, shows Hermes's replies, tool progress and approval requests, and lets other agents delegate to

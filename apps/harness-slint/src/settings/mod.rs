@@ -9,6 +9,7 @@
 pub mod agy;
 mod docview;
 pub mod keymap;
+mod presets;
 mod values;
 mod worker;
 
@@ -2017,20 +2018,34 @@ fn wire(window: &AppWindow) {
                     })
                     .collect();
             } else {
-                let candidate = api::AddProvider {
-                    label,
-                    base_url: ui.get_provider_url().trim().to_owned(),
-                    model: ui.get_provider_model().trim().to_owned(),
-                    api_key: ui.get_provider_key().trim().to_owned(),
-                    kind: String::new(),
-                };
-                if candidate.label.is_empty()
-                    || candidate.base_url.is_empty()
-                    || candidate.model.is_empty()
-                {
+                // One entry per key (one per line). Entries with the same endpoint and model form a pool
+                // that new sessions take in turn (round robin), like Command Code keys. No key at all is
+                // fine for a local server.
+                let base_url = ui.get_provider_url().trim().to_owned();
+                let model = ui.get_provider_model().trim().to_owned();
+                if label.is_empty() || base_url.is_empty() || model.is_empty() {
                     return;
                 }
-                requests.push(candidate);
+                let mut keys = command_code_keys(&ui.get_provider_key());
+                if keys.is_empty() {
+                    keys.push(String::new());
+                }
+                let many = keys.len() > 1;
+                requests = keys
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, api_key)| api::AddProvider {
+                        label: if many {
+                            format!("{label} {}", i + 1)
+                        } else {
+                            label.clone()
+                        },
+                        base_url: base_url.clone(),
+                        model: model.clone(),
+                        api_key,
+                        kind: String::new(),
+                    })
+                    .collect();
             }
             // 提交后立即清空输入框，密钥不在界面里停留。
             for clear in [
@@ -2042,6 +2057,8 @@ fn wire(window: &AppWindow) {
             ] {
                 clear(&ui, SharedString::new());
             }
+            ui.set_provider_preset(SharedString::new());
+            ui.set_provider_edit_url(false);
             ui.set_provider_open(false);
         });
         for request in requests {
@@ -2066,6 +2083,7 @@ fn wire(window: &AppWindow) {
         agy::refresh();
     });
     agy::wire(window);
+    presets::install(window);
 
     let cfg = window.global::<ConfigUi>();
     cfg.on_select_agent(|agent| {

@@ -286,7 +286,41 @@ export struct ProviderRow {
     kind: string,
 }
 
+// A ready-made API provider: picking it fills the endpoint and a default model, so only a key is needed.
+export struct ProviderPreset {
+    id: string,
+    name: string,
+    // short line under the name ("OpenAI-compatible", "local, no key")
+    tag: string,
+    url: string,
+    model: string,
+    // shown once picked: where the key comes from, limits
+    note: string,
+    // page that creates keys ("" = none)
+    key-url: string,
+    // a local server that needs no key
+    keyless: bool,
+    // monogram for providers without a logo
+    letter: string,
+}
+
 export global AgentsUi {
+    in property <[ProviderPreset]> presets;
+    // id of the picked preset; "" = none picked yet, "custom" = any OpenAI-compatible endpoint
+    in-out property <string> provider-preset;
+    // the picked preset (set with provider-preset)
+    in property <ProviderPreset> provider-current;
+    // the endpoint field is shown (custom, or "edit" pressed on a preset)
+    in-out property <bool> provider-edit-url;
+    // models the endpoint listed (GET /models), filtered by the model field
+    in property <[string]> provider-models;
+    // "" idle, otherwise a status line for the model list ("Loading…", "41 models", an error)
+    in property <string> provider-models-note;
+    in property <bool> provider-models-loading;
+    callback pick-preset(string);
+    callback fetch-models();
+    callback filter-models(string);
+    callback open-key-page(string);
     in property <[AgentCard]> cards;
     in property <[ProviderRow]> providers;
     in-out property <string> provider-label;

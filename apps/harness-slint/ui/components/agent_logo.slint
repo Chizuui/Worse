@@ -45,7 +45,19 @@ export component AgentMark inherits Rectangle {
     border-color: #2A2D33;
     clip: true;
     accessible-role: none;
-    Image {
+    // A letter to show when the name has no logo (provider presets); without one the default mark is used.
+    in property <string> letter;
+    property <bool> monogram: root.key == "" && root.letter != "";
+    if root.monogram: Text {
+        text: root.letter;
+        font-size: root.size * 0.5;
+        font-weight: 600;
+        color: #E9E9EC;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+    if !root.monogram: Image {
         x: root.bleed ? 0px : root.size * 0.17;
         y: root.bleed ? 0px : root.size * 0.17;
         width: root.bleed ? root.size : root.size * 0.66;
