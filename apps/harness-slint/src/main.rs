@@ -28,6 +28,7 @@ mod settings;
 mod setup;
 mod speed;
 mod wallpaper;
+mod window_frame;
 mod workarea;
 
 #[allow(
@@ -207,6 +208,7 @@ fn select_renderer() {
         match slint::BackendSelector::new()
             .backend_name("winit".into())
             .renderer_name(renderer.into())
+            .with_winit_window_attributes_hook(window_frame::attributes)
             .select()
         {
             Ok(()) => {

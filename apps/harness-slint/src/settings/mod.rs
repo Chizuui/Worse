@@ -465,11 +465,13 @@ impl State {
         SNAP.with(|cell| *cell.borrow_mut() = json);
         KEYMAP.with(|cell| *cell.borrow_mut() = Some(Keymap::new(&settings.shortcuts)));
         let theme = self.window.global::<Theme>();
-        theme.set_pref(match settings.appearance.theme {
+        let pref = match settings.appearance.theme {
             harness_settings::ThemePref::System => 0,
             harness_settings::ThemePref::Light => 1,
             harness_settings::ThemePref::Dark => 2,
-        });
+        };
+        theme.set_pref(pref);
+        crate::window_frame::follow_theme(&self.window, pref);
         let zoom = f32::from(settings.appearance.zoom_percent) / 100.0;
         theme.set_ui_font_size(f32::from(settings.appearance.ui_font_size) * zoom);
         theme.set_code_size(f32::from(settings.appearance.code_font_size) * zoom);
