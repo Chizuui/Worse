@@ -131,12 +131,15 @@ impl HelperLaunch {
 pub fn run_memory_mcp(args: impl IntoIterator<Item = String>) -> ExitCode {
     let mut project = None;
     let mut session = None;
+    let mut agent = None;
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         if arg == "--project" {
             project = args.next().map(PathBuf::from);
         } else if arg == "--session" {
             session = args.next();
+        } else if arg == "--agent" {
+            agent = args.next().filter(|name| !name.trim().is_empty());
         }
     }
     let home = match env_path("HARNESS_HOME") {
@@ -161,6 +164,7 @@ pub fn run_memory_mcp(args: impl IntoIterator<Item = String>) -> ExitCode {
         &home,
         project.as_deref(),
         session.as_deref(),
+        agent.as_deref(),
         stdin,
         io::stdout().lock(),
     ) {

@@ -155,12 +155,12 @@ pub fn fingerprint(content: Option<&str>) -> String {
     }
 }
 
-struct LockGuard {
+pub(crate) struct LockGuard {
     path: PathBuf,
 }
 
 impl LockGuard {
-    fn acquire(path: &Path) -> std::io::Result<Self> {
+    pub(crate) fn acquire(path: &Path) -> std::io::Result<Self> {
         for _ in 0..LOCK_ATTEMPTS {
             match OpenOptions::new().write(true).create_new(true).open(path) {
                 Ok(_) => {

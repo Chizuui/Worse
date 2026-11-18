@@ -934,6 +934,9 @@ impl SessionActor {
         let mut notes_pushed = false;
         if fresh {
             blocks.push(text_block(&self.memory_block().await));
+            if let Some(recall) = self.recall_block(&turn.user_text).await {
+                blocks.push(text_block(&recall));
+            }
             if let Some(notes) = self.notes_block().await {
                 blocks.push(text_block(&notes));
                 notes_pushed = true;
@@ -1010,6 +1013,99 @@ impl SessionActor {
         })
         .await
         .unwrap_or_default()
+    }
+
+    /// What the local memory holds for this request (pinned memories, related ones, earlier sessions of the
+    /// project); `None` when recall is switched off. Built once per fresh agent session, so it stays fixed
+    /// for that session.
+    async fn recall_block(&self, request: &str) -> Option<String> {
+        let home = self.ctx.config.home.clone();
+        let project = crate::recall::project_key(&self.row.workspace_path);
+        let session = self.row.id.as_str().to_owned();
+        let request = request.to_owned();
+        tokio::task::spawn_blocking(move || {
+            let store = crate::recall::Store::new(&home);
+            if !store.config().recall {
+                return None;
+            }
+            let memories = store.load();
+            Some(crate::recall::recall_block(&crate::recall::RecallInput {
+                memories: &memories,
+                project: Some(&project),
+                session: &session,
+                query: &request,
+                now: crate::recall::now_ms(),
+            }))
+        })
+        .await
+        .ok()
+        .flatten()
+    }
+
+    /// Writes the digest of this session to the local memory, so a later session, or another agent, can pick
+    /// up from it. Subagent sessions are left out: their parent's digest covers the work.
+    fn capture_episode(&self) {
+        if self.ctx.subagents.get(&self.row.id).is_some() {
+            return;
+        }
+        let turns: Vec<crate::recall::EpisodeTurn> = self
+            .turns
+            .iter()
+            .map(|t| crate::recall::EpisodeTurn {
+                user: queue::user_with_steers(t),
+                assistant: t.assistant_text.clone(),
+                files: t
+                    .tool_calls
+                    .iter()
+                    .flat_map(|call| call.content.iter())
+                    .filter_map(|item| match item {
+                        ToolContent::Diff { path, .. } => Some(self.relative(path)),
+                        _ => None,
+                    })
+                    .collect(),
+            })
+            .collect();
+        let agent = self
+            .turns
+            .iter()
+            .rev()
+            .find_map(|t| t.agent.as_ref())
+            .map(|a| self.ctx.display_name(a))
+            .unwrap_or_default();
+        let home = self.ctx.config.home.clone();
+        let session = self.row.id.as_str().to_owned();
+        let project = self.row.workspace_path.clone();
+        let title = self.row.title.clone();
+        drop(tokio::task::spawn_blocking(move || {
+            let store = crate::recall::Store::new(&home);
+            if !store.config().capture {
+                return;
+            }
+            let text = crate::recall::episode_text(&turns);
+            if text.is_empty() {
+                return;
+            }
+            if let Err(error) = store.put_episode(&session, &project, &title, &agent, &text) {
+                tracing::warn!(%error, "saving the session digest failed");
+            }
+        }));
+    }
+
+    /// `path` relative to the session's workspace when it lies inside it (shorter, and the same on every
+    /// machine).
+    fn relative(&self, path: &str) -> String {
+        let normal = path.replace('\\', "/");
+        let root = crate::recall::project_key(&self.row.workspace_path);
+        let inside = if cfg!(windows) {
+            normal.to_lowercase().starts_with(&format!("{root}/"))
+        } else {
+            normal.starts_with(&format!("{root}/"))
+        };
+        if inside {
+            normal[root.len() + 1..].to_owned()
+        } else {
+            normal
+        }
     }
 
     async fn notes_block(&self) -> Option<String> {
@@ -1598,6 +1694,9 @@ impl SessionActor {
         }
         self.persist_turn(turn_id).await;
         self.touch().await;
+        if status == TurnStatus::Completed {
+            self.capture_episode();
+        }
         self.emit(EventKind::TurnFinished {
             turn_id: turn_id.clone(),
             agent,
