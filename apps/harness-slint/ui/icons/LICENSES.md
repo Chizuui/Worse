@@ -8,9 +8,12 @@
 - `files/`: copied from ZCode `packages/desktop/src/renderer/public/material-icons` (Material Icon Theme by Philipp Kief,
   MIT License, https://github.com/material-extensions/vscode-material-icon-theme).
 
-- `agents/`: brand marks of Anthropic Claude, OpenAI Codex, Google Gemini, Google Antigravity and DeepSeek, from LobeHub
-  Icons (`@lobehub/icons-static-svg`, MIT License, https://github.com/lobehub/lobe-icons). The marks are trademarks of their
-  owners and are used only to identify each agent.
+- `agents/`: brand marks of Anthropic Claude, OpenAI Codex, Google Gemini, Google Antigravity and DeepSeek, and of the
+  API providers offered as presets (OpenRouter, xAI, Mistral, Groq, Kimi, Z.ai, Qwen, MiniMax, Together AI, Fireworks,
+  Cerebras, NVIDIA, Hugging Face, Vercel, OpenCode, Ollama, LM Studio, Nous Research for the Hermes gateway), from LobeHub
+  Icons (`@lobehub/icons-static-svg` 1.103.0, MIT License, https://github.com/lobehub/lobe-icons). Single-colour marks
+  are stored white, because every mark sits on a dark tile. The marks are trademarks of their owners and are used only
+  to identify each agent or provider.
 - `agents/commandcode.png`: the Command Code app icon as served by https://commandcode.ai
   (`/favicon/2024/android-chrome-192x192.png`). It is the mark of Command Code, not covered by this repository's license,
   and is used only to identify the Command Code agent.

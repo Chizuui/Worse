@@ -1,14 +1,39 @@
 import { Theme } from "../theme/tokens.slint";
 
 export global AgentLogo {
+    // `name` starts with `brand`, as a display name ("OpenRouter 2") or as a provider id ("api-openrouter-2").
+    pure function is(n: string, brand: string) -> bool {
+        return n.starts-with(brand) || n.starts-with("api-" + brand);
+    }
     pure public function key(name: string) -> string {
-        if name.to-lowercase().starts-with("claude") || name.to-lowercase() == "anthropic" { return "claude"; }
-        if name.to-lowercase().starts-with("codex") { return "codex"; }
-        if name.to-lowercase().starts-with("openai") { return "openai"; }
-        if name.to-lowercase().starts-with("agy") || name.to-lowercase().starts-with("antigravity") { return "antigravity"; }
-        if name.to-lowercase().starts-with("gemini") { return "gemini"; }
-        if name.to-lowercase().starts-with("command-code") || name.to-lowercase().starts-with("command code") || name.to-lowercase().starts-with("commandcode") { return "commandcode"; }
-        if name.to-lowercase().starts-with("deepseek") || name.to-lowercase().starts-with("api-deepseek") || name.to-lowercase() == "harness" { return "deepseek"; }
+        return self.key-of(name.to-lowercase());
+    }
+    pure function key-of(n: string) -> string {
+        if n.starts-with("claude") || n == "anthropic" { return "claude"; }
+        if n.starts-with("codex") { return "codex"; }
+        if self.is(n, "openai") { return "openai"; }
+        if n.starts-with("agy") || n.starts-with("antigravity") { return "antigravity"; }
+        if self.is(n, "gemini") || self.is(n, "google") { return "gemini"; }
+        if n.starts-with("command-code") || n.starts-with("command code") || n.starts-with("commandcode") || n.starts-with("api-command-code") { return "commandcode"; }
+        if self.is(n, "deepseek") || n == "harness" { return "deepseek"; }
+        if self.is(n, "openrouter") { return "openrouter"; }
+        if self.is(n, "xai") || self.is(n, "grok") { return "xai"; }
+        if self.is(n, "mistral") { return "mistral"; }
+        if self.is(n, "groq") { return "groq"; }
+        if self.is(n, "kimi") || self.is(n, "moonshot") { return "kimi"; }
+        if self.is(n, "z.ai") || self.is(n, "z-ai") || self.is(n, "zai") || self.is(n, "glm") || self.is(n, "zhipu") { return "zai"; }
+        if self.is(n, "qwen") || self.is(n, "alibaba") || self.is(n, "dashscope") { return "qwen"; }
+        if self.is(n, "minimax") { return "minimax"; }
+        if self.is(n, "together") { return "together"; }
+        if self.is(n, "fireworks") { return "fireworks"; }
+        if self.is(n, "cerebras") { return "cerebras"; }
+        if self.is(n, "nvidia") { return "nvidia"; }
+        if self.is(n, "hugging face") || self.is(n, "hugging-face") || self.is(n, "huggingface") { return "huggingface"; }
+        if self.is(n, "vercel") { return "vercel"; }
+        if self.is(n, "opencode") { return "opencode"; }
+        if self.is(n, "ollama") { return "ollama"; }
+        if self.is(n, "lm studio") || self.is(n, "lm-studio") || self.is(n, "lmstudio") { return "lmstudio"; }
+        if self.is(n, "hermes") || self.is(n, "nous") { return "nousresearch"; }
         return "";
     }
     pure public function image(key: string) -> image {
@@ -18,6 +43,24 @@ export global AgentLogo {
         if key == "antigravity" { return @image-url("../icons/agents/antigravity.svg"); }
         if key == "gemini" { return @image-url("../icons/agents/gemini.svg"); }
         if key == "commandcode" { return @image-url("../icons/agents/commandcode.png"); }
+        if key == "openrouter" { return @image-url("../icons/agents/openrouter.svg"); }
+        if key == "xai" { return @image-url("../icons/agents/xai.svg"); }
+        if key == "mistral" { return @image-url("../icons/agents/mistral.svg"); }
+        if key == "groq" { return @image-url("../icons/agents/groq.svg"); }
+        if key == "kimi" { return @image-url("../icons/agents/kimi.svg"); }
+        if key == "zai" { return @image-url("../icons/agents/zai.svg"); }
+        if key == "qwen" { return @image-url("../icons/agents/qwen.svg"); }
+        if key == "minimax" { return @image-url("../icons/agents/minimax.svg"); }
+        if key == "together" { return @image-url("../icons/agents/together.svg"); }
+        if key == "fireworks" { return @image-url("../icons/agents/fireworks.svg"); }
+        if key == "cerebras" { return @image-url("../icons/agents/cerebras.svg"); }
+        if key == "nvidia" { return @image-url("../icons/agents/nvidia.svg"); }
+        if key == "huggingface" { return @image-url("../icons/agents/huggingface.svg"); }
+        if key == "vercel" { return @image-url("../icons/agents/vercel.svg"); }
+        if key == "opencode" { return @image-url("../icons/agents/opencode.svg"); }
+        if key == "ollama" { return @image-url("../icons/agents/ollama.svg"); }
+        if key == "lmstudio" { return @image-url("../icons/agents/lmstudio.svg"); }
+        if key == "nousresearch" { return @image-url("../icons/agents/nousresearch.svg"); }
         return @image-url("../icons/agents/deepseek.svg");
     }
     pure public function tint(key: string) -> color {

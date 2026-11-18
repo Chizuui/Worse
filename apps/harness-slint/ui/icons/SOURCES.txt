@@ -161,3 +161,21 @@ agents/deepseek.svg <- @lobehub/icons-static-svg:deepseek-color
 agents/antigravity.svg <- @lobehub/icons-static-svg:antigravity-color
 agents/openai.svg <- @lobehub/icons-static-svg:openai (fill set to white)
 agents/commandcode.png <- https://commandcode.ai/favicon/2024/android-chrome-192x192.png (unchanged)
+agents/openrouter.svg <- @lobehub/icons-static-svg:openrouter (currentColor set to white)
+agents/xai.svg <- @lobehub/icons-static-svg:xai (currentColor set to white)
+agents/mistral.svg <- @lobehub/icons-static-svg:mistral-color
+agents/groq.svg <- @lobehub/icons-static-svg:groq (currentColor set to white)
+agents/kimi.svg <- @lobehub/icons-static-svg:kimi-color (currentColor set to white)
+agents/zai.svg <- @lobehub/icons-static-svg:zai (currentColor set to white)
+agents/qwen.svg <- @lobehub/icons-static-svg:qwen-color
+agents/minimax.svg <- @lobehub/icons-static-svg:minimax-color
+agents/together.svg <- @lobehub/icons-static-svg:together-color
+agents/fireworks.svg <- @lobehub/icons-static-svg:fireworks (currentColor set to white)
+agents/cerebras.svg <- @lobehub/icons-static-svg:cerebras-color (currentColor set to white)
+agents/nvidia.svg <- @lobehub/icons-static-svg:nvidia-color
+agents/huggingface.svg <- @lobehub/icons-static-svg:huggingface-color
+agents/vercel.svg <- @lobehub/icons-static-svg:vercel (currentColor set to white)
+agents/opencode.svg <- @lobehub/icons-static-svg:opencode (currentColor set to white)
+agents/ollama.svg <- @lobehub/icons-static-svg:ollama (currentColor set to white)
+agents/lmstudio.svg <- @lobehub/icons-static-svg:lmstudio (currentColor set to white)
+agents/nousresearch.svg <- @lobehub/icons-static-svg:nousresearch (currentColor set to white)

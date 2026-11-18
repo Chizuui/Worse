@@ -233,7 +233,9 @@ numbered providers with the same endpoint and model, which makes them a round-ro
   one; elsewhere the field is empty. "List models" asks the endpoint (`GET <endpoint>/models` with the first
   key) and shows its ids; typing filters them, a click picks one. A local preset lists its models as soon as it
   is picked. OpenAI's `{"data": [{"id"}]}`, Ollama's `{"models": [{"name"}]}` and a bare list are read.
-- **Marks.** A preset without a logo shows its first letter.
+- **Marks.** Each preset shows its provider's mark (LobeHub Icons, `ui/icons/LICENSES.md`); the mark is found
+  from the provider's name or id, so it also shows in the provider list, the agent picker and the session list.
+  A name without a mark ("Other endpoint", a provider named by the user) shows its first letter in the dialog.
 
 ## 8. Measurements
 
