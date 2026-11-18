@@ -1601,12 +1601,20 @@ component AgentPicker inherits HorizontalLayout {
     // 全部 agent 都耗尽（暂停）时允许手动选择已耗尽的 agent 重试：hub 会清除其耗尽标记并恢复暂停的回合。
     in property <bool> paused;
     callback choose(string);
-    alignment: end;
-    padding-right: 36px;
+    // Above the agent button that opened it (the button sits at the left of the composer).
+    alignment: start;
+    // Set from `report` (a plain property: binding it to the position would be a layout loop).
+    property <length> pad;
+    property <length> anchor: DockUi.anchor-x;
+    padding-left: root.pad;
+    changed anchor => {
+        root.report();
+    }
     function report() {
         DockUi.menu-x = self.absolute-position.x;
         DockUi.menu-y = self.absolute-position.y;
         DockUi.menu-w = self.width;
+        root.pad = clamp(DockUi.anchor-x - self.absolute-position.x, 0px, max(0px, self.width - 268px));
     }
     init => {
         root.report();
@@ -2590,6 +2598,7 @@ component Composer inherits VerticalLayout {
                     accessible-role: button;
                     accessible-label: @tr("Agent: {0}", root.sticky-name);
                     accessible-action-default => {
+                        DockUi.anchor-x = self.absolute-position.x;
                         root.toggle-picker();
                     }
                     agent-chip := HorizontalLayout {
@@ -2626,6 +2635,7 @@ component Composer inherits VerticalLayout {
                     agta := TouchArea {
                         mouse-cursor: pointer;
                         clicked => {
+                            DockUi.anchor-x = parent.absolute-position.x;
                             root.toggle-picker();
                         }
                     }
@@ -3245,6 +3255,13 @@ export component AppWindow inherits Window {
     default-font-size: Theme.ui-base;
     callback window-action(string);
     in property <bool> win-maximized;
+    // Light or dark changed (a theme picked in Settings, or the system's): Rust tints the Windows title bar
+    // and border to match (`window_frame.rs`).
+    callback frame-dark-changed(bool);
+    property <bool> frame-dark: Theme.dark;
+    changed frame-dark => {
+        root.frame-dark-changed(self.frame-dark);
+    }
     // Live update (phase 1): Rust sets this when the build output changed under the running shadow copy.
     in-out property <bool> update-ready;
     callback restart-for-update();

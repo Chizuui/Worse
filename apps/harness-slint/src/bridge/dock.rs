@@ -83,6 +83,20 @@ fn option_rows(list: &[(String, String)]) -> ModelRc<OptionRow> {
     ))
 }
 
+/// The models whose name or id contains every word of `query` (case-insensitive); all of them for an empty
+/// query.
+fn matching_models(list: &[(String, String)], query: &str) -> Vec<(String, String)> {
+    let query = query.to_lowercase();
+    let words: Vec<&str> = query.split_whitespace().collect();
+    list.iter()
+        .filter(|(id, name)| {
+            let text = format!("{name} {id}").to_lowercase();
+            words.iter().all(|word| text.contains(word))
+        })
+        .cloned()
+        .collect()
+}
+
 /// Display name of the chosen value; the id when the agent did not list it, "" when nothing is chosen.
 fn chosen_name(list: &[(String, String)], value: Option<&str>) -> String {
     let Some(value) = value else {
@@ -239,9 +253,15 @@ impl UiState {
     pub(super) fn apply_options(&mut self, options: Option<Options>) {
         let dock = self.dock();
         let Some(o) = options else {
-            for set in [DockUi::set_modes, DockUi::set_models, DockUi::set_efforts] {
+            for set in [
+                DockUi::set_modes,
+                DockUi::set_models,
+                DockUi::set_models_shown,
+                DockUi::set_efforts,
+            ] {
                 set(&dock, ModelRc::default());
             }
+            dock.set_model_query(SharedString::new());
             dock.set_picker_open(SharedString::new());
             dock.set_machine(false);
             crate::machine_view::set_session(&self.window, None, false, "", "");
@@ -252,6 +272,9 @@ impl UiState {
         };
         dock.set_modes(option_rows(&o.modes));
         dock.set_models(option_rows(&o.models));
+        // The menu's list is the full list narrowed by what is typed in its search box.
+        let query = dock.get_model_query().to_string();
+        dock.set_models_shown(option_rows(&matching_models(&o.models, &query)));
         dock.set_efforts(option_rows(&o.efforts));
         dock.set_mode(sv(o.mode.as_deref().unwrap_or_default()));
         dock.set_model(sv(o.model.as_deref().unwrap_or_default()));
@@ -488,5 +511,19 @@ pub(super) fn wire(window: &crate::ui::AppWindow) {
     dock.on_queue_move(|id, delta| with_state(|s| s.queue_move(&id, delta)));
     dock.on_steer(|| with_state(UiState::steer));
     dock.on_pick_option(|which, id| with_state(|s| s.pick_option(&which, &id)));
+    let weak = window.as_weak();
+    dock.on_filter_models(move |query| {
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        let dock = window.global::<DockUi>();
+        use slint::Model as _;
+        let all: Vec<(String, String)> = dock
+            .get_models()
+            .iter()
+            .map(|row| (row.id.to_string(), row.name.to_string()))
+            .collect();
+        dock.set_models_shown(option_rows(&matching_models(&all, &query)));
+    });
     dock.on_failure_action(|action| with_state(|s| s.failure_action(&action)));
 }

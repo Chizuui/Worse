@@ -89,16 +89,39 @@ without it. The pieces that show an agent at work (thinking line, tool spinners,
 A focused or hovered window also counts as visible: X11 without a window manager reports the window as
 occluded at startup.
 
-### 3.6 Rounded window on Windows 11
+### 3.6 Window frame on Windows 11
 
-With the custom title bar ("Use Windows title bar" off) the window is frameless, and Windows 11 draws a
-frameless window square and without a shadow. `apps/harness-slint/src/window_frame.rs` asks DWM for the normal
-look through winit's window attributes: `CornerPreference::Round` (DWM rounds and anti-aliases the corners,
-and squares them again while the window is maximized or snapped) and the undecorated shadow. The frame follows
-the app's theme (`set_theme` on the winit window), so the thin border DWM draws is dark in the dark theme; this
-does not touch winit's record of the system theme that Slint reads for "System". The radius is DWM's own
-(8 px), not configurable. Windows 10 has no corner preference and stays square. With the Windows title bar on,
-Windows 11 rounds the window by itself.
+`apps/harness-slint/src/window_frame.rs`.
+
+- **Custom title bar** ("Use Windows title bar" off): the window is frameless, and Windows 11 draws a
+  frameless window square and without a shadow. winit's window attributes ask DWM for the normal look:
+  `CornerPreference::Round` (DWM rounds and anti-aliases the corners, and squares them again while the window
+  is maximized or snapped) and the undecorated shadow. The radius is DWM's own (8 px).
+- **Windows title bar** (the default): Windows draws the bar and the 1 px border in its own colours (the
+  accent colour or grey), which sat badly on the app's canvas. DWM takes a caption colour, a caption text
+  colour and a border colour per window (Windows 11 build 22000+); they are set to the theme's canvas, text
+  and hairline, so the bar and the app read as one surface, and set again when the app changes between light
+  and dark (`frame-dark-changed`). The bar keeps its native buttons, snapping and resizing.
+
+Windows 10 ignores both.
+
+### 3.7 Fixes from a report on Windows (2026-11-19)
+
+Seen on Windows, reproduced on Linux with the build of the time:
+
+- **An expanded Thought was drawn over the rows below it.** Its text sits in a conditional element of a list
+  row, where the layout width does not reach the height measurement; the row was measured as one line. The
+  text now has an explicit width, as message and tool rows already had.
+- **Command output was set in the interface font**, so tables did not line up. Output of commands and file
+  tools is now fixed-width; tools that return prose (web, thoughts, MCP answers) keep the interface font.
+- **The agent and model menus opened at the right end of the composer** while their buttons are at the left.
+  Each menu now opens above the button that opened it.
+- **A long model list could only be scrolled.** With more than eight models the menu has a search box that
+  takes the keyboard as it opens: typing narrows by name or id (every word must match), Enter picks the first
+  match, Esc closes.
+- **An agent asked "what tools do you have in this harness" went through the application's files.** Nothing
+  told it what Harness is. A fresh agent session now starts with a `<harness>` block naming the tool servers
+  it has (memory, delegate, computer, graph) and what each is for (`crates/harness-agent-hub/src/about.rs`).
 
 ## 4. Team strip
 
@@ -300,8 +323,8 @@ Not verified:
 - A real Hermes gateway and a real Command Code key (`COMMAND_CODE_API_KEY` in ACP mode follows the CLI's
   documentation of its headless login), and any real provider behind a preset: no key was sent to a provider.
   Default model ids come from documentation and may be renamed; "List models" shows what an endpoint serves.
-- Rounded corners on Windows 11 (section 3.6): Wine has no DWM, so the corner preference and the frame theme
-  were only type-checked for the Windows target.
+- The window frame on Windows 11 (section 3.6): rounded corners, and the title bar and border colours. No
+  Windows was available and Wine has no DWM, so they were only type-checked for the Windows target.
 - The wallpaper file picker on Linux (GTK). The Windows dialog was driven under Wine; the settings write behind
   both is the same one the tests use.
 - New interface strings are English only; the Chinese translation falls back to English for them.

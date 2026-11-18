@@ -552,6 +552,7 @@ fn main() -> ExitCode {
     remote::install(&window, &data_dir);
     plan_usage::install(&window);
     install_window_chrome(&window);
+    window_frame::install(&window);
     install_restart_for_update(&window, &workspace_dir);
     if live_update::is_shadow() {
         live_update::cleanup_old_copies();

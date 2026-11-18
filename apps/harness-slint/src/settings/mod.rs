@@ -474,7 +474,6 @@ impl State {
             harness_settings::ThemePref::Dark => 2,
         };
         theme.set_pref(pref);
-        crate::window_frame::follow_theme(&self.window, pref);
         let zoom = f32::from(settings.appearance.zoom_percent) / 100.0;
         theme.set_ui_font_size(f32::from(settings.appearance.ui_font_size) * zoom);
         theme.set_code_size(f32::from(settings.appearance.code_font_size) * zoom);

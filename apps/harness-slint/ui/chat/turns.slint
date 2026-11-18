@@ -75,6 +75,9 @@ export component ToolCard inherits VerticalLayout {
     init => {
         root.content-width = root.width;
     }
+    // Output of commands and file tools is terminal text (tables, listings, code): fixed-width, so columns
+    // line up. Other tools (web pages, thoughts, MCP answers) return prose and keep the interface font.
+    property <bool> raw-output: root.tool-kind == "execute" || root.tool-kind == "read" || root.tool-kind == "search" || root.tool-kind == "edit" || root.tool-kind == "delete" || root.tool-kind == "move";
     property <image> kind-icon: root.tool-kind == "read" ? Icons.file-text : root.tool-kind == "fetch" ? Icons.globe : root.tool-kind == "edit" || root.tool-kind == "move" ? Icons.square-pen : root.tool-kind == "delete" ? Icons.trash-2 : root.tool-kind == "search" ? Icons.search : root.tool-kind == "think" ? Icons.brain : root.tool-kind == "execute" ? Icons.square-terminal : Icons.wrench;
     spacing: 4px;
     // Flat row (no box): a fill appears only on hover or while its detail is open.
@@ -294,8 +297,8 @@ export component ToolCard inherits VerticalLayout {
                     width: max(40px, root.content-width - row.text-x - 12px);
                     text: p.kind == 5 ? (p.text == "input" ? @tr("Input") : @tr("Output")) : p.kind == 2 ? "+ " + p.text : p.kind == 3 ? "- " + p.text : p.text;
                     wrap: word-wrap;
-                    font-family: p.kind == 0 || p.kind == 5 ? "" : Theme.mono-font;
-                    font-size: p.kind == 0 || p.kind == 5 ? Theme.ui-sm : Theme.code-size;
+                    font-family: (p.kind == 0 && !root.raw-output) || p.kind == 5 ? "" : Theme.mono-font;
+                    font-size: (p.kind == 0 && !root.raw-output) || p.kind == 5 ? Theme.ui-sm : Theme.code-size;
                     font-weight: p.kind == 1 || p.kind == 5 ? Theme.weight-medium : 400;
                     color: p.kind == 5 ? Theme.foreground-subtle : p.kind == 2 ? Theme.diff-added : p.kind == 3 ? Theme.diff-removed : Theme.foreground;
                     accessible-role: none;
@@ -312,6 +315,17 @@ export component ThinkingRow inherits VerticalLayout {
     in property <string> preview;
     in property <bool> active;
     in property <bool> expanded;
+    // The expanded text sits in a conditional element of a list row: the layout's width does not reach its
+    // height measurement there, so the row was measured as if the text were one line and the next rows were
+    // drawn over it. An explicit width (kept in a plain property to avoid a width binding loop) fixes the
+    // height, as in the message and tool rows.
+    property <length> content-width: 400px;
+    changed width => {
+        root.content-width = root.width;
+    }
+    init => {
+        root.content-width = root.width;
+    }
     spacing: 4px;
     Rectangle {
         height: 30px;
@@ -380,9 +394,10 @@ export component ThinkingRow inherits VerticalLayout {
             background: Theme.border-hover;
         }
         Text {
+            // 17 padding + 2 rule + 14 spacing sit to its left.
+            width: max(40px, root.content-width - 33px);
             text: root.text;
             wrap: word-wrap;
-            horizontal-stretch: 1;
             font-size: Theme.ui-sm;
             color: Theme.foreground-subtle;
             accessible-role: AccessibleRole.text;

@@ -45,6 +45,13 @@ export global DockUi {
     in-out property <length> menu-x;
     in-out property <length> menu-y;
     in-out property <length> menu-w;
+    // Window x of the button that opened a picker menu: the menu opens above that button, not at the far end
+    // of the composer.
+    in-out property <length> anchor-x;
+    // Models the menu shows: `models` narrowed by `model-query` (kept by Rust; Slint cannot search text).
+    in property <[OptionRow]> models-shown;
+    in-out property <string> model-query;
+    callback filter-models(string);
     // Footer width level (UI-local, computed by PickerBar from measured widths): "full" = three buttons,
     // "medium" = Model + options button (Mode, Effort in the popup), "compact" = options button only.
     in-out property <string> picker-layout: "full";
@@ -108,6 +115,11 @@ export component PickerButton inherits HorizontalLayout {
         text-color: root.which == "mode" && DockUi.machine ? Theme.destructive : root.which == "mode" && DockUi.research ? Theme.brand : Theme.foreground-subtle;
         enabled: !DockUi.options-locked && !DockUi.options-pending;
         clicked => {
+            DockUi.anchor-x = root.absolute-position.x;
+            if root.which == "model" && DockUi.model-query != "" {
+                DockUi.model-query = "";
+                DockUi.filter-models("");
+            }
             DockUi.picker-open = DockUi.picker-open == root.which ? "" : root.which;
         }
     }
@@ -127,6 +139,7 @@ component OptionsButton inherits Rectangle {
         // tip-ta (on top) takes the pointer, so its hover drives the button's highlight.
         active: DockUi.picker-open == "options" || (tip-ta.has-hover && root.enabled);
         clicked => {
+            DockUi.anchor-x = root.absolute-position.x;
             DockUi.picker-open = DockUi.picker-open == "options" ? "" : "options";
         }
     }
@@ -366,12 +379,20 @@ component MenuHeading inherits HorizontalLayout {
 }
 
 export component PickerMenu inherits HorizontalLayout {
-    alignment: end;
-    padding-right: 36px;
+    // Above the button that opened it, kept inside the composer.
+    alignment: start;
+    // Set from `report` (a plain property: binding it to the position would be a layout loop).
+    property <length> pad;
+    property <length> anchor: DockUi.anchor-x;
+    padding-left: root.pad;
+    changed anchor => {
+        root.report();
+    }
     function report() {
         DockUi.menu-x = self.absolute-position.x;
         DockUi.menu-y = self.absolute-position.y;
         DockUi.menu-w = self.width;
+        root.pad = clamp(DockUi.anchor-x - self.absolute-position.x, 0px, max(0px, self.width - 312px));
     }
     init => {
         root.report();
@@ -421,16 +442,81 @@ export component PickerMenu inherits HorizontalLayout {
         }
     }
     if DockUi.picker-open == "model": MenuShell {
-        width: 260px;
+        // A long list (OpenRouter, Command Code: dozens of models) gets a search box that takes the keyboard
+        // as the menu opens: type to narrow, Enter picks the first match.
+        property <bool> searchable: DockUi.models.length > 8;
+        width: self.searchable ? 304px : 260px;
+        if self.searchable: Rectangle {
+            height: 30px;
+            border-radius: 8px;
+            background: Theme.surface;
+            border-width: 1px;
+            border-color: model-search.has-focus ? Theme.border-hover : Theme.border;
+            Icon {
+                x: 9px;
+                y: (parent.height - self.height) / 2;
+                source: Icons.search;
+                size: Theme.icon-xs;
+                tint: Theme.icon-subtlest;
+            }
+            if model-search.text == "": Text {
+                x: 30px;
+                width: parent.width - 40px;
+                text: "Search " + DockUi.models.length + " models";
+                font-size: Theme.ui-sm;
+                color: Theme.foreground-subtlest;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+            model-search := TextInput {
+                x: 30px;
+                y: (parent.height - self.height) / 2;
+                width: parent.width - 40px;
+                height: 18px;
+                text <=> DockUi.model-query;
+                single-line: true;
+                font-size: Theme.ui-sm;
+                color: Theme.foreground;
+                accessible-label: "Search models";
+                init => {
+                    self.focus();
+                }
+                edited => {
+                    DockUi.filter-models(self.text);
+                }
+                accepted => {
+                    if DockUi.models-shown.length > 0 {
+                        DockUi.pick-option("model", DockUi.models-shown[0].id);
+                        DockUi.picker-open = "";
+                    }
+                }
+                key-pressed(event) => {
+                    if event.text == Key.Escape {
+                        DockUi.picker-open = "";
+                        return accept;
+                    }
+                    reject
+                }
+            }
+        }
+        if DockUi.models-shown.length == 0: Text {
+            height: 34px;
+            text: "No model matches";
+            font-size: Theme.ui-sm;
+            color: Theme.foreground-subtlest;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
         Flickable {
-            height: min(DockUi.models.length * 34px, 340px);
-            content-height: DockUi.models.length * 34px;
+            height: min(DockUi.models-shown.length * 34px, 340px);
+            content-height: DockUi.models-shown.length * 34px;
             VerticalLayout {
                 width: parent.width;
                 spacing: 2px;
-                for o[i] in DockUi.models: OptionItem {
+                for o[i] in DockUi.models-shown: OptionItem {
                     text: o.name;
-                    hint: (i + 1) + "";
+                    // Number keys pick from a short list; a long one is searched instead.
+                    hint: DockUi.models.length > 8 ? "" : (i + 1) + "";
                     label: "model-option " + o.name;
                     checked: o.id == DockUi.model;
                     clicked => {
