@@ -74,6 +74,10 @@ pub(crate) fn state_dir(home: &Path, id: &str) -> PathBuf {
     home.join(PROVIDERS_DIR).join(id)
 }
 
+/// Held across every read-modify-write of `providers.json`. The settings page sends one add per key, each in
+/// its own task; without this, two adds read the same file and the later save drops the earlier entry.
+static WRITE: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 pub(crate) async fn load(home: &Path) -> Result<ProvidersFile, ApiError> {
     let path = home.join(PROVIDERS_FILE);
     match tokio::fs::read(&path).await {
@@ -339,6 +343,7 @@ pub(crate) async fn add(
     request: AddProvider,
     loaded: &(dyn Fn(&AgentId) -> bool + Sync),
 ) -> Result<ProviderInfo, ApiError> {
+    let _write = WRITE.lock().await;
     let label = clean_label(&request.label)?;
     let command_code = match request.kind.trim() {
         "" => false,
@@ -402,6 +407,7 @@ pub(crate) async fn update(
     request: UpdateProvider,
     loaded: &(dyn Fn(&AgentId) -> bool + Sync),
 ) -> Result<ProviderInfo, ApiError> {
+    let _write = WRITE.lock().await;
     let mut file = load(&config.home).await?;
     let Some(entry) = file
         .providers
@@ -433,6 +439,7 @@ pub(crate) async fn update(
 }
 
 pub(crate) async fn remove(config: &HubConfig, id: &AgentId) -> Result<(), ApiError> {
+    let _write = WRITE.lock().await;
     let mut file = load(&config.home).await?;
     let before = file.providers.len();
     file.providers.retain(|e| e.id != id.as_str());
@@ -462,6 +469,44 @@ mod tests {
             api_key: "key".into(),
             kind: kind.into(),
         }
+    }
+
+    /// The settings page sends one add per key, each in its own task: every key must end up in the file.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn concurrent_adds_keep_every_entry() {
+        let home = std::env::temp_dir().join(format!(
+            "harness-providers-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        tokio::fs::create_dir_all(&home).await.expect("temp home");
+        let mut config = HubConfig::from_env().expect("config");
+        config.home = home.clone();
+        let config = std::sync::Arc::new(config);
+        let mut tasks = Vec::new();
+        for i in 1..=6 {
+            let config = std::sync::Arc::clone(&config);
+            tasks.push(tokio::spawn(async move {
+                let request = AddProvider {
+                    label: format!("Pool {i}"),
+                    base_url: "http://127.0.0.1:1234/v1".into(),
+                    model: "m".into(),
+                    api_key: format!("key-{i}"),
+                    kind: String::new(),
+                };
+                add(&config, request, &|_| false).await.map(|_| ())
+            }));
+        }
+        for task in tasks {
+            task.await.expect("join").expect("add");
+        }
+        let file = load(&home).await.expect("load");
+        assert_eq!(file.providers.len(), 6);
+        assert_eq!(
+            pools(&file.providers).len(),
+            1,
+            "same endpoint and model: one round-robin pool"
+        );
+        let _ = tokio::fs::remove_dir_all(&home).await;
     }
 
     fn ids(pool: &[AgentId]) -> Vec<&str> {
