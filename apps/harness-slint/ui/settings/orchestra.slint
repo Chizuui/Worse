@@ -855,6 +855,7 @@ export component OrchestraPage inherits VerticalLayout {
     property <string> mode: SettingsUi.get-string("orchestra.defaultMode", SettingsUi.rev);
     property <string> instr: SettingsUi.get-string("orchestra.instructions", SettingsUi.rev);
     property <int> max-conc: SettingsUi.get-int("orchestra.maxConcurrent", SettingsUi.rev);
+    property <int> max-nested: SettingsUi.get-int("orchestra.maxNestedPerSubagent", SettingsUi.rev);
     max-width: 880px;
     alignment: start;
     spacing: 20px;
@@ -948,23 +949,46 @@ export component OrchestraPage inherits VerticalLayout {
         note: @tr("Applies to new delegations");
         ORow {
             label: @tr("Max concurrent subagents");
-            description: @tr("Extra delegations wait in the queue.");
+            description: @tr("Subagents the main chat runs at once. Subagents started by subagents are not counted here.");
             VerticalLayout {
                 alignment: center;
                 OStepper {
                     label: @tr("Max concurrent subagents");
                     text: root.max-conc;
                     can-dec: root.max-conc > 1;
-                    can-inc: root.max-conc < 8;
+                    can-inc: true;
                     dec => { SettingsUi.set-int("orchestra.maxConcurrent", max(1, root.max-conc - 1)); }
-                    inc => { SettingsUi.set-int("orchestra.maxConcurrent", min(8, root.max-conc + 1)); }
+                    inc => { SettingsUi.set-int("orchestra.maxConcurrent", root.max-conc + 1); }
                 }
             }
-            Text {
-                text: @tr("up to 8");
-                font-size: 11px;
-                color: Theme.icon-subtlest;
-                vertical-alignment: center;
+        }
+        ODiv { }
+        ORow {
+            label: @tr("Subagents can start subagents");
+            description: @tr("Lets a subagent split its task across more subagents. Applies to new subagents.");
+            VerticalLayout {
+                alignment: center;
+                Switch {
+                    label: @tr("Subagents can start subagents");
+                    checked: SettingsUi.get-bool("orchestra.nestedSubagents", SettingsUi.rev);
+                    toggled(on) => { SettingsUi.set-bool("orchestra.nestedSubagents", on); }
+                }
+            }
+        }
+        if SettingsUi.get-bool("orchestra.nestedSubagents", SettingsUi.rev): ODiv { }
+        if SettingsUi.get-bool("orchestra.nestedSubagents", SettingsUi.rev): ORow {
+            label: @tr("Max subagents per subagent");
+            description: @tr("Each subagent's own quota for the subagents it starts, separate from the main chat's limit.");
+            VerticalLayout {
+                alignment: center;
+                OStepper {
+                    label: @tr("Max subagents per subagent");
+                    text: root.max-nested;
+                    can-dec: root.max-nested > 1;
+                    can-inc: true;
+                    dec => { SettingsUi.set-int("orchestra.maxNestedPerSubagent", max(1, root.max-nested - 1)); }
+                    inc => { SettingsUi.set-int("orchestra.maxNestedPerSubagent", root.max-nested + 1); }
+                }
             }
         }
         ODiv { }

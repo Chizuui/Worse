@@ -1270,6 +1270,7 @@ fn fingerprint(root: &Path) -> R<BTreeMap<PathBuf, (Vec<u8>, std::time::SystemTi
     Ok(out)
 }
 
+#[allow(clippy::too_many_lines)]
 async fn import(chat: &Chat, gate: &Gate) -> R<()> {
     let root = &chat.import_root;
     if root.exists() {

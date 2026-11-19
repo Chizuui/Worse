@@ -277,7 +277,8 @@ async fn wake(agent: Arc<Agent>, id: String) {
             }),
         );
         let user = notification(&finished).await;
-        let result = session::run_turn(&agent, &id, &mut s, serde_json::Value::String(user), &token).await;
+        let result =
+            session::run_turn(&agent, &id, &mut s, serde_json::Value::String(user), &token).await;
         s.persist(agent.provider.state_dir.as_deref(), &id).await;
         agent.jobs.remove(&task);
         let mut update = json!({"sessionUpdate": "async_task_state_update", "asyncTaskId": task});

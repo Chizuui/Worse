@@ -20,7 +20,7 @@ impl SessionActor {
         let Some(role) = agy_delegate::agy_role(&self.ctx, agent, &self.row.id) else {
             return;
         };
-        if self.running.as_ref().is_none_or(|r| r.cancelling) {
+        if self.running.as_ref().map_or(true, |r| r.cancelling) {
             return;
         }
         let redirected = self

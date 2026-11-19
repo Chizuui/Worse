@@ -1,0 +1,213 @@
+// Security page (design frame S6 "Security", spec docs/specs/harness/security-panel.md §6): scanner state, scan
+// action, the commit gate, the three audit toggles and the findings table.
+import { Theme } from "../theme/tokens.slint";
+import { PageHeader, Group, SettingRow, Switch, SegmentedControl, SetButton, Pill } from "parts.slint";
+import { SettingsUi, SecurityUi } from "globals.slint";
+
+component SeverityPill inherits Rectangle {
+    in property <string> severity;
+    property <color> tint: root.severity == "critical"
+        ? #f2555a
+        : root.severity == "high"
+        ? #f5b14c
+        : root.severity == "medium"
+        ? #d8b34a
+        : root.severity == "low"
+        ? #4bd992
+        : Theme.foreground-subtlest;
+    height: 19px;
+    preferred-width: 74px;
+    min-width: 74px;
+    max-width: 74px;
+    border-radius: Theme.radius-full;
+    background: root.tint.with-alpha(0.14);
+    Text {
+        text: root.severity;
+        font-size: Theme.ui-font-size - 3px;
+        font-weight: Theme.weight-medium;
+        color: root.tint;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component HeaderCell inherits Text {
+    in property <bool> grow: false;
+    horizontal-stretch: root.grow ? 1 : 0;
+    font-size: 11px;
+    font-weight: Theme.weight-medium;
+    color: Theme.muted;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
+component Cell inherits Text {
+    in property <bool> grow: false;
+    in property <bool> mono: false;
+    horizontal-stretch: root.grow ? 1 : 0;
+    font-size: 12px;
+    color: Theme.foreground-subtle;
+    vertical-alignment: center;
+    overflow: elide;
+    font-family: root.mono ? Theme.mono-font : Theme.ui-font;
+}
+
+component ToggleRow inherits SettingRow {
+    in property <string> key;
+    Switch {
+        checked: SettingsUi.get-bool(root.key, SettingsUi.rev);
+        toggled(on) => {
+            SettingsUi.set-bool(root.key, on);
+        }
+    }
+}
+
+export component SecurityPage inherits VerticalLayout {
+    in property <bool> stacked;
+    property <bool> ready: SecurityUi.installed;
+    property <bool> idle: !SecurityUi.scanning;
+    property <string> state-title: root.ready ? @tr("osv-scanner is ready") : @tr("osv-scanner is not installed");
+    property <string> state-note: root.ready
+        ? @tr("Pinned {}, stored in your Harness folder and verified against the release checksum.", SecurityUi.version)
+        : @tr("Downloads {} from github.com/google/osv-scanner and verifies its SHA-256 checksum. Nothing is fetched until you ask.", "v2.7.1");
+    spacing: 18px;
+    alignment: start;
+
+    PageHeader {
+        title: @tr("Security");
+        description: @tr("Known vulnerabilities in this workspace's dependencies, and what Harness does about them.");
+    }
+
+    Group {
+        title: @tr("Dependency scanner");
+        note: root.ready ? "v" + SecurityUi.version : @tr("Not installed");
+
+        SettingRow {
+            first: true;
+            stacked: root.stacked;
+            title: root.state-title;
+            description: root.state-note;
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                if !root.ready: SetButton {
+                    text: @tr("Download scanner");
+                    variant: "primary";
+                    enabled: !SecurityUi.scanning;
+                    clicked => {
+                        SecurityUi.download();
+                    }
+                }
+                if root.ready: SetButton {
+                    text: SecurityUi.scanning ? @tr("Scanning…") : @tr("Scan now");
+                    variant: "primary";
+                    enabled: root.idle;
+                    clicked => {
+                        SecurityUi.scan();
+                    }
+                }
+                if root.ready: SetButton {
+                    text: @tr("Remove scanner");
+                    enabled: root.idle;
+                    clicked => {
+                        SecurityUi.remove();
+                    }
+                }
+            }
+        }
+
+        SettingRow {
+            stacked: root.stacked;
+            title: @tr("Commit gate");
+            description: @tr("What a commit does when a lockfile in it has known advisories.");
+            SegmentedControl {
+                label: @tr("Commit gate");
+                options: [{ id: "off", label: @tr("Off") }, { id: "warn", label: @tr("Warn") }, { id: "block", label: @tr("Block") }];
+                current: SecurityUi.gate;
+                select(id) => {
+                    SecurityUi.set-gate(id);
+                }
+            }
+        }
+
+        ToggleRow {
+            stacked: root.stacked;
+            key: "security.scanOnLockfileChange";
+            title: @tr("Scan when a lockfile changes");
+            description: @tr("One scan per change, a few seconds after the file stops changing.");
+        }
+
+        ToggleRow {
+            stacked: root.stacked;
+            key: "security.offlineScan";
+            title: @tr("Offline scanning only");
+            description: @tr("Use the local OSV database and make no request to osv.dev. Download it once with osv-scanner to use this.");
+        }
+
+        ToggleRow {
+            stacked: root.stacked;
+            key: "security.showDiffBadge";
+            title: @tr("Show a count on lockfiles in the diff view");
+            description: @tr("A badge on the lockfiles the last scan covered.");
+        }
+    }
+
+    Group {
+        title: @tr("Findings");
+        note: SecurityUi.scanned-at;
+
+        if SecurityUi.status != "" && SecurityUi.rows.length == 0: Rectangle {
+            height: 52px;
+            Text {
+                x: 16px;
+                width: parent.width - 32px;
+                vertical-alignment: center;
+                text: SecurityUi.status;
+                font-size: Theme.ui-sm;
+                color: Theme.muted;
+                wrap: word-wrap;
+            }
+        }
+
+        if SecurityUi.rows.length > 0: HorizontalLayout {
+            height: 30px;
+            padding-left: 16px;
+            padding-right: 16px;
+            spacing: 12px;
+            HeaderCell { text: @tr("Package"); grow: true; }
+            HeaderCell { text: @tr("Version"); width: 86px; }
+            HeaderCell { text: @tr("Advisory"); grow: true; }
+            HeaderCell { text: @tr("Severity"); width: 74px; }
+            HeaderCell { text: @tr("Fixed in"); width: 96px; }
+        }
+
+        for row in SecurityUi.rows: Rectangle {
+            height: 38px;
+            background: row-touch.has-hover ? Theme.card-selected : transparent;
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                spacing: 12px;
+                Cell { text: row.package; grow: true; }
+                Cell { text: row.version; width: 86px; mono: true; }
+                Cell { text: row.id; grow: true; }
+                SeverityPill { severity: row.severity; }
+                Cell { text: row.fixed; width: 96px; mono: true; }
+            }
+            row-touch := TouchArea { }
+        }
+
+        if SecurityUi.rows.length > 0: HorizontalLayout {
+            height: 40px;
+            padding-left: 16px;
+            padding-right: 16px;
+            spacing: 8px;
+            alignment: start;
+            Pill { text: @tr("{} total", SecurityUi.total); tint: Theme.foreground-subtle; }
+            if SecurityUi.critical > 0: Pill { text: @tr("{} critical", SecurityUi.critical); tint: #f2555a; }
+            if SecurityUi.high > 0: Pill { text: @tr("{} high", SecurityUi.high); tint: #f5b14c; }
+            if SecurityUi.medium > 0: Pill { text: @tr("{} medium", SecurityUi.medium); tint: #d8b34a; }
+            if SecurityUi.low > 0: Pill { text: @tr("{} low", SecurityUi.low); tint: #4bd992; }
+        }
+    }
+}

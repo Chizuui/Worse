@@ -458,6 +458,7 @@ pub(crate) async fn remove(config: &HubConfig, id: &AgentId) -> Result<(), ApiEr
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
 
     fn entry(id: &str, base_url: &str, model: &str, kind: &str) -> ProviderEntry {
@@ -544,7 +545,7 @@ mod tests {
     fn keys_without_a_key_stay_out() {
         let mut empty = entry("command-code-a", "", "", KIND_COMMAND_CODE);
         empty.api_key = "  ".into();
-        assert!(pools(&[empty]).is_empty());
+        assert_eq!(pools(&[empty]).len(), 0);
     }
 
     #[test]

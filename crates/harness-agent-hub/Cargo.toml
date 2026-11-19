@@ -26,6 +26,8 @@ uuid = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
 harness-import = { path = "../harness-import" }
+# Performance recorder (spec performance-recorder.md): spans around ACP bridge traffic.
+harness-perf = { path = "../harness-perf" }
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider", "system-proxy"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 sha2 = "0.10"

@@ -150,12 +150,50 @@ export global DiffUi {
 }
 
 // MCP / Skills / Commands / Hooks / Subagents (one pattern, spec §6.2).
+export struct SkillRow {
+    name: string,
+    description: string,
+    group: string,
+    installed: bool,
+    update: bool,
+    busy: bool,
+    // Skill trigger health (spec skill-health.md): grade of the installed skill, empty when unknown.
+    health: string,
+    health-detail: string,
+}
+
+export global SkillsUi {
+    in property <[SkillRow]> rows;
+    in property <int> hidden;
+    in property <bool> loading;
+    in property <bool> catalog-available: true;
+    in property <string> status;
+    in property <bool> status-error;
+    in-out property <string> query;
+    // Worst grade over the installed skills plus its score, for the page header.
+    in property <string> health-grade;
+    in property <int> health-score;
+    in property <bool> checking;
+    // Copyable `reach eval` line, shown only while the opt-in live check is on (spec skill-health.md).
+    in property <string> live-command;
+    callback search(string);
+    callback refresh();
+    callback install(string);
+    callback update(string);
+    callback remove(string);
+    callback check-health();
+}
+
 export global ConfigUi {
     in property <string> concept;
     in property <string> agent: "claude-code";
     in property <string> scope: "user";
     in property <[ResRow]> rows;
     in property <[ResGroup]> groups;
+    in-out property <int> limit: 10;
+    in property <int> total;
+    in property <int> hidden;
+    callback show-more();
     in property <bool> loading;
     in property <bool> supported: true;
     in property <bool> scope-supported: true;
@@ -382,6 +420,34 @@ export global ProjectsUi {
     callback undo-remove();
 }
 
+export struct VulnRow {
+    package: string,
+    version: string,
+    id: string,
+    severity: string,
+    fixed: string,
+    source: string,
+}
+
+export global SecurityUi {
+    in property <bool> scanning;
+    in property <bool> installed;
+    in property <string> version;
+    in property <string> status;
+    in property <string> error;
+    in property <[VulnRow]> rows;
+    in property <int> total;
+    in property <int> critical;
+    in property <int> high;
+    in property <int> medium;
+    in property <int> low;
+    in property <string> scanned-at;
+    in property <string> gate;
+    callback download();
+    callback remove();
+    callback scan();
+    callback set-gate(string);
+}
 export global ArchiveUi {
     in property <[ArchiveRow]> rows;
     in-out property <string> query;
@@ -531,6 +597,7 @@ export global GraphUi {
     in property <string> install-plan;
     in property <string> project;
     in property <bool> has-graph;
+    in property <bool> checked;
     // "1,204 nodes · 3,310 links · 18 communities · updated 2h ago"
     in property <string> summary;
     in property <bool> has-html;

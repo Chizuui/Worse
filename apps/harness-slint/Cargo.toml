@@ -1,6 +1,6 @@
 [package]
 name = "harness-slint"
-version = "0.1.6"
+version = "0.1.7"
 edition.workspace = true
 # Slint 1.18 itself requires Rust 1.92 (enforced through its own rust-version).
 rust-version.workspace = true
@@ -52,6 +52,8 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 harness-workspace = { path = "../../crates/harness-workspace" }
 # Phase 9.2: "Reveal workspace in file manager" (desktop SystemPathRevealer).
 harness-platform = { path = "../../crates/harness-platform" }
+# Performance recorder (spec performance-recorder.md): Perfetto trace from `crates/harness-perf`.
+harness-perf = { path = "../../crates/harness-perf" }
 alacritty_terminal = { version = "0.26", default-features = false }
 # Phase 9.2 composer: image paste (clipboard bitmap → PNG), file picker, whiteboard / annotation PNG export.
 image = { version = "0.25", default-features = false, features = ["png", "bmp", "jpeg", "gif", "webp"] }

@@ -70,7 +70,7 @@ static SNAPSHOT: Mutex<Snapshot> = Mutex::new(Snapshot {
 });
 static TUNNEL: Mutex<Option<tunnel::Tunnel>> = Mutex::new(None);
 static COMMANDS: OnceLock<Sender<Cmd>> = OnceLock::new();
-/// HARNESS_HOME (paired devices live in `remote.json` there).
+/// `HARNESS_HOME` (paired devices live in `remote.json` there).
 static STATE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 enum Cmd {
@@ -145,6 +145,7 @@ pub fn shutdown() {
 }
 
 /// Server thread: one runtime, one handle, commands applied in order.
+#[allow(clippy::needless_pass_by_value)]
 fn serve(rx: mpsc::Receiver<Cmd>) {
     let Ok(runtime) = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
@@ -313,6 +314,7 @@ impl Cache {
 }
 
 /// Paints the page from the snapshot (UI thread, timer-driven).
+#[allow(clippy::too_many_lines)]
 fn refresh(window: &AppWindow) {
     poll_tunnel();
     sync_public_host();
@@ -456,7 +458,7 @@ fn expiry_text(expires_ms: u64) -> String {
     }
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
+        .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
         .unwrap_or_default();
     if expires_ms <= now {
         return "expired".to_owned();
@@ -489,7 +491,7 @@ fn wire(window: &AppWindow) {
     ui.on_pair_new(|| {
         send(Cmd::Pair {
             name: "Phone".into(),
-        })
+        });
     });
     ui.on_revoke(|id| send(Cmd::Revoke(id.to_string())));
     ui.on_refresh(|| send(Cmd::Devices));
@@ -547,12 +549,11 @@ pub fn start_tunnel() {
     let Some(settings) = crate::settings::current() else {
         return;
     };
-    let port = match snapshot().server.clone() {
-        ServerState::Up { .. } => settings.remote.port,
-        _ => {
-            snapshot().note = "Start the server before the tunnel.".into();
-            return;
-        }
+    let port = if let ServerState::Up { .. } = snapshot().server.clone() {
+        settings.remote.port
+    } else {
+        snapshot().note = "Start the server before the tunnel.".into();
+        return;
     };
     let cfg = tunnel::TunnelConfig::new(
         &settings.remote.tunnel_bin,

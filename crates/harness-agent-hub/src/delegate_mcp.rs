@@ -20,6 +20,7 @@ const PROGRESS_EVERY: Duration = Duration::from_secs(15);
 
 /// Where the hub listens; from `HARNESS_DELEGATE_ADDR` / `_TOKEN` / `_SESSION`.
 #[derive(Clone)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct DelegateEnv {
     pub addr: String,
     pub token: String,
@@ -27,6 +28,8 @@ pub struct DelegateEnv {
     /// `HARNESS_DELEGATE_ROLE=child` (§9.8.1): only selects the tool list; the hub enforces the role itself.
     pub child: bool,
     pub router: bool,
+    /// `HARNESS_DELEGATE_ROLE=nested`: a subagent that may start subagents (delegate tools plus `notify_parent`).
+    pub nested: bool,
     /// `HARNESS_DELEGATE_COMPACT=1` (agy): small tool definitions, details in the instructions.
     pub compact: bool,
 }
@@ -38,6 +41,7 @@ impl std::fmt::Debug for DelegateEnv {
             .field("session", &self.session)
             .field("child", &self.child)
             .field("router", &self.router)
+            .field("nested", &self.nested)
             .finish_non_exhaustive()
     }
 }
@@ -53,6 +57,7 @@ impl DelegateEnv {
             session: get("HARNESS_DELEGATE_SESSION")?,
             child: get("HARNESS_DELEGATE_ROLE").as_deref() == Some("child"),
             router: get("HARNESS_DELEGATE_ROLE").as_deref() == Some("router"),
+            nested: get("HARNESS_DELEGATE_ROLE").as_deref() == Some("nested"),
             compact: get("HARNESS_DELEGATE_COMPACT").as_deref() == Some("1"),
         })
     }
@@ -112,12 +117,19 @@ pub fn serve(
             }
             "ping" => reply(&out, &id, &json!({})),
             "tools/list" => {
+                let list = |child: bool| {
+                    if env.compact {
+                        crate::delegate_compact::tools(child)
+                    } else {
+                        tool_list(child)
+                    }
+                };
                 let tools = always_loaded(if env.router {
                     router_tools()
-                } else if env.compact {
-                    crate::delegate_compact::tools(env.child)
+                } else if env.nested {
+                    nested_tools(&list(false), &list(true))
                 } else {
-                    tool_list(env.child)
+                    list(env.child)
                 });
                 reply(&out, &id, &json!({ "tools": tools }));
             }
@@ -210,6 +222,18 @@ fn router_tools() -> Value {
     ])
 }
 
+/// Delegate tools of a parent plus `notify_parent` from the subagent list.
+pub(crate) fn nested_tools(parent: &Value, child: &Value) -> Value {
+    let mut tools = parent.as_array().cloned().unwrap_or_default();
+    if let Some(notify) = child
+        .as_array()
+        .and_then(|list| list.iter().find(|t| t["name"] == "notify_parent"))
+    {
+        tools.push(notify.clone());
+    }
+    Value::Array(tools)
+}
+
 pub(crate) fn tool_list(child: bool) -> Value {
     let [claim, release] = claim_tools();
     if child {
@@ -233,13 +257,19 @@ pub(crate) fn tool_list(child: bool) -> Value {
         },
         {
             "name": "delegate",
-            "description": "Hand a self-contained task to another AI coding agent managed by Harness (for example Codex, another Claude account, or an API model such as DeepSeek). Use this, not a built-in subagent/Task/Agent tool, whenever the user asks for a subagent. The subagent works in the same project folder in its own Harness session, which the user can watch live. The subagent does not see this conversation: put every needed detail (files, goal, constraints, expected output) in `task`. By default this call waits and returns the final answer. With `background: true it returns at once with the subagent's session id, so you can keep working or end your turn and send it more instructions with subagent_message. When it finishes, Harness delivers its answer to you automatically as a new message, so do not poll with subagent_wait; stopping your own turn does not stop the subagent. Up to 4 subagents can run at once. To send a follow-up to the same subagent, pass the session_id from its earlier result. Split work so subagents edit different files; they claim paths with claim_paths.",
+            "description": "Hand a self-contained task to another AI coding agent managed by Harness (for example Codex, another Claude account, or an API model such as DeepSeek). Use this, not a built-in subagent/Task/Agent tool, whenever the user asks for a subagent. The subagent works in the same project folder in its own Harness session, which the user can watch live. The subagent does not see this conversation: put every needed detail (files, goal, constraints, expected output) in `task`. By default this call waits and returns the final answer. With `background: true it returns at once with the subagent's session id, so you can keep working or end your turn and send it more instructions with subagent_message. When it finishes, Harness delivers its answer to you automatically as a new message, so do not poll with subagent_wait; stopping your own turn does not stop the subagent. Several subagents can run at once (the user sets the limit in Harness settings). To send a follow-up to the same subagent, pass the session_id from its earlier result. Split work so subagents edit different files; they claim paths with claim_paths.",
             "inputSchema": {"type": "object", "properties": {
                 "task": {"type": "string", "description": "Complete instructions for the subagent."},
                 "agent": {"type": "string", "description": "Agent id from list_agents. Omit to let Harness pick: the user's decision model chooses the agent (and model) that suits the task when one is set, otherwise the first available agent."},
                 "title": {"type": "string", "description": "Short label shown in the Harness subagent panel."},
                 "session_id": {"type": "string", "description": "Continue an earlier subagent session instead of starting a new one."},
-                "background": {"type": "boolean", "description": "Return immediately; the answer is delivered to you as a new message when the subagent finishes."}
+                "background": {"type": "boolean", "description": "Return immediately; the answer is delivered to you as a new message when the subagent finishes."},
+                "scope": {"type": "object", "description": "Optional narrowing of the subagent's permissions; a wider scope than your own is rejected.", "properties": {
+                    "paths": {"type": "array", "items": {"type": "string"}, "description": "Workspace-relative paths or folders it may touch; omit for the whole workspace."},
+                    "tools": {"type": "array", "items": {"type": "string"}, "description": "Tool name fragments it may use; omit for every tool."},
+                    "network": {"type": "boolean", "description": "Whether network tools are allowed (default true, and it cannot be wider than your own scope)."},
+                    "minutes": {"type": "integer", "description": "Minutes until its permissions expire."}
+                }}
             }, "required": ["task"]}
         },
         {
@@ -267,6 +297,7 @@ fn tool_text(text: &str, is_error: bool) -> Value {
     json!({"content": [{"type": "text", "text": text}], "isError": is_error})
 }
 
+#[allow(clippy::too_many_lines)]
 fn call(env: &DelegateEnv, out: &Out, params: &Value) -> Value {
     let name = params["name"].as_str().unwrap_or("");
     let args = params
@@ -293,7 +324,7 @@ fn call(env: &DelegateEnv, out: &Out, params: &Value) -> Value {
             return tool_text(
                 &format!("Harness delegate server unreachable: {error}"),
                 true,
-            )
+            );
         }
     };
     if response["ok"].as_bool() != Some(true) {
@@ -340,13 +371,13 @@ fn call(env: &DelegateEnv, out: &Out, params: &Value) -> Value {
                     result["ticketId"].as_str().unwrap_or("none")
                 ),
                 false,
-            )
+            );
         }
         "dismiss" => {
             return tool_text(
                 &format!("Dismissed {}.", result["triggerId"].as_str().unwrap_or("")),
                 false,
-            )
+            );
         }
         "claim" => return claim_text(result),
         "release" => {
@@ -356,7 +387,7 @@ fn call(env: &DelegateEnv, out: &Out, params: &Value) -> Value {
                     result["released"].as_u64().unwrap_or(0)
                 ),
                 false,
-            )
+            );
         }
         _ => {}
     }
@@ -420,7 +451,9 @@ fn message_text(result: &Value) -> String {
             "Stopped subagent {id}'s turn and sent the message. Its reply is delivered to you as a new message."
         )
     } else if result["queued"].as_bool() == Some(true) {
-        format!("Queued for subagent {id}; it runs after the current turn. Its reply is delivered to you as a new message.")
+        format!(
+            "Queued for subagent {id}; it runs after the current turn. Its reply is delivered to you as a new message."
+        )
     } else {
         format!("Sent to subagent {id}. Its reply is delivered to you as a new message.")
     }

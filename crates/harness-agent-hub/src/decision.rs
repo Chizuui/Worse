@@ -356,6 +356,7 @@ mod tests {
     /// The whole call against a local Chat Completions server: the request carries the key and the question,
     /// and the answer becomes a choice. Then the cases that leave the decision to the rule.
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[allow(clippy::too_many_lines)]
     async fn choose_asks_the_provider_and_falls_back_cleanly() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let home = std::env::temp_dir().join(format!(

@@ -179,6 +179,12 @@ fn demo_subagents(parent: &SessionId) -> Vec<harness_core_api::SubagentView> {
                 started_at: now - ago * 1000,
                 finished_at: (status == SubagentStatus::Done).then_some(now - 20_000),
                 result_preview: preview.to_owned(),
+                scope: (n == 1).then(|| harness_core_api::ScopeView {
+                    paths: vec!["src/core".to_owned()],
+                    tools: vec!["edit".to_owned()],
+                    network: false,
+                    expires_at: Some(now + 600_000),
+                }),
             }
         };
     vec![

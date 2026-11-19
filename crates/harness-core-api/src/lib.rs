@@ -63,14 +63,14 @@ pub use orchestra::{
 pub use types::{
     AgentId, AgentInfo, AgentRuntimeState, Availability, BackgroundTask, CreateSession, ErrorClass,
     ListSessions, MemoryScope, MemoryWriteMode, PermissionDecision, PermissionOption,
-    PermissionOptionKind, PermissionRequestId, PermissionRequestView, QuotaState, SendAccepted,
-    SendMessage, SessionCost, SessionDetail, SessionId, SessionSummary, SubagentStatus,
-    SubagentView, ToolCallStatus, ToolCallView, TurnAttempt, TurnDiff, TurnId, TurnSegment,
-    ThoughtView, TurnStatus, TurnView, WorktreeInfo, WorktreeRequest,
+    PermissionOptionKind, PermissionRequestId, PermissionRequestView, QuotaState, ResumableRun,
+    ScopeView, SendAccepted, SendMessage, SessionCost, SessionDetail, SessionId, SessionSummary,
+    SubagentStatus, SubagentView, ThoughtView, ToolCallStatus, ToolCallView, TurnAttempt, TurnDiff,
+    TurnId, TurnSegment, TurnStatus, TurnView, WorktreeInfo, WorktreeRequest,
 };
 
 /// API version string; bumped (minor) on every additive change.
-pub const API_VERSION: &str = "0.21.0";
+pub const API_VERSION: &str = "0.23.0";
 
 /// Default body of the methods added in 0.4.0 and later.
 fn unsupported<T: Send + 'static>(name: &'static str) -> BoxFuture<'static, ApiResult<T>> {
@@ -167,6 +167,27 @@ pub trait HarnessCore: Send + Sync {
     ) -> BoxFuture<'_, ApiResult<()>> {
         let _ = (session_id, task_id);
         unsupported("stop_background_task")
+    }
+
+    /// The run the hub stopped in the middle of, if the user can resume it (API 0.23.0).
+    fn resumable_run(
+        &self,
+        session_id: SessionId,
+    ) -> BoxFuture<'_, ApiResult<Option<ResumableRun>>> {
+        let _ = session_id;
+        unsupported("resumable_run")
+    }
+
+    /// Continues an interrupted run with one new turn; the resume prompt lists the finished steps.
+    fn resume_run(&self, session_id: SessionId) -> BoxFuture<'_, ApiResult<SendAccepted>> {
+        let _ = session_id;
+        unsupported("resume_run")
+    }
+
+    /// Dismisses the resume offer of a session without continuing it.
+    fn discard_run(&self, session_id: SessionId) -> BoxFuture<'_, ApiResult<()>> {
+        let _ = session_id;
+        unsupported("discard_run")
     }
 
     /// Answers a pending permission request with one of its option ids.

@@ -90,7 +90,11 @@ fn doc_file(dir: &Path) -> Option<PathBuf> {
         return None;
     }
     let import_only = std::fs::read_to_string(&claude).is_ok_and(|text| text.trim() == IMPORT_LINE);
-    if import_only { None } else { Some(claude) }
+    if import_only {
+        None
+    } else {
+        Some(claude)
+    }
 }
 
 /// Path relative to `cwd` when inside it, absolute otherwise (forward slashes on every OS).

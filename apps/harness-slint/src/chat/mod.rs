@@ -813,13 +813,14 @@ impl ChatState {
         self.chip_data.clear();
         for item in items {
             match item {
-                ContextItem::File { path } | ContextItem::Folder { path } => {
+                ContextItem::File { path }
+                | ContextItem::Folder { path }
+                | ContextItem::Image {
+                    path: Some(path), ..
+                } => {
                     self.add_file_chip(&path);
                 }
-                ContextItem::Image {
-                    path: Some(path), ..
-                } => self.add_file_chip(&path),
-                ContextItem::Image { path: None, .. } => {}
+                ContextItem::Image { path: None, .. } | ContextItem::Research => {}
                 ContextItem::Text { text, .. } => {
                     let lines = text.lines().count();
                     self.chips.push(ChipRow {
@@ -833,7 +834,6 @@ impl ChatState {
                     self.chip_data.push(Chip::Paste(text));
                 }
                 ContextItem::Session { session_id } => self.add_session_chip(session_id.as_str()),
-                ContextItem::Research => {}
             }
         }
         self.last_draft = text.to_string();

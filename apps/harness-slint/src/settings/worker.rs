@@ -6,12 +6,14 @@
 //! applied only after `Req::Confirm` (with the plan's conflict guard).
 
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use harness_agent_config::{
-    launch, AgentConfigService, AgentKind, AuthState, Concept, ConfigError, ConfigPaths,
-    ConfigTarget, EntryBody, FileExistenceProbe, McpImport, Scope, WritePlan,
+    launch, skill_catalog, AgentConfigService, AgentKind, AuthState, Concept, ConceptSupport,
+    ConfigError, ConfigPaths, ConfigTarget, EntryBody, FileExistenceProbe, McpImport, Scope,
+    WritePlan,
 };
 use harness_core_api as api;
 use harness_settings::{relocation, Settings, SettingsStore};
@@ -59,6 +61,17 @@ pub enum PlanOp {
         text: String,
     },
     ImportMcp(Vec<AgentKind>),
+    /// Installs a catalog skill at user scope for every agent that supports it (spec skill-marketplace.md §2).
+    InstallCatalog {
+        name: String,
+        skill: Box<harness_agent_config::Skill>,
+        /// `(relative path, content)` of the skill's extra files.
+        extra: Vec<(String, String)>,
+    },
+    /// Removes an installed skill from every agent that has it.
+    RemoveCatalog {
+        name: String,
+    },
 }
 
 pub enum DocKind {
@@ -113,6 +126,14 @@ pub enum Req {
     },
     Unarchive(String),
     DeleteArchived(String),
+    /// Names of the installed skills at user scope, per agent id (skill marketplace).
+    SkillsInstalled {
+        seq: u64,
+    },
+    /// Skill trigger health report over the installed skills (spec `skill-health.md`).
+    SkillsHealth {
+        seq: u64,
+    },
 }
 
 enum Pending {
@@ -123,6 +144,9 @@ enum Pending {
 
 /// Archive page size (hub maximum is 200).
 const ARCHIVE_PAGE: u32 = 50;
+
+/// Agents the skill marketplace installs to (user scope only, spec skill-marketplace.md §1).
+const MARKET_AGENTS: [AgentKind; 3] = [AgentKind::ClaudeCode, AgentKind::Codex, AgentKind::Harness];
 
 /// Runs `f` on the UI thread with the settings state.
 fn post(f: impl FnOnce(&mut State) + Send + 'static) {
@@ -140,6 +164,13 @@ fn plan_paths(plan: &WritePlan) -> String {
         .map(|c| c.path.display().to_string())
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+/// True when `agent` accepts skills at user scope.
+fn market_supports(svc: &AgentConfigService, agent: AgentKind) -> bool {
+    svc.capabilities(agent)
+        .into_iter()
+        .any(|c: ConceptSupport| c.concept == Concept::Skill && c.user)
 }
 
 fn import_summary(import: &McpImport) -> String {
@@ -160,7 +191,7 @@ fn import_summary(import: &McpImport) -> String {
             })
             .collect::<Vec<_>>()
             .join(", ");
-        text.push_str(&format!(" (could not read {names})"));
+        let _ = write!(text, " (could not read {names})");
     }
     text
 }
@@ -185,7 +216,7 @@ impl Worker {
                 ConfigPaths::for_home(&self.data_dir, &self.data_dir, Some(self.workspace.clone()))
             }
         };
-        let svc = AgentConfigService::new(paths, Arc::new(FileExistenceProbe));
+        let svc = AgentConfigService::new(paths.clone(), Arc::new(FileExistenceProbe));
         let mut pending: Option<Pending> = None;
         let mut watch = self.store.as_ref().map(|s| s.subscribe());
         if let Some(target) = relocation::pending(&self.base).await {
@@ -243,6 +274,50 @@ impl Worker {
                         .find(|c| c.concept == concept);
                     let result = svc.list(concept, target).await.map_err(|e| message(&e));
                     post(move |s| s.config_listed(seq, support, result));
+                }
+                Req::SkillsInstalled { seq } => {
+                    let mut installed = Vec::new();
+                    for agent in MARKET_AGENTS {
+                        let target = ConfigTarget::new(agent, Scope::User);
+                        let names = svc.list(Concept::Skill, target).await.map_or_else(
+                            |_| Vec::new(),
+                            |entries| entries.into_iter().map(|e| e.name).collect(),
+                        );
+                        installed.push((agent.agent_id().to_owned(), names));
+                    }
+                    crate::skills::installed_loaded(seq, installed);
+                }
+                Req::SkillsHealth { seq } => {
+                    let report = harness_agent_config::skill_health::report_for_scope(
+                        &paths,
+                        &MARKET_AGENTS,
+                        Scope::User,
+                    )
+                    .await
+                    .map_err(|e| e.to_string());
+                    // 实时检查默认关闭（user 的配额）：只有设置里显式打开时才生成可复制的命令，
+                    // Harness 自身从不启动 skill-reach（spec skill-health.md §Live check）。
+                    let live = self.store.as_ref().and_then(|store| {
+                        let flag = store.snapshot().skill_health.clone();
+                        MARKET_AGENTS
+                            .iter()
+                            .find_map(|agent| {
+                                let dir = harness_agent_config::skill_health::skills_dir(
+                                    &paths,
+                                    *agent,
+                                    Scope::User,
+                                )?;
+                                harness_agent_config::skill_health::LiveCheck::build(
+                                    flag.live_check,
+                                    &flag.binary,
+                                    *agent,
+                                    &dir,
+                                    None,
+                                )
+                            })
+                            .map(|command| command.to_command_line())
+                    });
+                    crate::skills::health_loaded(seq, report, live);
                 }
                 Req::ReadRaw { seq, path } => {
                     // 凭据文件（auth.json、.credentials.json 等）一律不读，只读 list 返回的配置文件。
@@ -501,6 +576,54 @@ impl Worker {
             }
             PlanOp::ImportMcp(_) => {
                 return Err("import is planned separately".to_owned());
+            }
+            PlanOp::InstallCatalog { name, skill, extra } => {
+                let mut merged = WritePlan::default();
+                let mut planned = 0_u32;
+                for agent in MARKET_AGENTS {
+                    if !market_supports(svc, agent) {
+                        continue;
+                    }
+                    let target = ConfigTarget::new(agent, Scope::User);
+                    let body = EntryBody::Skill((*skill).clone());
+                    let plan = svc
+                        .plan_upsert(target, &body, None)
+                        .await
+                        .map_err(|e| message(&e))?;
+                    let plan = skill_catalog::with_extra_files(plan, &extra)
+                        .await
+                        .map_err(|e| message(&e))?;
+                    planned += 1;
+                    merged.changes.extend(plan.changes);
+                }
+                if planned == 0 {
+                    return Err(format!("no agent accepts skills ({name})"));
+                }
+                let path = plan_paths(&merged);
+                let diff = merged.diff();
+                let no_op = merged.is_no_op();
+                return Ok((Pending::Plan(merged), diff, path, no_op));
+            }
+            PlanOp::RemoveCatalog { name } => {
+                let mut merged = WritePlan::default();
+                for agent in MARKET_AGENTS {
+                    if !market_supports(svc, agent) {
+                        continue;
+                    }
+                    let target = ConfigTarget::new(agent, Scope::User);
+                    match svc.plan_delete(Concept::Skill, target, &name).await {
+                        Ok(plan) => merged.changes.extend(plan.changes),
+                        Err(ConfigError::NotFound(_)) => {}
+                        Err(error) => return Err(message(&error)),
+                    }
+                }
+                if merged.changes.is_empty() {
+                    return Err(format!("{name} is not installed"));
+                }
+                let path = plan_paths(&merged);
+                let diff = merged.diff();
+                let no_op = merged.is_no_op();
+                return Ok((Pending::Plan(merged), diff, path, no_op));
             }
         }
         .map_err(|e| message(&e))?;

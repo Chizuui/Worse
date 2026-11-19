@@ -103,6 +103,8 @@ export struct SubagentRow {
     // What it did just before `activity`, newest first (at most three), and how many steps so far.
     trail: [string],
     steps: int,
+    // Its narrowed permissions (phase-9-parity.md 9.8.2); empty means unrestricted.
+    scope: string,
 }
 
 export struct FleetGroup {
@@ -166,6 +168,7 @@ export global ChatUi {
     // ---- turns (R8 / R10 / R14) ----
     // Expand / collapse a tool card or thinking row (state lives in the Rust model so virtualised rows keep it).
     callback toggle-detail(int);
+    callback toggle-group(int);
     // "edit" | "rewind" | "fork" | "retry" | "undo" | "reapply" | "copy-md" | "copy-csv" | "open" on a chat item id.
     callback turn-action(string, int);
     // Open a tool-card path (`path` or `path:line`, workspace-relative or absolute) in the editor.
@@ -234,6 +237,8 @@ export global ChatUi {
     in property <string> parent-title;
     // "open" (subagent id) | "back" (parent id) | "tick".
     callback subagent-action(string, string);
+    in property <bool> has-earlier;
+    callback load-earlier();
     // Stop button of a background task (§9.17).
     callback stop-background-task(string);
     public pure function elapsed(start: int, end: int) -> string {

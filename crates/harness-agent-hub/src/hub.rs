@@ -13,8 +13,8 @@ use harness_core_api::{
 use harness_core_api::{
     AgentId, AgentInfo, ApiError, ApiResult, BoxFuture, CreateSession, ErrorClass, EventKind,
     EventStream, HarnessCore, ListSessions, MemoryScope, MemoryWriteMode, PermissionRequestId,
-    QuotaState, SendAccepted, SendMessage, SessionDetail, SessionId, SessionSummary, TurnDiff,
-    TurnId,
+    QuotaState, ResumableRun, SendAccepted, SendMessage, SessionDetail, SessionId, SessionSummary,
+    TurnDiff, TurnId,
 };
 use harness_core_api::{AgentOptions, SessionConfigOptions, SessionModels, SessionModes};
 use harness_core_api::{
@@ -317,12 +317,15 @@ impl HubCtx {
         Value::Array(servers)
     }
 
-    /// ACP `McpServer` entry of `harness-delegate` (§9.8): top-level sessions only, so delegation is one level deep.
+    /// ACP `McpServer` entry of `harness-delegate` (§9.8). Subagents get the `child` role, or `nested` (delegate tools
+    /// plus `notify_parent`) while settings allow subagents to start subagents.
     fn delegate_mcp_server(&self, session: &SessionId, compact: bool) -> Option<Value> {
         let endpoint = self.subagents.endpoint.get()?;
         // §9.8.1：子会话也拿到该服务器，但只是 child 角色（notify_parent / claim_paths），仍不能再委派。
         let role = if self.routers.is_router(session) {
             "router"
+        } else if self.subagents.is_child(session) && self.config.delegation.nested() {
+            "nested"
         } else if self.subagents.is_child(session) {
             "child"
         } else {
@@ -490,6 +493,7 @@ impl Hub {
     async fn start_delegate(&self) {
         tokio::spawn(crate::delegate::track(Arc::downgrade(&self.ctx)));
         tokio::spawn(crate::board::track(Arc::downgrade(&self.ctx)));
+        tokio::spawn(crate::resume::track(Arc::downgrade(&self.ctx)));
         if std::env::var("HARNESS_DELEGATE").is_ok_and(|v| v == "0") {
             return;
         }
@@ -680,6 +684,7 @@ impl Hub {
         self.create_inner(request, Some(parent.clone()), None).await
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn create_inner(
         &self,
         request: CreateSession,
@@ -904,6 +909,20 @@ impl HarnessCore for Hub {
             // (delegate_server::push). A subagent is stopped from its own session.
             self.ask(&session_id, SessionCmd::Stop).await
         })
+    }
+    fn resumable_run(
+        &self,
+        session_id: SessionId,
+    ) -> BoxFuture<'_, ApiResult<Option<ResumableRun>>> {
+        Box::pin(self.do_resumable_run(session_id))
+    }
+
+    fn resume_run(&self, session_id: SessionId) -> BoxFuture<'_, ApiResult<SendAccepted>> {
+        Box::pin(self.do_resume_run(session_id))
+    }
+
+    fn discard_run(&self, session_id: SessionId) -> BoxFuture<'_, ApiResult<()>> {
+        Box::pin(self.do_discard_run(session_id))
     }
 
     fn cancel_queued(

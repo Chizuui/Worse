@@ -30,6 +30,8 @@ export global LiveUi {
     in-out property <string> view: "code";
     // Follow the agent: every tool that reads or edits a file moves the view there.
     in-out property <bool> follow: true;
+    in-out property <bool> follow-subagents: false;
+    in property <string> who;
     in property <string> path;
     in property <string> name;
     // "read" | "edit" | "pending" | "open" | "" (nothing yet).
@@ -165,7 +167,7 @@ export component LivePanel inherits Rectangle {
                     overflow: elide;
                 }
                 if !root.screen && LiveUi.path != "": Text {
-                    text: (LiveUi.action == "edit" ? @tr("Edited") : LiveUi.action == "pending" ? @tr("About to change") : LiveUi.action == "read" ? @tr("Reading") : @tr("Opened")) + (LiveUi.note != "" ? " · " + LiveUi.note : "");
+                    text: (LiveUi.who != "" ? LiveUi.who + " · " : "") + (LiveUi.action == "edit" ? @tr("Edited") : LiveUi.action == "pending" ? @tr("About to change") : LiveUi.action == "read" ? @tr("Reading") : @tr("Opened")) + (LiveUi.note != "" ? " · " + LiveUi.note : "");
                     font-size: Theme.ui-xs + 1px;
                     color: Theme.foreground-subtlest;
                     overflow: elide;
@@ -205,6 +207,34 @@ export component LivePanel inherits Rectangle {
                         clicked => {
                             LiveUi.view = v.id;
                         }
+                    }
+                }
+            }
+            if !root.screen: Rectangle {
+                y: (parent.height - self.height) / 2;
+                height: 26px;
+                width: sub-text.preferred-width + 18px;
+                border-radius: Theme.radius-sm;
+                background: LiveUi.follow-subagents ? Theme.raised : sta.has-hover ? Theme.surface-hover : Theme.surface;
+                border-width: 1px;
+                border-color: LiveUi.follow-subagents ? Theme.accent-fg.with-alpha(0.5) : Theme.border;
+                accessible-role: button;
+                accessible-label: @tr("Follow subagents");
+                accessible-checked: LiveUi.follow-subagents;
+                accessible-action-default => {
+                    LiveUi.follow-subagents = !LiveUi.follow-subagents;
+                }
+                sub-text := Text {
+                    text: @tr("Subagents");
+                    font-size: Theme.ui-xs + 1px;
+                    color: LiveUi.follow-subagents ? Theme.foreground : Theme.foreground-subtlest;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+                sta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        LiveUi.follow-subagents = !LiveUi.follow-subagents;
                     }
                 }
             }

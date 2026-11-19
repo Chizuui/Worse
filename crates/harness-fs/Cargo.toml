@@ -12,6 +12,16 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 icu_collator = { workspace = true }
+magika = { version = "1.1.0", optional = true }
+
+[features]
+default = []
+magika = ["dep:magika"]
+ort = ["dep:ort"]
+
+[dependencies.ort]
+version = "=2.0.0-rc.12"
+optional = true
 
 [dev-dependencies]
 tempfile = { workspace = true }

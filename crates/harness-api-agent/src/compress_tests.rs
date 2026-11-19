@@ -41,11 +41,22 @@ fn sample() -> Vec<Value> {
 fn fold_replaces_range_and_decompress_restores_it() {
     let messages = sample();
     let mut folds = Folds::default();
-    let id = folds.compress(&messages, 0, 3, "Fixed login token expiry in src/lib.rs:12", false).unwrap();
+    let id = folds
+        .compress(
+            &messages,
+            0,
+            3,
+            "Fixed login token expiry in src/lib.rs:12",
+            false,
+        )
+        .unwrap();
     let view = folds.view(&messages);
     assert_eq!(view.len(), 6);
     let carrier = view[0]["content"].as_str().unwrap();
-    assert!(carrier.contains(&format!("f{id}")) && carrier.contains("m0-m3"), "{carrier}");
+    assert!(
+        carrier.contains(&format!("f{id}")) && carrier.contains("m0-m3"),
+        "{carrier}"
+    );
     assert!(carrier.contains("src/lib.rs:12"));
     assert_eq!(view[1]["content"], "now add tests");
     let fold = folds.decompress(&messages, id).unwrap();
@@ -57,9 +68,18 @@ fn fold_replaces_range_and_decompress_restores_it() {
 fn fold_never_splits_a_call_from_its_result() {
     let messages = sample();
     let mut folds = Folds::default();
-    assert!(folds.compress(&messages, 2, 3, "x", false).unwrap_err().contains("tool result"));
-    assert!(folds.compress(&messages, 0, 1, "x", false).unwrap_err().contains("m2"));
-    assert!(folds.compress(&messages, 0, 2, "", false).unwrap_err().contains("empty"));
+    assert!(folds
+        .compress(&messages, 2, 3, "x", false)
+        .unwrap_err()
+        .contains("tool result"));
+    assert!(folds
+        .compress(&messages, 0, 1, "x", false)
+        .unwrap_err()
+        .contains("m2"));
+    assert!(folds
+        .compress(&messages, 0, 2, "", false)
+        .unwrap_err()
+        .contains("empty"));
     assert!(folds.compress(&messages, 0, 99, "x", false).is_err());
 }
 
@@ -68,7 +88,10 @@ fn outer_fold_absorbs_inner_and_partial_overlap_fails() {
     let messages = sample();
     let mut folds = Folds::default();
     let inner = folds.compress(&messages, 0, 3, "inner", false).unwrap();
-    assert!(folds.compress(&messages, 1, 6, "x", false).unwrap_err().contains(&format!("f{inner}")));
+    assert!(folds
+        .compress(&messages, 1, 6, "x", false)
+        .unwrap_err()
+        .contains(&format!("f{inner}")));
     let outer = folds.compress(&messages, 0, 7, "outer", false).unwrap();
     assert_ne!(inner, outer);
     assert_eq!(folds.folds.len(), 1);
@@ -126,6 +149,9 @@ fn status_lists_valid_ranges_and_nudge_fires_once_per_step() {
         messages.push(answer("tail"));
     }
     let note = compress_tools::nudge(&mut folds, &messages).unwrap();
-    assert!(note.contains("context_compress") && note.contains("m0-m2 ~42"), "{note}");
+    assert!(
+        note.contains("context_compress") && note.contains("m0-m2 ~42"),
+        "{note}"
+    );
     assert!(compress_tools::nudge(&mut folds, &messages).is_none());
 }

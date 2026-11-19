@@ -566,6 +566,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&home);
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn call(id: u32, name: &str, arguments: Value) -> String {
         json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":name,"arguments":arguments}})
             .to_string()
@@ -574,6 +575,7 @@ mod tests {
     /// One agent saves in one session; another agent in a later session of the same project finds it, reads
     /// the earlier session, corrects the memory and forgets it. A session of another project sees nothing.
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn recall_tools_carry_memories_across_sessions_and_agents() {
         let home = std::env::temp_dir().join(format!(
             "harness-mcp-recall-{}",

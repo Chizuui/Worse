@@ -340,6 +340,31 @@ fn permission_detail(tool: &ToolCallView) -> String {
     lines.join("\n")
 }
 
+fn with_content_warnings(detail: String, tool: &ToolCallView) -> String {
+    let warnings: Vec<String> = tool
+        .locations
+        .iter()
+        .map(|l| Path::new(&l.path))
+        .filter(|p| p.is_file())
+        .take(4)
+        .filter_map(|p| {
+            let warning = harness_workspace::filetype::inspect(p).warning?;
+            let name = p.file_name().map_or_else(
+                || p.display().to_string(),
+                |n| n.to_string_lossy().into_owned(),
+            );
+            Some(format!("⚠ {name}: {warning}"))
+        })
+        .collect();
+    if warnings.is_empty() {
+        return detail;
+    }
+    if detail.is_empty() {
+        return warnings.join("\n");
+    }
+    format!("{detail}\n{}", warnings.join("\n"))
+}
+
 /// Find hits per call (the hub caps at 500).
 const FIND_LIMIT: u32 = 200;
 
@@ -422,6 +447,22 @@ async fn hub_config(home: &Path, store: &SettingsStore) -> Result<HubConfig, Str
     config.helpers =
         harness_agent_hub::helpers::HelperLaunch::for_app(exe).map_err(|e| e.to_string())?;
     config.agent_defaults = prefs::agent_defaults(&store.snapshot());
+    let policy = config.delegation.clone();
+    let fact_check = config.fact_check.clone();
+    let apply = move |settings: &harness_settings::Settings| {
+        policy.set_limit(usize::from(settings.orchestra.max_concurrent));
+        policy.set_nested(settings.orchestra.nested_subagents);
+        policy.set_nested_limit(usize::from(settings.orchestra.max_nested_per_subagent));
+        fact_check.set_on(settings.research.fact_check);
+    };
+    apply(&store.snapshot());
+    let mut changes = store.subscribe();
+    tokio::spawn(async move {
+        while changes.changed().await.is_ok() {
+            let settings = changes.borrow_and_update().clone();
+            apply(&settings);
+        }
+    });
     // `@` mentions and the command center search files through the workspace index (built on first use).
     config.file_search = Some(harness_agent_hub::SharedFileSearch(Arc::new(
         harness_workspace::WorkspaceFileSearch::new(),
@@ -751,7 +792,9 @@ impl Adapter {
                 }
                 self.fleet.set_sessions(&list);
                 self.emit(Event::Sessions(list.iter().map(summary).collect()));
-                self.emit(Event::Fleet(self.fleet.snapshot()));
+                if let Some(fleet) = self.fleet.changed() {
+                    self.emit(Event::Fleet(fleet));
+                }
             }
             Err(error) => self.report("sessions", &error),
         }
@@ -1390,13 +1433,13 @@ impl Adapter {
                 answer(reply, async move { core.start_card(card).await });
             }
             ChatCall::LinkBoard(key, reply) => {
-                answer(reply, async move { core.link_board(key).await })
+                answer(reply, async move { core.link_board(key).await });
             }
             ChatCall::UnlinkBoard(key, reply) => {
-                answer(reply, async move { core.unlink_board(key).await })
+                answer(reply, async move { core.unlink_board(key).await });
             }
             ChatCall::SyncBoard(key, reply) => {
-                answer(reply, async move { core.sync_board(key).await })
+                answer(reply, async move { core.sync_board(key).await });
             }
             ChatCall::InboxStatus(reply) => answer(reply, async move { core.inbox_status().await }),
             ChatCall::SetInboxEnabled(on, reply) => {
@@ -1424,6 +1467,17 @@ impl Adapter {
             ChatCall::DiscardTicket(id, reply) => {
                 answer(reply, async move { core.discard_ticket(id).await });
             }
+            ChatCall::ResumableRun { session, reply } => answer(reply, async move {
+                core.resumable_run(api::SessionId::new(session)).await
+            }),
+            ChatCall::ResumeRun { session, reply } => answer(reply, async move {
+                core.resume_run(api::SessionId::new(session))
+                    .await
+                    .map(drop)
+            }),
+            ChatCall::DiscardRun { session, reply } => answer(reply, async move {
+                core.discard_run(api::SessionId::new(session)).await
+            }),
         }
     }
 
@@ -1441,6 +1495,7 @@ impl Adapter {
             .unwrap_or_else(|| id.0.clone())
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn open(&mut self, session: &str) {
         let detail = match self.core.open_session(api::SessionId::new(session)).await {
             Ok(detail) => detail,
@@ -1528,7 +1583,9 @@ impl Adapter {
             .map_or("", |t| t.user_text.as_str());
         self.fleet.set_open(&id, &detail.subagents, prompt);
         self.fleet.set_running(&id, running);
-        self.emit(Event::Fleet(self.fleet.snapshot()));
+        if let Some(fleet) = self.fleet.changed() {
+            self.emit(Event::Fleet(fleet));
+        }
         self.emit(Event::Subagents {
             session: id.clone(),
             items: detail.subagents,
@@ -1591,7 +1648,7 @@ impl Adapter {
         };
         let number = self.next_request;
         self.next_request += 1;
-        let detail = permission_detail(&tool);
+        let detail = with_content_warnings(permission_detail(&tool), &tool);
         self.emit(Event::ToolUpdated {
             session: session.clone(),
             id: item,
@@ -1630,7 +1687,9 @@ impl Adapter {
 
     async fn on_event(&mut self, event: HubEvent) {
         if self.fleet.on_event(&event) {
-            self.emit(Event::Fleet(self.fleet.snapshot()));
+            if let Some(fleet) = self.fleet.changed() {
+                self.emit(Event::Fleet(fleet));
+            }
         }
         match &event.kind {
             EventKind::SessionCreated { .. }
@@ -1677,6 +1736,12 @@ impl Adapter {
             (Some(view), Some(id)) => &view.id == id && event.seq > view.since,
             _ => false,
         };
+        if !is_open {
+            let open = self.view.as_ref().map(|v| v.id.0.clone());
+            if let Some(tool) = open.and_then(|open| self.fleet.subagent_tool(&open, &event)) {
+                self.emit(tool);
+            }
+        }
         if is_open && matches!(event.kind, EventKind::TurnsRemoved { .. }) {
             // 回退/编辑重发/重试删除了回合：已显示的条目和 item→turn 映射都已失效，按快照重建视图。
             if let Some(id) = self.active_id() {
@@ -1693,10 +1758,13 @@ impl Adapter {
                     | EventKind::SessionOptionsChanged { .. }
                     | EventKind::AgentSwitched { .. }
             );
-            let meta = matches!(
-                event.kind,
-                EventKind::TurnFinished { .. } | EventKind::SubagentUpdated { .. }
-            );
+            let meta = match &event.kind {
+                EventKind::TurnFinished { .. } => true,
+                EventKind::SubagentUpdated { subagent } => {
+                    subagent.finished_at.is_some() && !subagent.status.is_active()
+                }
+                _ => false,
+            };
             self.on_session_event(event.kind);
             if options {
                 if let Some(id) = self.active_id() {
@@ -2355,6 +2423,48 @@ impl Adapter {
 
 /// Turns one snapshot turn into UI items (user text, earlier attempts + failover notices, tools, reply).
 fn snapshot_turn(view: &mut View, turn: &api::TurnView, items: &mut Vec<(ItemId, Item)>) {
+    let start = items.len();
+    snapshot_turn_items(view, turn, items);
+    let ended = !matches!(
+        turn.status,
+        api::TurnStatus::Running | api::TurnStatus::Queued | api::TurnStatus::Paused
+    );
+    if !ended {
+        return;
+    }
+    let cut = turn.status != api::TurnStatus::Completed;
+    let mut marked = false;
+    for (_, item) in &mut items[start..] {
+        match item {
+            Item::Tool { status, .. }
+                if matches!(status, ToolStatus::Running | ToolStatus::AwaitingPermission) =>
+            {
+                *status = ToolStatus::Failed;
+            }
+            Item::Assistant { status, .. } => marked = *status != TurnStatus::Done,
+            _ => {}
+        }
+    }
+    if cut && !marked {
+        let status = match turn.status {
+            api::TurnStatus::Cancelled => TurnStatus::Cancelled,
+            api::TurnStatus::Failed => TurnStatus::Failed,
+            _ => TurnStatus::Interrupted,
+        };
+        let id = view.alloc_in(&turn.id);
+        items.push((
+            id,
+            Item::Assistant {
+                agent: turn.agent.as_ref().map(|a| a.0.clone()).unwrap_or_default(),
+                text: String::new(),
+                status,
+            },
+        ));
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn snapshot_turn_items(view: &mut View, turn: &api::TurnView, items: &mut Vec<(ItemId, Item)>) {
     let user = view.alloc_in(&turn.id);
     items.push((
         user,
@@ -2402,6 +2512,36 @@ fn snapshot_turn(view: &mut View, turn: &api::TurnView, items: &mut Vec<(ItemId,
         })
         .collect();
     let agent = turn.agent.as_ref().map(|a| a.0.clone()).unwrap_or_default();
+    let mut map = TurnMap {
+        user: Some(user),
+        ..TurnMap::default()
+    };
+    let status = match turn.status {
+        api::TurnStatus::Running => Some(TurnStatus::Streaming),
+        api::TurnStatus::Completed => Some(TurnStatus::Done),
+        api::TurnStatus::Cancelled => Some(TurnStatus::Cancelled),
+        api::TurnStatus::Failed => Some(TurnStatus::Failed),
+        api::TurnStatus::Interrupted => Some(TurnStatus::Interrupted),
+        api::TurnStatus::Queued | api::TurnStatus::Paused => None,
+    };
+    let interleaved = turn
+        .segments
+        .iter()
+        .any(|s| matches!(s, api::TurnSegment::Text { text } if !text.trim().is_empty()));
+    if interleaved {
+        snapshot_segments(view, turn, &agent, &denied, status, &mut map, items);
+        if turn.status == api::TurnStatus::Paused {
+            let id = view.alloc_in(&turn.id);
+            items.push((
+                id,
+                Item::Notice {
+                    notice: Notice::Paused { reset: None },
+                },
+            ));
+        }
+        view.turns.insert(turn.id.clone(), map);
+        return;
+    }
     for tool in &turn.tool_calls {
         let id = view.alloc_in(&turn.id);
         view.tools.insert(tool.tool_call_id.clone(), id);
@@ -2424,18 +2564,6 @@ fn snapshot_turn(view: &mut View, turn: &api::TurnView, items: &mut Vec<(ItemId,
             ));
         }
     }
-    let mut map = TurnMap {
-        user: Some(user),
-        ..TurnMap::default()
-    };
-    let status = match turn.status {
-        api::TurnStatus::Running => Some(TurnStatus::Streaming),
-        api::TurnStatus::Completed => Some(TurnStatus::Done),
-        api::TurnStatus::Cancelled => Some(TurnStatus::Cancelled),
-        api::TurnStatus::Failed => Some(TurnStatus::Failed),
-        api::TurnStatus::Interrupted => Some(TurnStatus::Interrupted),
-        api::TurnStatus::Queued | api::TurnStatus::Paused => None,
-    };
     if let Some(status) = status {
         let text = if turn.status == api::TurnStatus::Failed && turn.assistant_text.is_empty() {
             turn.error.clone().unwrap_or_default()
@@ -2468,6 +2596,127 @@ fn snapshot_turn(view: &mut View, turn: &api::TurnView, items: &mut Vec<(ItemId,
         ));
     }
     view.turns.insert(turn.id.clone(), map);
+}
+
+#[allow(clippy::too_many_lines)]
+fn snapshot_segments(
+    view: &mut View,
+    turn: &api::TurnView,
+    agent: &str,
+    denied: &HashSet<&str>,
+    status: Option<TurnStatus>,
+    map: &mut TurnMap,
+    items: &mut Vec<(ItemId, Item)>,
+) {
+    let mut placed: HashSet<&str> = HashSet::new();
+    let mut pending = String::new();
+    let mut last_text: Option<usize> = None;
+    let push_tool = |view: &mut View, items: &mut Vec<(ItemId, Item)>, tool: &ToolCallView| {
+        let id = view.alloc_in(&turn.id);
+        view.tools.insert(tool.tool_call_id.clone(), id);
+        view.merged.insert(tool.tool_call_id.clone(), tool.clone());
+        items.push((
+            id,
+            snapshot_tool(agent, tool, denied.contains(tool.title.as_str())),
+        ));
+    };
+    let flush = |view: &mut View,
+                 items: &mut Vec<(ItemId, Item)>,
+                 pending: &mut String,
+                 last_text: &mut Option<usize>| {
+        let text = pending.trim();
+        if text.is_empty() {
+            pending.clear();
+            return;
+        }
+        let id = view.alloc_in(&turn.id);
+        items.push((
+            id,
+            Item::Assistant {
+                agent: agent.to_string(),
+                text: text.to_string(),
+                status: TurnStatus::Done,
+            },
+        ));
+        *last_text = Some(items.len() - 1);
+        pending.clear();
+    };
+    for segment in &turn.segments {
+        match segment {
+            api::TurnSegment::Text { text } => pending.push_str(text),
+            api::TurnSegment::Tool { tool_call_id } => {
+                flush(view, items, &mut pending, &mut last_text);
+                if let Some(tool) = turn
+                    .tool_calls
+                    .iter()
+                    .find(|t| &t.tool_call_id == tool_call_id)
+                {
+                    if placed.insert(tool.tool_call_id.as_str()) {
+                        push_tool(view, items, tool);
+                    }
+                }
+            }
+            api::TurnSegment::Steer { text } => {
+                flush(view, items, &mut pending, &mut last_text);
+                let id = view.alloc_in(&turn.id);
+                items.push((
+                    id,
+                    Item::User {
+                        text: text.clone(),
+                        background: false,
+                        images: Vec::new(),
+                    },
+                ));
+            }
+        }
+    }
+    let trailing_text = !pending.trim().is_empty();
+    for tool in &turn.tool_calls {
+        if !placed.contains(tool.tool_call_id.as_str()) {
+            flush(view, items, &mut pending, &mut last_text);
+            push_tool(view, items, tool);
+        }
+    }
+    flush(view, items, &mut pending, &mut last_text);
+    let Some(status) = status else {
+        return;
+    };
+    let ends_with_text = trailing_text && last_text == Some(items.len() - 1);
+    match last_text {
+        Some(index) if ends_with_text || status != TurnStatus::Streaming => {
+            let (id, item) = &mut items[index];
+            if let Item::Assistant { status: s, .. } = item {
+                *s = status;
+            }
+            map.reply = Some(*id);
+            if status == TurnStatus::Streaming {
+                map.assistant = Some(*id);
+            }
+        }
+        _ => {
+            let text = if status == TurnStatus::Failed {
+                turn.error.clone().unwrap_or_default()
+            } else {
+                String::new()
+            };
+            if text.is_empty() && status != TurnStatus::Streaming {
+                return;
+            }
+            let id = view.alloc_in(&turn.id);
+            items.push((
+                id,
+                Item::Assistant {
+                    agent: agent.to_string(),
+                    text,
+                    status,
+                },
+            ));
+            map.reply = Some(id);
+            if status == TurnStatus::Streaming {
+                map.assistant = Some(id);
+            }
+        }
+    }
 }
 
 fn snapshot_tool(agent: &str, tool: &ToolCallView, denied: bool) -> Item {

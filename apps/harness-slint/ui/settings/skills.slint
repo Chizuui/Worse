@@ -1,0 +1,211 @@
+// Skill marketplace list (spec skill-marketplace.md §3.3): catalog rows from google/skills with an installed
+// badge and Install / Update / Remove actions. Rendered by ConfigPage when the concept is "skill"; the installed
+// skills themselves stay in the grid below, so this page never writes a file — every action opens the diff first.
+import { Theme } from "../theme/tokens.slint";
+import { Icons, Spinner, Button } from "../components/controls.slint";
+import { SearchField, StatusLine, Badge, Switch } from "parts.slint";
+import { SkillsUi, SkillRow, SettingsUi } from "globals.slint";
+
+component CatalogCard inherits Rectangle {
+    in property <SkillRow> item;
+    height: root.item.health != "" && root.item.health-detail != "" ? 152px : 118px;
+    clip: true;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: ta.has-hover ? Theme.border-hover : Theme.border;
+    background: ta.has-hover ? Theme.surface : Theme.card;
+    animate background, border-color { duration: Theme.dur-hover; }
+    ta := TouchArea {
+        enabled: !root.item.busy;
+    }
+    VerticalLayout {
+        padding: 14px;
+        spacing: 8px;
+        HorizontalLayout {
+            height: 18px;
+            spacing: 8px;
+            Text {
+                text: root.item.name;
+                font-size: 12px;
+                font-weight: Theme.weight-semibold;
+                color: Theme.foreground;
+                vertical-alignment: center;
+                overflow: elide;
+                horizontal-stretch: 1;
+            }
+            if root.item.group != "": Badge {
+                text: root.item.group;
+                tint: Theme.muted;
+            }
+            if root.item.installed: Badge {
+                text: root.item.update ? @tr("Update available") : @tr("Installed");
+                tint: root.item.update ? Theme.warning : Theme.success;
+            }
+            if root.item.health != "": Badge {
+                text: root.item.health == "good" ? @tr("Healthy") : root.item.health == "warning" ? @tr("Needs work") : @tr("Broken");
+                tint: root.item.health == "good" ? Theme.success : root.item.health == "warning" ? Theme.warning : Theme.destructive;
+            }
+        }
+        if root.item.health != "" && root.item.health-detail != "": Text {
+            text: root.item.health-detail;
+            font-size: 10px;
+            color: root.item.health == "good" ? Theme.foreground-subtle : Theme.warning;
+            wrap: word-wrap;
+            overflow: elide;
+            height: 26px;
+        }
+        Text {
+            text: root.item.description;
+            font-size: 11px;
+            color: Theme.foreground-subtlest;
+            wrap: word-wrap;
+            overflow: elide;
+            height: 30px;
+        }
+        HorizontalLayout {
+            height: 26px;
+            alignment: end;
+            spacing: 6px;
+            if root.item.busy: Spinner {
+                size: 14px;
+            }
+            if root.item.installed: Button {
+                text: @tr("Remove");
+                size: "xs";
+                variant: "ghost";
+                enabled: !root.item.busy;
+                clicked => {
+                    SkillsUi.remove(root.item.name);
+                }
+            }
+            if root.item.installed && root.item.update: Button {
+                text: @tr("Update");
+                size: "xs";
+                variant: "primary";
+                enabled: !root.item.busy;
+                clicked => {
+                    SkillsUi.update(root.item.name);
+                }
+            }
+            if !root.item.installed: Button {
+                text: @tr("Install");
+                size: "xs";
+                variant: "primary";
+                has-icon: true;
+                icon: Icons.download;
+                enabled: !root.item.busy;
+                clicked => {
+                    SkillsUi.install(root.item.name);
+                }
+            }
+        }
+    }
+}
+
+export component SkillBrowse inherits VerticalLayout {
+    spacing: 12px;
+    HorizontalLayout {
+        height: 34px;
+        spacing: 8px;
+        SearchField {
+            height: 34px;
+            placeholder: SkillsUi.rows.length == 0 ? @tr("Search the skill catalog…") : @tr("Search {0} catalog entries…", SkillsUi.rows.length);
+            text <=> SkillsUi.query;
+            edited(q) => {
+                SkillsUi.search(q);
+            }
+        }
+        if SkillsUi.loading: Spinner {
+            size: 16px;
+        }
+        Button {
+            text: @tr("Refresh catalog");
+            size: "sm";
+            enabled: !SkillsUi.loading;
+            clicked => {
+                SkillsUi.refresh();
+            }
+        }
+        Button {
+            text: @tr("Check skills");
+            size: "sm";
+            enabled: !SkillsUi.checking;
+            clicked => {
+                SkillsUi.check-health();
+            }
+        }
+        if SkillsUi.health-grade != "": Badge {
+            text: @tr("{0} · average score {1}", SkillsUi.health-grade == "good" ? @tr("All healthy") : SkillsUi.health-grade == "warning" ? @tr("Some need work") : @tr("Some broken"), SkillsUi.health-score);
+            tint: SkillsUi.health-grade == "good" ? Theme.success : SkillsUi.health-grade == "warning" ? Theme.warning : Theme.destructive;
+        }
+    }
+    HorizontalLayout {
+        height: 24px;
+        spacing: 8px;
+        Switch {
+            label: @tr("Live check with skill-reach");
+            checked: SettingsUi.get-bool("skillHealth.liveCheck", SettingsUi.rev);
+            toggled(on) => {
+                SettingsUi.set-bool("skillHealth.liveCheck", on);
+                SkillsUi.check-health();
+            }
+        }
+        Text {
+            text: @tr("Live check with skill-reach (shows the command to run; uses your quota)");
+            font-size: 11px;
+            color: Theme.foreground-subtle;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+    }
+    if SkillsUi.live-command != "": Text {
+        text: SkillsUi.live-command;
+        font-family: "monospace";
+        font-size: 10px;
+        color: Theme.foreground-subtlest;
+        wrap: word-wrap;
+        max-height: 28px;
+        accessible-role: text;
+    }
+    if SkillsUi.rows.length == 0: Rectangle {
+        height: 120px;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Theme.card-border;
+        background: Theme.card;
+        VerticalLayout {
+            alignment: center;
+            padding: 16px;
+            spacing: 6px;
+            Text {
+                text: SkillsUi.loading ? @tr("Loading the catalog…") : SkillsUi.catalog-available ? @tr("No skill matches the search") : @tr("The catalog is not available offline");
+                font-size: Theme.ui-base;
+                color: Theme.foreground-subtle;
+                horizontal-alignment: center;
+            }
+            Text {
+                text: SkillsUi.catalog-available ? @tr("Clear the search to see every catalog entry.") : @tr("Installed skills stay editable below.");
+                font-size: Theme.ui-sm;
+                color: Theme.muted;
+                horizontal-alignment: center;
+            }
+        }
+    }
+    if SkillsUi.rows.length > 0: VerticalLayout {
+        spacing: 8px;
+        for row in SkillsUi.rows: CatalogCard {
+            item: row;
+        }
+    }
+    if SkillsUi.hidden > 0: Text {
+        text: @tr("{0} more entries; type in the search box to narrow the list.", SkillsUi.hidden);
+        font-size: 11px;
+        color: Theme.muted;
+        horizontal-alignment: center;
+    }
+    StatusLine {
+        text: SkillsUi.status;
+        error: SkillsUi.status-error;
+    }
+}

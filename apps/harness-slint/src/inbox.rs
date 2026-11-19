@@ -5,6 +5,7 @@ use harness_core_api::{
     TriggerRecord,
 };
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel, Weak};
+use std::fmt::Write as _;
 
 use crate::core::{ChatCall, Command, Reply};
 use crate::ui::{
@@ -161,7 +162,7 @@ fn source_row(source: &InboxSource) -> InboxSourceRow {
         detail.push_str(" · routed by Orchestra");
     }
     if !source.shadow_labels.is_empty() {
-        detail.push_str(&format!(" · shadow: {}", source.shadow_labels.join(", ")));
+        let _ = write!(detail, " · shadow: {}", source.shadow_labels.join(", "));
     }
     InboxSourceRow {
         id: sv(&source.id),
@@ -502,40 +503,37 @@ fn open_form(source: Option<&InboxSource>) {
     with_ui(|ui| {
         ui.set_agents(model(options));
         ui.set_form_error(SharedString::new());
-        match source {
-            Some(s) => {
-                let agent = s
-                    .agent
-                    .as_ref()
-                    .map(|a| a.as_str().to_owned())
-                    .unwrap_or_default();
-                ui.set_form_id(sv(&s.id));
-                ui.set_form_repo(sv(&s.repo));
-                ui.set_form_folder(sv(&s.workspace_path));
-                ui.set_form_users(sv(&s.allowlist.join(", ")));
-                ui.set_form_handle(sv(&s.handle));
-                ui.set_form_agent_label(sv(&agent_label(&agent)));
-                ui.set_form_agent(sv(&agent));
-                ui.set_form_minutes(i32::try_from(s.interval_secs / 60).unwrap_or(2));
-                ui.set_form_draft(s.draft_first);
-                ui.set_form_enabled(s.enabled);
-                ui.set_form_route(s.route);
-                ui.set_form_shadow(sv(&s.shadow_labels.join(", ")));
-            }
-            None => {
-                ui.set_form_id(SharedString::new());
-                ui.set_form_repo(SharedString::new());
-                ui.set_form_folder(sv(&crate::bridge::workspace_path()));
-                ui.set_form_users(SharedString::new());
-                ui.set_form_handle(sv(harness_core_api::DEFAULT_INBOX_HANDLE));
-                ui.set_form_agent(SharedString::new());
-                ui.set_form_agent_label(sv("Default agent"));
-                ui.set_form_minutes(2);
-                ui.set_form_draft(false);
-                ui.set_form_enabled(true);
-                ui.set_form_route(false);
-                ui.set_form_shadow(SharedString::new());
-            }
+        if let Some(s) = source {
+            let agent = s
+                .agent
+                .as_ref()
+                .map(|a| a.as_str().to_owned())
+                .unwrap_or_default();
+            ui.set_form_id(sv(&s.id));
+            ui.set_form_repo(sv(&s.repo));
+            ui.set_form_folder(sv(&s.workspace_path));
+            ui.set_form_users(sv(&s.allowlist.join(", ")));
+            ui.set_form_handle(sv(&s.handle));
+            ui.set_form_agent_label(sv(&agent_label(&agent)));
+            ui.set_form_agent(sv(&agent));
+            ui.set_form_minutes(i32::try_from(s.interval_secs / 60).unwrap_or(2));
+            ui.set_form_draft(s.draft_first);
+            ui.set_form_enabled(s.enabled);
+            ui.set_form_route(s.route);
+            ui.set_form_shadow(sv(&s.shadow_labels.join(", ")));
+        } else {
+            ui.set_form_id(SharedString::new());
+            ui.set_form_repo(SharedString::new());
+            ui.set_form_folder(sv(&crate::bridge::workspace_path()));
+            ui.set_form_users(SharedString::new());
+            ui.set_form_handle(sv(harness_core_api::DEFAULT_INBOX_HANDLE));
+            ui.set_form_agent(SharedString::new());
+            ui.set_form_agent_label(sv("Default agent"));
+            ui.set_form_minutes(2);
+            ui.set_form_draft(false);
+            ui.set_form_enabled(true);
+            ui.set_form_route(false);
+            ui.set_form_shadow(SharedString::new());
         }
         ui.set_form_open(true);
     });
@@ -598,7 +596,7 @@ fn action_for(action: &str, id: &str) {
     let refreshed = |()| refresh();
     match action {
         "filter" => {
-            STATE.with(|s| s.borrow_mut().filter = id.clone());
+            STATE.with(|s| s.borrow_mut().filter.clone_from(&id));
             render_notices();
         }
         "mark-read" => {

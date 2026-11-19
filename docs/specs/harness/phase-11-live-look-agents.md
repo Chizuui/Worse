@@ -33,6 +33,11 @@ row facts).
   shown.
 - A read reports twice (started, finished) with the same span; the view is rendered once.
 - Long lines are not wrapped: the row is as wide as the longest line and the list scrolls sideways.
+- **Subagents** toggle (next to Code | Screen, off by default, not persisted): while on, file reads and edits of
+  every subagent under the open session (nested ones included) move the view too, so it jumps between the main
+  agent and its subagents; the header then names the subagent ("<task title> · Reading · lines 10–40"). The
+  core sends these as `Event::SubagentTool` only for subagents whose top-level session is the open one
+  (`core/fleet.rs` `subagent_tool`, which also fills in the kind and locations that tool updates omit).
 
 ## 3. Look
 

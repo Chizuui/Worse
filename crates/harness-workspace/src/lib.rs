@@ -13,6 +13,9 @@ pub use git_ops::{LOG_DEPTH_MAX, LOG_PAGE_MAX};
 
 pub use file_search::WorkspaceFileSearch;
 
+/// Content-based file type checks for the workspace (`docs/specs/harness/file-safety.md`).
+pub use harness_fs::filetype;
+
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -456,8 +459,8 @@ impl Workspace {
         let root = self.root_str();
         let this = self.clone();
         self.blocking(move |inner| {
-            let rules = IgnoreRules::build(&root, true, &[".git/".to_owned()])
-                .map_err(ApiError::Internal)?;
+            let excludes = [".git/", "target/", "node_modules/"].map(str::to_owned);
+            let rules = IgnoreRules::build(&root, true, &excludes).map_err(ApiError::Internal)?;
             let bus = inner.bus.clone();
             let root_for_sink = inner.root.clone();
             let sink: WatchSink = Arc::new(move |id: &str, signal: WatchSignal| match signal {

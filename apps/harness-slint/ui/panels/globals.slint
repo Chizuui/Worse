@@ -86,6 +86,8 @@ export struct DiffFileRow {
     status: string,
     added: int,
     removed: int,
+    // Advisories the last dependency scan reported for this file (0 = none, no badge).
+    vulns: int,
 }
 
 export global PanelDiff {

@@ -516,6 +516,20 @@ pub enum ChatCall {
     PostTicket(String, Reply<()>),
     StopTicket(String, Reply<()>),
     DiscardTicket(String, Reply<()>),
+    /// The run the hub left unfinished (docs/specs/harness/resumable-runs.md §6).
+    ResumableRun {
+        session: SessionId,
+        reply: Reply<Option<api::ResumableRun>>,
+    },
+    /// Starts the resume turn (a normal send whose message carries the finished steps).
+    ResumeRun {
+        session: SessionId,
+        reply: Reply<()>,
+    },
+    DiscardRun {
+        session: SessionId,
+        reply: Reply<()>,
+    },
 }
 
 /// One find-in-session hit mapped onto the opened transcript.
@@ -644,6 +658,14 @@ pub enum Event {
         locations: Vec<api::ToolLocation>,
         raw_input: Option<String>,
         raw_output: Option<String>,
+    },
+    /// A subagent anywhere under the open session read or edited a file (drives the Live tab's Subagents follow).
+    SubagentTool {
+        root: SessionId,
+        title: String,
+        kind: Option<String>,
+        content: Vec<api::ToolContent>,
+        locations: Vec<api::ToolLocation>,
     },
     /// Thinking delta of the running turn (live only, not persisted).
     Thought {

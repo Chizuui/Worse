@@ -26,6 +26,8 @@ pub mod overlay;
 mod paths;
 pub mod plan;
 mod service;
+pub mod skill_catalog;
+pub mod skill_health;
 mod types;
 
 pub use auth::{AuthProbe, FileExistenceProbe, StaticProbe};

@@ -133,10 +133,13 @@ async fn fetch(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, String> {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::Digest;
+    use std::fmt::Write as _;
     sha2::Sha256::digest(bytes)
         .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+        .fold(String::new(), |mut out, b| {
+            let _ = write!(out, "{b:02x}");
+            out
+        })
 }
 
 fn find_root(dir: &Path, depth: usize) -> Option<PathBuf> {

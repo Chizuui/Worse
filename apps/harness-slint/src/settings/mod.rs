@@ -39,8 +39,8 @@ use crate::ui::{
     SelectOption, SettingsUi, ShortcutRow, ShortcutsUi, Theme,
 };
 use keymap::{Keymap, Press, Verdict};
-use worker::{DocKind, PlanOp};
-pub use worker::{Req, Worker};
+use worker::DocKind;
+pub use worker::{PlanOp, Req, Worker};
 
 const NAV: &[(&str, i32)] = &[
     ("general", 0),
@@ -49,6 +49,7 @@ const NAV: &[(&str, i32)] = &[
     ("orchestra", 0),
     ("inbox", 0),
     ("remote", 0),
+    ("security", 0),
     ("shortcuts", 0),
     ("instructions", 1),
     ("memory", 1),
@@ -60,8 +61,10 @@ const NAV: &[(&str, i32)] = &[
     ("projects", 2),
     ("archive", 2),
     ("import", 2),
+    ("performance", 2),
 ];
 
+const ROW_PAGE: i32 = 10;
 const HOOK_EVENTS: &[&str] = &[
     "PreToolUse",
     "PostToolUse",
@@ -572,12 +575,17 @@ impl State {
             concept if concept_of(concept).is_some() => {
                 let cfg = self.window.global::<ConfigUi>();
                 cfg.set_concept(sv(concept));
+                cfg.set_limit(ROW_PAGE);
                 if cfg.get_agent() == "harness" && concept != "mcp" && concept != "skill" {
                     cfg.set_agent(sv("claude-code"));
                 }
                 cfg.set_query(SharedString::new());
+                self.after = After::Config;
                 self.close_editor();
                 self.reload_config();
+                if concept == "skill" {
+                    crate::skills::open();
+                }
             }
             _ => {}
         }
@@ -928,15 +936,25 @@ impl State {
                 detail: sv("stdio"),
                 extra: SharedString::new(),
             });
+        let matches = |e: &&Entry| {
+            query.is_empty()
+                || e.name.to_lowercase().contains(&query)
+                || e.summary.to_lowercase().contains(&query)
+        };
+        let total = self.entries.iter().filter(matches).count();
+        let limit = if cfg.get_concept() == "hook" {
+            usize::MAX
+        } else {
+            usize::try_from(cfg.get_limit().max(ROW_PAGE)).unwrap_or(usize::MAX)
+        };
+        cfg.set_total(i32::try_from(self.entries.len()).unwrap_or(i32::MAX));
+        cfg.set_hidden(i32::try_from(total.saturating_sub(limit)).unwrap_or(i32::MAX));
         let rows: Vec<ResRow> = builtin_rows
             .chain(
                 self.entries
                     .iter()
-                    .filter(|e| {
-                        query.is_empty()
-                            || e.name.to_lowercase().contains(&query)
-                            || e.summary.to_lowercase().contains(&query)
-                    })
+                    .filter(matches)
+                    .take(limit)
                     .map(|e| ResRow {
                         name: sv(&e.name),
                         scope: sv(match e.scope {
@@ -1138,6 +1156,7 @@ impl State {
         if self.after == After::Doc {
             self.window.global::<DocUi>().set_error(sv(error));
         }
+        crate::skills::plan_finished(Some(error));
         self.status(error, true);
     }
 
@@ -1154,6 +1173,7 @@ impl State {
                     }
                     After::Doc => self.load_doc(),
                 }
+                crate::skills::plan_finished(None);
             }
             Err(error) => diff.set_error(sv(error)),
         }
@@ -1302,7 +1322,7 @@ impl State {
             .collect();
         let unused = self.projects.iter().filter(|p| p.unused).count();
         ui.set_unused_count(i32::try_from(unused).unwrap_or(i32::MAX));
-        let total: u64 = self.projects.iter().map(|p| p.sessions as u64).sum();
+        let total: u64 = self.projects.iter().map(|p| u64::from(p.sessions)).sum();
         ui.set_total_sessions(i32::try_from(total).unwrap_or(i32::MAX));
         ui.set_selected(i32::try_from(self.selected.len()).unwrap_or(i32::MAX));
         ui.set_rows(model(rows));
@@ -1435,7 +1455,7 @@ impl State {
 }
 /// Writes one setting through the settings worker (the store's single write path), e.g. `setup.firstRunDone`.
 /// "#RRGGBB" → colour (settings S2 accent swatches).
-/// Last two segments of a path ("D:\\work\\ZCode\\Worse" -> "ZCode/Worse").
+/// Last two segments of a path ("D:\\work\\`ZCode`\\Worse" -> "ZCode/Worse").
 fn same_path(a: &str, b: &str) -> bool {
     let norm = |s: &str| {
         s.trim_end_matches(['\\', '/'])
@@ -1451,6 +1471,7 @@ fn short_path(path: &str) -> String {
     parts[n.saturating_sub(2)..].join("/")
 }
 
+#[allow(clippy::many_single_char_names)]
 fn parse_hex(s: &str) -> Option<slint::Color> {
     let h = s.trim().strip_prefix('#')?;
     if h.len() != 6 {
@@ -1500,6 +1521,7 @@ fn reset_settings(s: &State) {
         "notifications",
         "updates",
         "orchestra",
+        "security",
     ] {
         if let Some(v) = defaults.get(section) {
             let mut v = v.clone();
@@ -2093,6 +2115,7 @@ fn wire(window: &AppWindow) {
         with_state(|s| {
             let cfg = s.window.global::<ConfigUi>();
             cfg.set_agent(agent.clone());
+            cfg.set_limit(ROW_PAGE);
             if agent == "harness" {
                 cfg.set_scope(sv("user"));
             }
@@ -2103,11 +2126,24 @@ fn wire(window: &AppWindow) {
     cfg.on_select_scope(|scope| {
         with_state(|s| {
             s.window.global::<ConfigUi>().set_scope(scope);
+            s.window.global::<ConfigUi>().set_limit(ROW_PAGE);
             s.close_editor();
             s.reload_config();
         });
     });
-    cfg.on_search(|_| with_state(|s| s.refresh_rows()));
+    cfg.on_search(|_| {
+        with_state(|s| {
+            s.window.global::<ConfigUi>().set_limit(ROW_PAGE);
+            s.refresh_rows();
+        });
+    });
+    cfg.on_show_more(|| {
+        with_state(|s| {
+            let cfg = s.window.global::<ConfigUi>();
+            cfg.set_limit(cfg.get_limit().saturating_add(ROW_PAGE));
+            s.refresh_rows();
+        });
+    });
     cfg.on_refresh(|| with_state(State::reload_config));
     cfg.on_edit(|name| with_state(|s| s.open_editor(Some(&name))));
     cfg.on_create(|| with_state(|s| s.open_editor(None)));
@@ -2200,6 +2236,7 @@ fn wire(window: &AppWindow) {
             let diff = s.window.global::<DiffUi>();
             diff.set_open(false);
             diff.set_lines(model(Vec::new()));
+            crate::skills::cancelled();
         });
     });
 
@@ -2245,6 +2282,7 @@ fn wire(window: &AppWindow) {
             ui.set_entry_text(sv(docview::entry_text(&ui.get_text(), index)));
         });
     });
+    #[allow(clippy::items_after_statements)]
     fn set_doc_text(s: &mut State, text: String) {
         {
             let ui = s.window.global::<DocUi>();

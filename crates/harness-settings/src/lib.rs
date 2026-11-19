@@ -21,7 +21,7 @@ mod store;
 pub use error::SettingsError;
 pub use model::{
     AgentPrefs, AppearanceSettings, ComposerSend, FollowUp, GeneralSettings, Language,
-    MemorySettings, NotificationSettings, ProxySettings, Settings, TerminalSettings, ThemePref,
-    UpdateSettings, SCHEMA_VERSION,
+    MemorySettings, NotificationSettings, ProxySettings, ResearchSettings, Settings,
+    TerminalSettings, ThemePref, UpdateSettings, SCHEMA_VERSION,
 };
 pub use store::{SaveOutcome, SettingsStore, LEGACY_FILE, SETTINGS_FILE};

@@ -1,6 +1,7 @@
 // Small building blocks shared by agent A's panels (tokens and shared controls come from agent B).
 import { Theme } from "../theme/tokens.slint";
 import { AgentLogo } from "../components/agent_logo.slint";
+import { ArtClock } from "../components/ascii.slint";
 
 // Panel toolbar row (ZCode panel header: 36px, title left, actions right, bottom border).
 export component PanelBar inherits Rectangle {
@@ -44,12 +45,13 @@ export component Pill inherits Rectangle {
 export component ProgressTrack inherits Rectangle {
     in property <float> ratio: -1;
     in property <color> tint: Theme.accent-fg;
+    in property <bool> on-busy-clock;
     height: 4px;
     border-radius: 2px;
     background: Theme.border-hover;
     clip: true;
     Rectangle {
-        property <float> phase: Theme.reduce-motion ? 0.3 : mod(animation-tick() / 1ms, 1600) / 1600;
+        property <float> phase: Theme.reduce-motion ? 0.3 : root.on-busy-clock ? mod(ArtClock.busy-tick, 18) / 18 : mod(animation-tick() / 1ms, 1600) / 1600;
         x: root.ratio < 0 ? (parent.width * 1.4 * self.phase - parent.width * 0.4) : 0;
         width: root.ratio < 0 ? parent.width * 0.4 : parent.width * clamp(root.ratio, 0, 1);
         height: parent.height;

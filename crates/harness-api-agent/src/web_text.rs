@@ -17,8 +17,28 @@ pub fn page_title(html: &str) -> String {
 
 const SKIP: [&str; 6] = ["script", "style", "noscript", "svg", "template", "head"];
 const BLOCK: [&str; 22] = [
-    "p", "div", "br", "li", "ul", "ol", "tr", "table", "section", "article", "header", "footer", "h1",
-    "h2", "h3", "h4", "h5", "h6", "pre", "blockquote", "main", "nav",
+    "p",
+    "div",
+    "br",
+    "li",
+    "ul",
+    "ol",
+    "tr",
+    "table",
+    "section",
+    "article",
+    "header",
+    "footer",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "pre",
+    "blockquote",
+    "main",
+    "nav",
 ];
 
 pub fn html_text(html: &str) -> String {
@@ -45,7 +65,9 @@ pub fn html_text(html: &str) -> String {
             .collect();
         i = tag_end;
         if inner.starts_with("!--") {
-            i = lower[tag_start..].find("-->").map_or(html.len(), |e| tag_start + e + 3);
+            i = lower[tag_start..]
+                .find("-->")
+                .map_or(html.len(), |e| tag_start + e + 3);
             continue;
         }
         if !closing && SKIP.contains(&name.as_str()) {
@@ -136,7 +158,9 @@ pub fn encode(text: &str) -> String {
     let mut out = String::with_capacity(text.len() * 3);
     for byte in text.bytes() {
         match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(char::from(byte)),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(char::from(byte));
+            }
             b' ' => out.push('+'),
             _ => {
                 let _ = write!(out, "%{byte:02X}");

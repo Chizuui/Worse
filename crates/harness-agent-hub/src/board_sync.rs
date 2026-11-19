@@ -232,7 +232,7 @@ struct Remote {
 async fn fetch_items(link: &Link) -> Result<Vec<Remote>, String> {
     let mut out = Vec::new();
     let mut after = Value::Null;
-    for _ in 0..(MAX_BOARD_CARDS / 100 + 1) {
+    for _ in 0..=(MAX_BOARD_CARDS / 100) {
         let data = graphql(ITEMS, json!({ "p": link.project_id, "after": after })).await?;
         let items = &data["node"]["items"];
         for node in items["nodes"]
@@ -368,6 +368,7 @@ struct Plan {
     started: Vec<String>,
 }
 
+#[allow(clippy::too_many_lines)]
 fn plan(
     c: &Connection,
     key: &str,
@@ -625,8 +626,7 @@ impl Hub {
             })
             .await
             .map_err(|e| e.to_string())?
-            .map(|s| s.workspace_path)
-            .unwrap_or_else(|| key.to_owned());
+            .map_or_else(|| key.to_owned(), |s| s.workspace_path);
         let remote = fetch_items(&link).await?;
         let wanted = key.to_owned();
         let plan_link = link.clone();
@@ -777,23 +777,22 @@ impl Hub {
         body: &str,
     ) -> Result<(u64, String, String), String> {
         let created = number.is_none();
-        let issue = match number {
-            Some(n) => gh(&["api", &format!("repos/{}/issues/{n}", link.repo)], None).await?,
-            None => {
-                let payload = json!({ "title": title, "body": body }).to_string();
-                gh(
-                    &[
-                        "api",
-                        "-X",
-                        "POST",
-                        &format!("repos/{}/issues", link.repo),
-                        "--input",
-                        "-",
-                    ],
-                    Some(payload),
-                )
-                .await?
-            }
+        let issue = if let Some(n) = number {
+            gh(&["api", &format!("repos/{}/issues/{n}", link.repo)], None).await?
+        } else {
+            let payload = json!({ "title": title, "body": body }).to_string();
+            gh(
+                &[
+                    "api",
+                    "-X",
+                    "POST",
+                    &format!("repos/{}/issues", link.repo),
+                    "--input",
+                    "-",
+                ],
+                Some(payload),
+            )
+            .await?
         };
         let issue: Value = serde_json::from_str(&issue).map_err(|e| e.to_string())?;
         let number = issue["number"]
@@ -811,12 +810,11 @@ impl Hub {
             .await?;
         }
         let vars = json!({ "p": link.project_id, "c": node });
-        let data = match graphql(ADD_ITEM, vars.clone()).await {
-            Ok(data) => data,
-            Err(_) => {
-                tokio::time::sleep(Duration::from_secs(3)).await;
-                graphql(ADD_ITEM, vars).await?
-            }
+        let data = if let Ok(data) = graphql(ADD_ITEM, vars.clone()).await {
+            data
+        } else {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            graphql(ADD_ITEM, vars).await?
         };
         let item = text(&data["addProjectV2ItemById"]["item"]["id"]);
         if item.is_empty() {
@@ -862,20 +860,19 @@ async fn create_link(repo: &str) -> Result<Link, String> {
                 .find(|p| p["closed"].as_bool() != Some(true))
                 .cloned()
         });
-    let project = match existing {
-        Some(project) => project,
-        None => {
-            let created = graphql(
-                CREATE_PROJECT,
-                json!({
-                    "o": repository["owner"]["id"],
-                    "r": repository["id"],
-                    "t": format!("{} board", text(&repository["name"])),
-                }),
-            )
-            .await?;
-            created["createProjectV2"]["projectV2"].clone()
-        }
+    let project = if let Some(project) = existing {
+        project
+    } else {
+        let created = graphql(
+            CREATE_PROJECT,
+            json!({
+                "o": repository["owner"]["id"],
+                "r": repository["id"],
+                "t": format!("{} board", text(&repository["name"])),
+            }),
+        )
+        .await?;
+        created["createProjectV2"]["projectV2"].clone()
     };
     let project_id = text(&project["id"]);
     if project_id.is_empty() {

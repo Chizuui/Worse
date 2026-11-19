@@ -76,6 +76,17 @@ pub(super) struct TurnState {
     last_usage: Option<(u64, u64)>,
 }
 
+impl TurnState {
+    pub(super) fn shift_rows(&mut self, by: usize) {
+        if let Some((_, index)) = self.thought.as_mut() {
+            *index += by;
+        }
+        for index in self.thought_rows.values_mut() {
+            *index += by;
+        }
+    }
+}
+
 const AUTO_COMPACT_AT: f32 = 0.85;
 
 fn measure_memory(workspace: std::path::PathBuf) {
@@ -90,7 +101,7 @@ fn measure_memory(workspace: std::path::PathBuf) {
         }
         let total = tokio::runtime::Builder::new_current_thread()
             .build()
-            .map(|rt| {
+            .map_or(0, |rt| {
                 rt.block_on(async {
                     let mut bytes = 0_u64;
                     for f in files {
@@ -100,8 +111,7 @@ fn measure_memory(workspace: std::path::PathBuf) {
                     }
                     bytes / 4
                 })
-            })
-            .unwrap_or(0);
+            });
         let _ = slint::invoke_from_event_loop(move || {
             with_state(|s| {
                 s.turn.memory_tokens = Some(total);
@@ -151,7 +161,35 @@ pub(super) fn subagent_row(s: &SubagentView) -> SubagentRow {
         agent_name: sv(s.agent.as_str()),
         trail: ModelRc::default(),
         steps: 0,
+        scope: sv(&scope_text(s)),
     }
+}
+
+/// Scope line of the subagent card (§9.8.2): paths, tools, network and time limit.
+fn scope_text(s: &SubagentView) -> String {
+    let Some(scope) = &s.scope else {
+        return String::new();
+    };
+    let mut parts = vec![if scope.paths.is_empty() {
+        "Whole workspace".to_owned()
+    } else {
+        scope.paths.join(", ")
+    }];
+    if !scope.tools.is_empty() {
+        parts.push(scope.tools.join(", "));
+    }
+    if !scope.network {
+        parts.push("No network".to_owned());
+    }
+    if let Some(deadline) = scope.expires_at {
+        let mins = ((deadline - now_ms()).max(0)) / 60_000;
+        parts.push(if mins >= 1 {
+            format!("{mins} min left")
+        } else {
+            "Expiring now".to_owned()
+        });
+    }
+    parts.join(" · ")
 }
 
 /// What a subagent did, kept by the UI for the team strip: the core only reports the current activity.
@@ -297,6 +335,40 @@ fn diff_parts(out: &mut Vec<ToolPart>, old: Option<&str>, new: &str) {
             shown += 1;
         }
     }
+}
+
+fn diff_counts(content: &[ToolContent]) -> (i32, i32) {
+    let mut added = 0usize;
+    let mut removed = 0usize;
+    for item in content {
+        if let ToolContent::Diff {
+            old_text, new_text, ..
+        } = item
+        {
+            let old_lines: Vec<&str> = old_text
+                .as_deref()
+                .map(|o| o.lines().collect())
+                .unwrap_or_default();
+            let new_lines: Vec<&str> = new_text.lines().collect();
+            let head = old_lines
+                .iter()
+                .zip(&new_lines)
+                .take_while(|(a, b)| a == b)
+                .count();
+            let tail = old_lines[head..]
+                .iter()
+                .rev()
+                .zip(new_lines[head..].iter().rev())
+                .take_while(|(a, b)| a == b)
+                .count();
+            removed += old_lines.len() - head - tail;
+            added += new_lines.len() - head - tail;
+        }
+    }
+    (
+        i32::try_from(added).unwrap_or(i32::MAX),
+        i32::try_from(removed).unwrap_or(i32::MAX),
+    )
 }
 
 /// Lines shown under a collapsed edit row.
@@ -578,6 +650,7 @@ impl UiState {
         self.chat.push(ChatItem {
             id,
             kind: 5,
+            agent: self.agent_name(&self.sticky).into(),
             text: sv(text),
             title: sv(&thought_preview(text)),
             status: 0,
@@ -585,6 +658,8 @@ impl UiState {
         });
         self.turn.thought = Some((id, index));
         self.turn.thought_rows.insert(id, index);
+        self.mark_continued(index);
+        self.regroup(index);
     }
 
     fn finish_thought(&mut self) {
@@ -603,6 +678,12 @@ impl UiState {
             u64::try_from(id)
                 .ok()
                 .and_then(|id| self.rows.get(&id).copied())
+        }
+    }
+
+    fn toggle_run(&self, id: i32) {
+        if let Some(index) = self.row_index(id) {
+            self.toggle_group(index);
         }
     }
 
@@ -630,7 +711,10 @@ impl UiState {
         let parts = tool_parts(content, locations, raw_input, raw_output);
         let peek = peek_parts(&parts);
         let file = crate::live::row_file(kind, content, locations);
+        let (added, removed) = diff_counts(content);
         self.update_row(id, |row| {
+            row.added = added;
+            row.removed = removed;
             row.tool_kind = sv(kind.unwrap_or_default());
             row.parts = ModelRc::new(VecModel::from(parts));
             row.peek = ModelRc::new(VecModel::from(peek));
@@ -895,7 +979,7 @@ impl UiState {
 
     // ---- changed files (R14) -------------------------------------------------------------------------
 
-    fn plan_changes(&self, item: ItemId, direction: ChangeDirection) {
+    pub(super) fn plan_changes(&self, item: ItemId, direction: ChangeDirection) {
         self.plan_changes_with(item, direction, None);
     }
 
@@ -1660,6 +1744,7 @@ impl UiState {
 pub(super) fn wire(window: &crate::ui::AppWindow) {
     let ui = window.global::<ChatUi>();
     ui.on_toggle_detail(|id| with_state(|s| s.toggle_detail(id)));
+    ui.on_toggle_group(|id| with_state(|s| s.toggle_run(id)));
     ui.on_turn_action(|action, id| with_state(|s| s.turn_action(&action, id)));
     ui.on_session_action(|action, id| with_state(|s| s.session_action(&action, &id)));
     ui.on_group_action(|action, id| with_state(|s| s.group_action(&action, &id)));
@@ -1691,12 +1776,36 @@ pub(super) fn wire(window: &crate::ui::AppWindow) {
 
 #[cfg(test)]
 mod tests {
-    use super::Trail;
+    use super::{diff_counts, ToolContent, Trail};
+
+    fn diff(old: Option<&str>, new: &str) -> ToolContent {
+        ToolContent::Diff {
+            path: "a.rs".into(),
+            old_text: old.map(Into::into),
+            new_text: new.into(),
+        }
+    }
+
+    #[test]
+    fn diff_counts_only_the_changed_middle() {
+        assert_eq!(
+            diff_counts(&[diff(Some("a\nb\nc\nd"), "a\nx\ny\nd")]),
+            (2, 2)
+        );
+        assert_eq!(diff_counts(&[diff(Some("a\nb"), "a\nb\nc")]), (1, 0));
+        assert_eq!(diff_counts(&[diff(Some("a\nb\nc"), "a\nc")]), (0, 1));
+        assert_eq!(diff_counts(&[diff(None, "one\ntwo\nthree")]), (3, 0));
+        assert_eq!(diff_counts(&[diff(Some("same"), "same")]), (0, 0));
+        assert_eq!(
+            diff_counts(&[diff(None, "a\nb"), diff(Some("x"), "y")]),
+            (3, 1)
+        );
+    }
 
     #[test]
     fn trail_keeps_the_steps_before_the_current_one() {
         let mut trail = Trail::default();
-        assert!(trail.note("Read a.rs").is_empty());
+        assert_eq!(trail.note("Read a.rs"), [] as [std::string::String; 0]);
         assert!(
             trail.note("Read a.rs").is_empty(),
             "the same step reported twice counts once"

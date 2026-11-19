@@ -4,7 +4,7 @@
 
 use serde_json::{json, Value};
 
-pub(crate) const DETAILS: &str = "Tool details. delegate: runs task as one turn of a subagent session in the same project folder; the user watches it in Harness. The subagent does not see this conversation, so put every needed detail (files, goal, constraints, expected output) in task. agent is an id from list_agents (omit it to let Harness pick). Without background it waits and returns the answer; with background true it returns the subagent's session id at once and the answer arrives later as a new message, so do not poll. Up to 4 subagents run at once; give them different files. Pass session_id to continue an earlier subagent. subagent_message(session_id, text, interrupt): queue more instructions; interrupt true stops its current turn first. subagent_wait(session_ids, timeout_s): only when you need a result inside the current turn. claim_paths(paths, note) before editing files, release_paths(paths) when done. notify_parent(text): a short note to the agent that delegated your task.";
+pub(crate) const DETAILS: &str = "Tool details. delegate: runs task as one turn of a subagent session in the same project folder; the user watches it in Harness. The subagent does not see this conversation, so put every needed detail (files, goal, constraints, expected output) in task. agent is an id from list_agents (omit it to let Harness pick). Without background it waits and returns the answer; with background true it returns the subagent's session id at once and the answer arrives later as a new message, so do not poll. Several subagents run at once (the user sets the limit in Harness); give them different files. Pass session_id to continue an earlier subagent. subagent_message(session_id, text, interrupt): queue more instructions; interrupt true stops its current turn first. subagent_wait(session_ids, timeout_s): only when you need a result inside the current turn. claim_paths(paths, note) before editing files, release_paths(paths) when done. notify_parent(text): a short note to the agent that delegated your task.";
 
 fn tool(name: &str, description: &str, properties: &Value, required: &[&str]) -> Value {
     json!({
@@ -81,6 +81,11 @@ mod tests {
             };
             let tools = super::tools(child);
             assert_eq!(names(&tools), names(&crate::delegate_mcp::tool_list(child)));
+            let nested =
+                crate::delegate_mcp::nested_tools(&super::tools(false), &super::tools(true));
+            assert!(names(&nested).contains(&"delegate".to_owned()));
+            assert!(names(&nested).contains(&"notify_parent".to_owned()));
+            assert_eq!(names(&nested).len(), names(&super::tools(false)).len() + 1);
             for t in tools.as_array().into_iter().flatten() {
                 let stored = serde_json::json!({
                     "name": t["name"], "description": t["description"], "parameters": t["inputSchema"]

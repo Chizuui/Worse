@@ -1,17 +1,18 @@
 //! Loopback delegate server (phase-9-parity.md §9.8 Transport): one JSON request line per TCP connection from
 //! `harness-memory-mcp --delegate`, one JSON reply line.
 
+use std::fmt::Write as _;
 use std::sync::{Arc, Weak};
 
 use harness_core_api::{
     AgentId, CreateSession, EventKind, HarnessCore, OrchestraNode, OrchestraRole, QuotaState,
-    RecvError, SendMessage, SessionId, SubagentStatus, SubagentView, TurnStatus,
+    RecvError, ScopeView, SendMessage, SessionId, SubagentStatus, SubagentView, TurnStatus,
 };
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 
-use crate::delegate::{preview, Endpoint, MAX_ACTIVE};
+use crate::delegate::{preview, Endpoint};
 use crate::hub::Hub;
 use crate::store;
 use crate::util::now_ms;
@@ -135,25 +136,27 @@ async fn push_to(hub: &Arc<Hub>, parent: &SessionId) {
                     .chars()
                     .take(PUSH_TEXT_CHARS)
                     .collect();
-                text.push_str(&format!(
+                let _ = write!(
+                    text,
                     "\n\n## Subagent \"{title}\" ({}, session {child}): {}",
                     value["agentName"].as_str().unwrap_or_default(),
                     value["outcome"].as_str().unwrap_or_default(),
-                ));
+                );
                 if let Some(error) = value["error"].as_str().filter(|e| !e.is_empty()) {
-                    text.push_str(&format!("\nError: {error}"));
+                    let _ = write!(text, "\nError: {error}");
                 }
-                text.push_str(&format!("\n{answer}"));
+                let _ = write!(text, "\n{answer}");
             }
             Err(error) => {
-                text.push_str(&format!(
+                let _ = write!(
+                    text,
                     "\n\n## Subagent \"{title}\" (session {child}): failed\n{error}"
-                ));
+                );
             }
         }
     }
     for note in &notes {
-        text.push_str(&format!("\n\nNote from {}: {}", note.child, note.text));
+        let _ = write!(text, "\n\nNote from {}: {}", note.child, note.text);
     }
     if let Err(error) = hub
         .send_message(SendMessage {
@@ -236,7 +239,9 @@ async fn handle(
         Some(op) if is_router && op != "agents" => {
             Err("the inbox router can only list agents, route and dismiss triggers".into())
         }
-        Some("agents" | "delegate" | "message" | "wait") if is_child => {
+        Some("agents" | "delegate" | "message" | "wait")
+            if is_child && !hub.ctx.config.delegation.nested() =>
+        {
             Err("a subagent cannot delegate or manage subagents; use notify_parent".into())
         }
         Some("notify") if !is_child => Err("notify_parent is only for subagents".into()),
@@ -249,6 +254,23 @@ async fn handle(
         Some("release") => release(hub, &parent_row, args),
         other => Err(format!("unknown op {other:?}")),
     }
+}
+
+/// `parent`'s own quota: top-level sessions use Max concurrent subagents, subagents use Max subagents per subagent.
+fn quota(hub: &Arc<Hub>, parent: &store::SessionRow) -> Result<(), String> {
+    let nested = hub.ctx.subagents.is_child(&parent.id);
+    let limit = hub.ctx.config.delegation.limit_for(nested);
+    if hub.ctx.subagents.active_children(&parent.id) < limit {
+        return Ok(());
+    }
+    let setting = if nested {
+        "Max subagents per subagent"
+    } else {
+        "Max concurrent subagents"
+    };
+    Err(format!(
+        "at most {limit} subagents can run at once (Settings › Orchestra › {setting}); wait for one to finish"
+    ))
 }
 
 /// The caller's own subagent, or an error.
@@ -285,10 +307,8 @@ async fn message(
         .subagents
         .get(&child)
         .is_some_and(|v| v.status.is_active());
-    if !active && hub.ctx.subagents.active_count(&parent.id) >= MAX_ACTIVE {
-        return Err(format!(
-            "at most {MAX_ACTIVE} subagents can run at once; wait for one to finish"
-        ));
+    if !active {
+        quota(hub, parent)?;
     }
     let interrupted = args["interrupt"].as_bool() == Some(true) && active;
     if interrupted {
@@ -466,6 +486,17 @@ fn claim(hub: &Arc<Hub>, caller: &store::SessionRow, args: &Value) -> Result<Val
             json!({"granted": [], "conflicts": [], "claims": all.iter().map(claim_json).collect::<Vec<_>>()}),
         );
     }
+    if let Some(scope) = hub.ctx.scope_of(&caller.id) {
+        if let Some(path) = paths
+            .iter()
+            .find(|p| !crate::delegate::allows_path(&scope, p))
+        {
+            return Err(format!(
+                "{path} is outside the scope of this subagent, which allows only: {}",
+                scope.paths.join(", ")
+            ));
+        }
+    }
     let request = crate::delegate_coord::Claim {
         workspace: caller.workspace_key.clone(),
         path: String::new(),
@@ -510,19 +541,24 @@ fn agent_state(a: &harness_core_api::AgentInfo) -> &'static str {
     }
 }
 
-/// The Orchestra team of `parent` when Orchestra is active for it (§9.11).
+/// The agents `parent` may delegate to when Orchestra is active (§9.11): the team, minus the parent's own agent.
 async fn team(hub: &Arc<Hub>, parent: &store::SessionRow) -> Option<Vec<OrchestraNode>> {
     let orchestra = hub.load_orchestra().await;
-    let root = orchestra.orchestrator()?;
-    // A Claude account (`claude-code-<label>`) is the same orchestrator as `claude-code` with another login.
+    orchestra.orchestrator()?;
     let config = &hub.ctx.config;
-    let same = root.agent == parent.active_agent
-        || (crate::accounts::is_claude(config, &root.agent)
-            && crate::accounts::is_claude(config, &parent.active_agent));
-    if !same {
-        return None;
-    }
-    Some(orchestra.team().into_iter().cloned().collect())
+    let me = &parent.active_agent;
+    let same = |agent: &AgentId| {
+        agent == me
+            || (crate::accounts::is_claude(config, agent) && crate::accounts::is_claude(config, me))
+    };
+    Some(
+        orchestra
+            .team()
+            .into_iter()
+            .filter(|n| !same(&n.agent))
+            .cloned()
+            .collect(),
+    )
 }
 
 async fn agents(hub: &Arc<Hub>, parent: &store::SessionRow) -> Value {
@@ -560,11 +596,8 @@ async fn delegate(
 ) -> Result<Value, String> {
     let mut task = task_text(args, "task")?;
     let background = args["background"].as_bool() == Some(true);
-    if hub.ctx.subagents.active_count(&parent.id) >= MAX_ACTIVE {
-        return Err(format!(
-            "at most {MAX_ACTIVE} subagents can run at once; wait for one to finish"
-        ));
-    }
+    quota(hub, parent)?;
+    let scope = delegation_scope(hub, parent, args)?;
     let mut agent = args["agent"]
         .as_str()
         .map(str::trim)
@@ -586,21 +619,21 @@ async fn delegate(
         }
     }
     if let Some(team) = team {
-        let node = match &agent {
-            Some(id) => team
-                .iter()
+        let node = if let Some(id) = &agent {
+            team.iter()
                 .find(|n| &n.agent == id)
-                .ok_or_else(|| format!("{id} is not in the Orchestra team; use list_agents"))?,
-            None => {
-                let list = hub.list_agents().await.unwrap_or_default();
-                team.iter()
-                    .filter(|n| n.role == OrchestraRole::Subagent)
-                    .find(|n| {
-                        list.iter()
-                            .any(|a| a.id == n.agent && agent_state(a) == "available")
-                    })
-                    .ok_or("no available Subagent in the Orchestra team; pass an agent from list_agents")?
-            }
+                .ok_or_else(|| format!("{id} is not in the Orchestra team; use list_agents"))?
+        } else {
+            let list = hub.list_agents().await.unwrap_or_default();
+            team.iter()
+                .filter(|n| n.role == OrchestraRole::Subagent)
+                .find(|n| {
+                    list.iter()
+                        .any(|a| a.id == n.agent && agent_state(a) == "available")
+                })
+                .ok_or(
+                    "no available Subagent in the Orchestra team; pass an agent from list_agents",
+                )?
         };
         agent = Some(node.agent.clone());
         role_line = format!("[Harness Orchestra] Your role: {}.", node.role.label());
@@ -665,6 +698,9 @@ async fn delegate(
             (summary.id, None)
         }
     };
+    set_scope(hub, &child, &scope).await;
+    let described = crate::delegate::describe(&scope, now_ms());
+    task = format!("{task}\n\nScope of this subagent: {described}. Actions outside it are denied.");
     let mut events = hub.ctx.events.subscribe();
     let accepted = hub
         .send_message(SendMessage {
@@ -781,7 +817,7 @@ async fn candidates(
             name: agent.display_name.clone(),
             role: node.map(|n| n.role.label().to_owned()).unwrap_or_default(),
             note: match node.and_then(|n| n.instructions.lines().next()) {
-                Some(note) if !note.trim().is_empty() => note.trim().to_owned(),
+                Some(first) if !first.trim().is_empty() => first.trim().to_owned(),
                 // Outside a team the delegating agent is a candidate too: say which one it is.
                 _ if &agent.id == caller => "the agent that is delegating this task".to_owned(),
                 _ => String::new(),
@@ -872,5 +908,66 @@ pub(crate) fn new_view(
         started_at: now_ms(),
         finished_at: None,
         result_preview: String::new(),
+        scope: None,
+    }
+}
+
+/// The scope a delegation keeps: the parent's scope, narrowed by the optional `scope` argument (§9.8.2).
+fn delegation_scope(
+    hub: &Arc<Hub>,
+    parent: &store::SessionRow,
+    args: &Value,
+) -> Result<ScopeView, String> {
+    let inherited = args["session_id"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .and_then(|id| hub.ctx.scope_of(&SessionId::new(id)))
+        .or_else(|| hub.ctx.scope_of(&parent.id));
+    let request = match args.get("scope") {
+        Some(value) if !value.is_null() => requested_scope(value)?,
+        _ => inherited.clone().unwrap_or_else(|| ScopeView {
+            paths: Vec::new(),
+            tools: Vec::new(),
+            network: true,
+            expires_at: None,
+        }),
+    };
+    crate::delegate::narrow(inherited.as_ref(), &request, now_ms())
+}
+
+fn requested_scope(value: &Value) -> Result<ScopeView, String> {
+    let mut paths = Vec::new();
+    for path in value["paths"].as_array().into_iter().flatten() {
+        let normalized = crate::delegate_coord::normalize(path.as_str().unwrap_or_default())?;
+        if !paths.contains(&normalized) {
+            paths.push(normalized);
+        }
+    }
+    let tools = value["tools"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(|t| t.trim().to_lowercase())
+        .filter(|t| !t.is_empty())
+        .collect::<Vec<_>>();
+    let network = match value.get("network") {
+        None | Some(Value::Null) => true,
+        Some(flag) => flag.as_bool().unwrap_or(true),
+    };
+    let minutes = value["minutes"].as_i64().unwrap_or_default();
+    Ok(ScopeView {
+        paths,
+        tools,
+        network,
+        expires_at: (minutes > 0).then(|| now_ms() + minutes * 60_000),
+    })
+}
+
+/// Records `scope` on a subagent's view (the only write path for the registry).
+async fn set_scope(hub: &Arc<Hub>, child: &SessionId, scope: &ScopeView) {
+    if let Some(mut view) = hub.ctx.subagents.get(child) {
+        view.scope = Some(scope.clone());
+        hub.ctx.put_subagent(view).await;
     }
 }

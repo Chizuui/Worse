@@ -252,6 +252,24 @@ impl SubagentStatus {
     }
 }
 
+/// Permissions of a subagent, always a narrowing of its parent (phase-9-parity.md 9.8.2).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScopeView {
+    /// Workspace-relative paths or folders; empty means the whole workspace.
+    #[serde(default)]
+    pub paths: Vec<String>,
+    /// Tool title fragments; empty means every tool.
+    #[serde(default)]
+    pub tools: Vec<String>,
+    /// Whether network tools are allowed.
+    #[serde(default)]
+    pub network: bool,
+    /// Unix milliseconds after which the scope denies every tool.
+    #[serde(default)]
+    pub expires_at: Option<i64>,
+}
+
 /// One subagent session of a parent (API 0.8.0, §9.8).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -268,6 +286,9 @@ pub struct SubagentView {
     pub finished_at: Option<i64>,
     /// First characters of the latest answer.
     pub result_preview: String,
+    /// Permissions of this subagent, narrowed against the parent (9.8.2).
+    #[serde(default)]
+    pub scope: Option<ScopeView>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -522,6 +543,27 @@ pub struct SessionDetail {
     pub cost: Option<SessionCost>,
     #[serde(default)]
     pub background_tasks: Vec<BackgroundTask>,
+}
+
+/// A run the hub stopped in the middle of; the user can continue it (API 0.23.0).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResumableRun {
+    pub session_id: SessionId,
+    pub turn_id: TurnId,
+    /// Agent that ran the interrupted turn; the resume turn starts with it.
+    pub agent: AgentId,
+    /// The user message the run was started with.
+    pub user_text: String,
+    /// Tool calls that finished before the interruption; the resume prompt lists them.
+    pub finished_steps: u32,
+    /// Title of the newest recorded step, for the banner.
+    pub last_step: Option<String>,
+    pub started_at: i64,
+    pub finished_at: Option<i64>,
+    /// Already resumed once; kept so a reconnecting client still shows the outcome.
+    #[serde(default)]
+    pub resumed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

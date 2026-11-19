@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use harness_agent_config::{AgentKind, AuthProbe, FileExistenceProbe};
@@ -69,6 +70,97 @@ pub struct HubConfig {
     pub schedule_min_interval_secs: u32,
     /// Credential store for Antigravity accounts. `from_env`: unavailable (the app injects the OS store).
     pub agy_creds: crate::agy_cred::SharedAgyCredStore,
+    /// Subagent limit and nesting (settings `orchestra.maxConcurrent`, `orchestra.nestedSubagents`). The UI keeps
+    /// it in step with settings while the hub runs. `from_env`: 4 at once, no nesting.
+    pub delegation: DelegationPolicy,
+    /// Fact check for deep research reports (docs/specs/harness/deep-research.md, section "Fact check"). The UI
+    /// keeps it in step with settings `research.factCheck`. `from_env`: on.
+    pub fact_check: FactCheckPolicy,
+}
+
+/// Live fact-check switch shared between the UI and the hub.
+#[derive(Debug, Clone)]
+pub struct FactCheckPolicy {
+    on: Arc<AtomicBool>,
+}
+
+impl Default for FactCheckPolicy {
+    fn default() -> Self {
+        Self {
+            on: Arc::new(AtomicBool::new(true)),
+        }
+    }
+}
+
+impl FactCheckPolicy {
+    #[must_use]
+    pub fn on(&self) -> bool {
+        self.on.load(Ordering::Relaxed)
+    }
+
+    pub fn set_on(&self, value: bool) {
+        self.on.store(value, Ordering::Relaxed);
+    }
+}
+
+/// Live delegation settings shared between the UI and the hub.
+#[derive(Debug, Clone)]
+pub struct DelegationPolicy {
+    limit: Arc<AtomicUsize>,
+    nested_limit: Arc<AtomicUsize>,
+    nested: Arc<AtomicBool>,
+}
+
+impl Default for DelegationPolicy {
+    fn default() -> Self {
+        Self {
+            limit: Arc::new(AtomicUsize::new(4)),
+            nested_limit: Arc::new(AtomicUsize::new(4)),
+            nested: Arc::new(AtomicBool::new(false)),
+        }
+    }
+}
+
+impl DelegationPolicy {
+    /// Direct subagents that may run at once under one top-level session (at least 1); nested ones do not count.
+    #[must_use]
+    pub fn limit(&self) -> usize {
+        self.limit.load(Ordering::Relaxed).max(1)
+    }
+
+    pub fn set_limit(&self, value: usize) {
+        self.limit.store(value.max(1), Ordering::Relaxed);
+    }
+
+    /// Subagents that one subagent may run at once under itself (its own quota, at least 1).
+    #[must_use]
+    pub fn nested_limit(&self) -> usize {
+        self.nested_limit.load(Ordering::Relaxed).max(1)
+    }
+
+    pub fn set_nested_limit(&self, value: usize) {
+        self.nested_limit.store(value.max(1), Ordering::Relaxed);
+    }
+
+    /// The quota that applies to `parent`'s own subagents.
+    #[must_use]
+    pub fn limit_for(&self, parent_is_subagent: bool) -> usize {
+        if parent_is_subagent {
+            self.nested_limit()
+        } else {
+            self.limit()
+        }
+    }
+
+    /// Whether a subagent may delegate to subagents of its own.
+    #[must_use]
+    pub fn nested(&self) -> bool {
+        self.nested.load(Ordering::Relaxed)
+    }
+
+    pub fn set_nested(&self, value: bool) {
+        self.nested.store(value, Ordering::Relaxed);
+    }
 }
 
 /// Shared [`FileSearchSource`] (`HubConfig` stays `Debug`/`Clone`).
@@ -144,6 +236,8 @@ impl HubConfig {
             import_roots: harness_import::ImportRoots::from_env(),
             schedule_min_interval_secs: 300,
             agy_creds: crate::agy_cred::SharedAgyCredStore::default(),
+            delegation: DelegationPolicy::default(),
+            fact_check: FactCheckPolicy::default(),
         })
     }
 

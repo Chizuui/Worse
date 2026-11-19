@@ -251,12 +251,12 @@ impl UiState {
                 if action == "link" {
                     self.board_call(
                         |reply| ChatCall::LinkBoard(key, reply),
-                        |s, board| s.show_board(board),
+                        super::UiState::show_board,
                     );
                 } else {
                     self.board_call(
                         |reply| ChatCall::SyncBoard(key, reply),
-                        |s, board| s.show_board(board),
+                        super::UiState::show_board,
                     );
                 }
             }

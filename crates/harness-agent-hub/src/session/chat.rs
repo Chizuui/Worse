@@ -394,7 +394,7 @@ impl SessionActor {
                 Err(reason) => {
                     return Err(ApiError::InvalidArgument(format!(
                         "file changes are not available: {reason}"
-                    )))
+                    )));
                 }
             };
         let plan = files::plan(&workspace, &trees).await?;

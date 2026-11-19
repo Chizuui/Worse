@@ -14,7 +14,9 @@
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
-use harness_core_api::{ContextItem, FailureKind, MentionKind, MentionQuery, RetryHint};
+use harness_core_api::{
+    ContextItem, FailureKind, MentionKind, MentionQuery, ResumableRun, RetryHint,
+};
 
 use super::{with_state, UiState};
 use crate::core::{ChatCall, Command, QueuedMessage, SessionId};
@@ -131,6 +133,7 @@ impl UiState {
         self.apply_options(None);
         self.dismiss_failure();
         self.load_skills();
+        self.load_resumable();
     }
 
     // ---- queue (R12) ---------------------------------------------------------------------------------
@@ -356,7 +359,7 @@ impl UiState {
         let value = id.to_string();
         match which {
             "mode" if value == "harness:machine" => {
-                self.send(Command::SetMachine { session, on: true })
+                self.send(Command::SetMachine { session, on: true });
             }
             "mode" => {
                 if self.dock().get_machine() {
@@ -503,6 +506,54 @@ impl UiState {
             _ => {}
         }
     }
+
+    // ---- resumable run (docs/specs/harness/resumable-runs.md §6) -------------------------------------
+
+    /// Asks the hub for the open session's interrupted run; the banner appears when there is one.
+    fn load_resumable(&mut self) {
+        let Some(session) = self.active.clone() else {
+            self.show_resumable(None);
+            return;
+        };
+        self.chat_call(
+            move |reply| ChatCall::ResumableRun { session, reply },
+            super::UiState::show_resumable,
+        );
+    }
+
+    fn show_resumable(&mut self, run: Option<ResumableRun>) {
+        let dock = self.dock();
+        if let Some(run) = run {
+            let plural = if run.finished_steps == 1 { "" } else { "s" };
+            dock.set_resume_title(sv(&format!(
+                "{} finished step{plural} before the interruption, for: {}",
+                run.finished_steps,
+                run.user_text.lines().next().unwrap_or_default()
+            )));
+            dock.set_resume_shown(true);
+        } else {
+            dock.set_resume_title(SharedString::new());
+            dock.set_resume_shown(false);
+        }
+    }
+
+    fn resume_action(&mut self, action: &str) {
+        let Some(session) = self.active.clone() else {
+            return;
+        };
+        self.dock().set_resume_shown(false);
+        match action {
+            "resume" => self.chat_call(
+                move |reply| ChatCall::ResumeRun { session, reply },
+                |_, ()| {},
+            ),
+            "discard" => self.chat_call(
+                move |reply| ChatCall::DiscardRun { session, reply },
+                |_, ()| {},
+            ),
+            _ => {}
+        }
+    }
 }
 
 pub(super) fn wire(window: &crate::ui::AppWindow) {
@@ -513,11 +564,11 @@ pub(super) fn wire(window: &crate::ui::AppWindow) {
     dock.on_pick_option(|which, id| with_state(|s| s.pick_option(&which, &id)));
     let weak = window.as_weak();
     dock.on_filter_models(move |query| {
+        use slint::Model as _;
         let Some(window) = weak.upgrade() else {
             return;
         };
         let dock = window.global::<DockUi>();
-        use slint::Model as _;
         let all: Vec<(String, String)> = dock
             .get_models()
             .iter()
@@ -526,4 +577,5 @@ pub(super) fn wire(window: &crate::ui::AppWindow) {
         dock.set_models_shown(option_rows(&matching_models(&all, &query)));
     });
     dock.on_failure_action(|action| with_state(|s| s.failure_action(&action)));
+    dock.on_resume_action(|action| with_state(|s| s.resume_action(&action)));
 }

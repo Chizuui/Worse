@@ -4,6 +4,8 @@
 //! `context_decompress` restores them. Folds are addressed by absolute message refs (`m12`) that are never
 //! reused, so earlier requests keep a stable prefix for prompt caching.
 
+use std::fmt::Write as _;
+
 use serde_json::{json, Value};
 
 use crate::llm;
@@ -32,6 +34,7 @@ pub struct Fold {
 }
 
 #[derive(Debug, Default)]
+#[allow(clippy::struct_field_names)]
 pub struct Folds {
     /// Absolute ref of `messages[0]` (messages dropped from the front so far).
     pub base: u64,
@@ -55,11 +58,12 @@ pub fn text_of(message: &Value) -> String {
         .flatten()
     {
         let function = &call["function"];
-        text.push_str(&format!(
+        let _ = write!(
+            text,
             "\n{}({})",
             function["name"].as_str().unwrap_or_default(),
             function["arguments"].as_str().unwrap_or_default()
-        ));
+        );
     }
     text
 }
@@ -213,7 +217,7 @@ impl Folds {
         if let Some(cut) = self
             .folds
             .iter()
-            .find(|f| !(f.end <= from || f.start > to) && !(f.start >= from && f.end <= to + 1))
+            .find(|f| f.end > from && f.start <= to && !(f.start >= from && f.end <= to + 1))
         {
             return Err(format!(
                 "the range cuts fold f{} (m{}-m{}): include all of it or none of it",
@@ -363,7 +367,10 @@ pub fn digest(messages: &[Value]) -> String {
                     lines.push(format!(
                         "  called {}({})",
                         call["function"]["name"].as_str().unwrap_or_default(),
-                        clip(call["function"]["arguments"].as_str().unwrap_or_default(), 160)
+                        clip(
+                            call["function"]["arguments"].as_str().unwrap_or_default(),
+                            160
+                        )
                     ));
                 }
             }
@@ -380,7 +387,7 @@ pub fn digest(messages: &[Value]) -> String {
         }
     }
     if omitted > 0 {
-        out.push_str(&format!("\n… {omitted} more lines omitted"));
+        let _ = write!(out, "\n… {omitted} more lines omitted");
     }
     out
 }

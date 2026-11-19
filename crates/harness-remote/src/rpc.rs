@@ -68,6 +68,7 @@ pub(crate) fn is_allowed(method: &str) -> bool {
 }
 
 /// Calls one allowlisted method. `Err` carries the message sent to the client.
+#[allow(clippy::too_many_lines)]
 pub(crate) async fn call(
     core: &dyn HarnessCore,
     method: &str,

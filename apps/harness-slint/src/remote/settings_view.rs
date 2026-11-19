@@ -68,6 +68,7 @@ fn toggle(title: &str, on: bool) -> Value {
     json!({ "title": title, "kind": "toggle", "on": on })
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn section(title: &str, rows: Vec<Value>) -> Value {
     json!({ "title": title, "rows": rows })
 }
@@ -106,6 +107,7 @@ impl SettingsView for DesktopSettings {
         })
     }
 
+    #[allow(clippy::too_many_lines)]
     fn page(&self, page: &str) -> Value {
         let Some(s) = current() else {
             return json!({ "title": page, "subtitle": "", "sections": [] });
@@ -220,6 +222,7 @@ impl SettingsView for DesktopSettings {
                         row("Default agent", agent_name(&s.orchestra.default_agent)),
                         row("Default mode", s.orchestra.default_mode.clone()),
                         row("Max concurrent", s.orchestra.max_concurrent.to_string()),
+                        row("Max per subagent", s.orchestra.max_nested_per_subagent.to_string()),
                         toggle("Auto claim", s.orchestra.auto_claim),
                         toggle("Snap to grid", s.orchestra.snap_to_grid),
                     ],
@@ -245,6 +248,24 @@ impl SettingsView for DesktopSettings {
                     ],
                 )],
             ),
+            "skill" => {
+                let skills = crate::skills::summary();
+                let rows: Vec<Value> = if skills.is_empty() {
+                    vec![row("Installed skills", "None")]
+                } else {
+                    skills
+                        .into_iter()
+                        .map(|(name, agents)| {
+                            json!({ "title": name, "detail": agents })
+                        })
+                        .collect()
+                };
+                (
+                    "Skills",
+                    "Installed agent skills (read-only)",
+                    vec![section("User scope", rows)],
+                )
+            }
             _ => (page, "", Vec::new()),
         };
         json!({ "title": title, "subtitle": subtitle, "sections": sections })
@@ -281,6 +302,7 @@ mod tests {
             "memory",
             "remote",
             "mcp",
+            "skill",
         ] {
             let mut found = Vec::new();
             keys(&DesktopSettings.page(page), &mut found);

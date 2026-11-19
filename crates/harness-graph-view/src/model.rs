@@ -324,7 +324,7 @@ pub(crate) mod tests {
             assert!(graph.neighbours(a).contains(&b));
             assert!(graph.neighbours(b).contains(&a));
         }
-        assert!(graph.neighbours(999).is_empty());
+        assert_eq!(graph.neighbours(999).len(), 0);
     }
 
     #[test]
@@ -355,7 +355,7 @@ pub(crate) mod tests {
             .all(|&i| graph.nodes[i].label.starts_with("node 1.")));
         assert_eq!(graph.search("g0/f3", 10).len(), 1);
         assert_eq!(graph.search("", 3).len(), 3);
-        assert!(graph.search("nothing like it", 10).is_empty());
+        assert_eq!(graph.search("nothing like it", 10).len(), 0);
         let hub = graph.clusters[0].members[0];
         assert_eq!(graph.note(hub), "4 links · src/g0/f0.rs");
         assert_eq!(graph.note(999), "");

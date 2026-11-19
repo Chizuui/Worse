@@ -21,11 +21,15 @@ mod machine_view;
 mod markdown;
 mod orchestra;
 mod panels;
+
+mod perf;
 mod plan_usage;
 mod release_update;
 mod remote;
+mod security;
 mod settings;
 mod setup;
+mod skills;
 mod speed;
 mod wallpaper;
 mod window_frame;
@@ -418,11 +422,12 @@ fn install_window_chrome(window: &ui::AppWindow) {
                     .next()
                     .and_then(|v| v.parse::<f64>().ok())
                     .unwrap_or(0.0);
+                #[allow(clippy::cast_possible_truncation)]
                 let top = (top * f64::from(handle.scale_factor())).round() as i32;
-                let rect = saved.take();
-                if !workarea::place_dragged(handle, rect, fraction, top) {
+                let saved_rect = saved.take();
+                if !workarea::place_dragged(handle, saved_rect, fraction, top) {
                     // No Win32 placement (or no cursor): fall back to the saved rect.
-                    if let Some(rect) = rect {
+                    if let Some(rect) = saved_rect {
                         workarea::restore(handle, rect);
                     }
                 }
@@ -455,6 +460,7 @@ fn install_window_chrome(window: &ui::AppWindow) {
     });
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() -> ExitCode {
     if let Some(code) = helper_mode() {
         return code;
@@ -536,14 +542,17 @@ fn main() -> ExitCode {
     #[cfg(feature = "automation")]
     test_window_size(&window);
     let first_run_done = initial.setup.first_run_done;
-    settings::install(&window, settings_tx, initial, &data_dir);
+    settings::install(&window, settings_tx.clone(), initial, &data_dir);
     settings::recall::install(&window, &data_dir, &workspace_dir);
     settings::graph::install(&window, &data_dir, &workspace_dir);
     settings::decision::install(&window, &data_dir);
+    skills::install(&window, settings_tx, &data_dir);
     // §9.10：首次启动检查与 Set up agents 对话框。
     setup::install(&window, first_run_done);
     chat::install(&window, files_tx.clone(), &workspace_dir, &data_dir);
     machine_view::install(&window, &data_dir);
+
+    perf::install(&window, &data_dir);
     bridge::install(&window, cmd_tx, files_tx, &workspace_dir);
     panels::install(&window);
     gitui::install(&window);
@@ -552,6 +561,7 @@ fn main() -> ExitCode {
     import::install(&window);
     remote::install(&window, &data_dir);
     plan_usage::install(&window);
+    security::install(&window, &base);
     install_window_chrome(&window);
     window_frame::install(&window);
     install_restart_for_update(&window, &workspace_dir);
@@ -562,11 +572,18 @@ fn main() -> ExitCode {
     release_update::watch(window.as_weak());
     let result = window.run();
     panels::trace("main: event loop returned");
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_secs(8));
+        panels::trace("main: shutdown watchdog fired");
+        relaunch();
+        std::process::exit(0);
+    });
     remote::shutdown();
     settings::teardown();
     bridge::teardown();
     chat::teardown();
     panels::teardown();
+    security::teardown();
     drop(window);
     panels::trace("main: joining core thread");
     if core_thread.join().is_err() {

@@ -89,6 +89,7 @@ pub fn definitions(mode: &str, background: bool) -> Vec<Value> {
         ));
     }
     out.extend(crate::web::definitions());
+    out.push(crate::factcheck::definition());
     out
 }
 
@@ -167,6 +168,11 @@ fn normalize(path: &Path) -> PathBuf {
     out
 }
 
+fn writes(name: &str, args: &Value) -> bool {
+    WRITE_TOOLS.contains(&name)
+        || (crate::factcheck::handles(name) && crate::factcheck::writes(args))
+}
+
 fn resolve(cwd: &Path, path: &str) -> PathBuf {
     let path = Path::new(path.trim());
     if path.is_absolute() {
@@ -242,6 +248,7 @@ fn title_of(name: &str, args: &Value) -> (String, &'static str) {
             "execute",
         ),
         other if crate::web::handles(other) => (crate::web::title(other, args), "fetch"),
+        other if crate::factcheck::handles(other) => (crate::factcheck::title(args), "other"),
         other => (other.to_owned(), "other"),
     }
 }
@@ -252,13 +259,14 @@ impl Ctx<'_> {
     }
 
     fn needs_permission(&self, name: &str, args: &Value) -> bool {
-        if !WRITE_TOOLS.contains(&name) || self.always.contains(name) {
+        if !writes(name, args) || self.always.contains(name) {
             return false;
         }
         if name == "run_command" {
             return true;
         }
         let inside = str_arg(args, "path")
+            .or_else(|| str_arg(args, "dir"))
             .is_some_and(|p| resolve(self.cwd, p).starts_with(normalize(self.cwd)));
         !(self.mode == "acceptEdits" && inside)
     }
@@ -313,7 +321,7 @@ impl Ctx<'_> {
         let mut update = tool.clone();
         update["sessionUpdate"] = json!("tool_call");
         self.update(&update);
-        let outcome = if self.mode == "readOnly" && WRITE_TOOLS.contains(&call.name.as_str()) {
+        let outcome = if self.mode == "readOnly" && writes(&call.name, &args) {
             Outcome::err("refused: the session is in read-only mode")
         } else if self.needs_permission(&call.name, &args) && !self.ask(&call.name, &tool).await {
             Outcome::err("the user denied this action")
@@ -344,6 +352,16 @@ impl Ctx<'_> {
                     Err(text) => Outcome::err(text),
                 }
             }
+            other if crate::factcheck::handles(other) => match crate::factcheck::run_at(
+                args,
+                crate::factcheck::writes(args)
+                    .then(|| resolve(self.cwd, str_arg(args, "dir").unwrap_or_default()))
+                    .filter(|p| p.starts_with(normalize(self.cwd)))
+                    .as_deref(),
+            ) {
+                Ok(text) => Outcome::ok(text),
+                Err(text) => Outcome::err(text),
+            },
             other if McpSet::handles(other) => match self.mcp.call(other, args.clone()).await {
                 Ok(text) => Outcome::ok(text),
                 Err(text) => Outcome::err(text),

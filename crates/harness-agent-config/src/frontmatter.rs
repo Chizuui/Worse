@@ -96,6 +96,17 @@ impl Doc {
         }
     }
 
+    /// Raw value of `key`, continuation lines included (no unquoting).
+    ///
+    /// Needed by the skill catalog: block scalars (`description: >-`) carry the text in the
+    /// continuation lines, which [`Doc::get`] cannot express.
+    pub(crate) fn raw(&self, key: &str) -> Option<&str> {
+        self.entries
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
+    }
+
     /// Entries other than `known` (for `extra_front_matter`), as `(key, raw value)`.
     pub(crate) fn extra(&self, known: &[&str]) -> Vec<(String, String)> {
         self.entries
@@ -140,7 +151,7 @@ impl Doc {
     }
 }
 
-fn unquote(value: &str) -> String {
+pub(crate) fn unquote(value: &str) -> String {
     let v = value.trim();
     if v.len() >= 2 && v.starts_with('"') && v.ends_with('"') {
         return v[1..v.len() - 1]

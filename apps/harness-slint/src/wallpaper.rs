@@ -12,6 +12,12 @@
 //! clock picks the frame, so the speed stays right), and its frames are scaled down until they fit a fixed
 //! memory budget.
 
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+
 use std::cell::RefCell;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -320,7 +326,7 @@ fn animation(
     for frame in frames.take(ANIM_FRAMES) {
         let frame = frame.map_err(|e| e.to_string())?;
         let (numer, denom) = frame.delay().numer_denom_ms();
-        let ms = if denom == 0 { 0 } else { numer / denom };
+        let ms = numer.checked_div(denom).unwrap_or(0);
         // Browsers play "as fast as possible" frames at 10 a second; so does this.
         let delay_ms = if ms < 20 { 100 } else { ms.max(MIN_DELAY_MS) };
         let composed = compose(&frame.into_buffer(), width, blur, delay_ms);
@@ -389,6 +395,7 @@ fn buffer(image: &RgbaImage) -> SharedPixelBuffer<Rgba8Pixel> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
 
     fn gradient(w: u32, h: u32) -> RgbaImage {

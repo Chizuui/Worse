@@ -9,6 +9,7 @@ import { ConfigUi, DocUi, ResRow, FormField, SettingsUi, RecallUi, RecallRow, Gr
 import { GraphCanvas } from "graph_canvas.slint";
 import { PageHeader, Group, SettingRow, Switch, TextField, TextArea, Select, SearchField, UnsupportedNotice, StatusLine } from "parts.slint";
 import { Labels } from "labels.slint";
+import { SkillBrowse } from "skills.slint";
 
 // Agent identity dot colour (design "Agent switcher": a 6px agent-colour dot before the label).
 global AgentDot {
@@ -1099,7 +1100,7 @@ export component ConfigPage inherits VerticalLayout {
             spacing: 8px;
             if root.concept == "skill": SearchField {
                 height: 34px;
-                placeholder: "Search " + ConfigUi.rows.length + " skills…";
+                placeholder: "Search " + ConfigUi.total + " installed…";
                 text <=> ConfigUi.query;
                 edited(q) => {
                     ConfigUi.search(q);
@@ -1163,8 +1164,40 @@ export component ConfigPage inherits VerticalLayout {
         if root.concept == "mcp": McpTable { }
         if root.concept == "subagent": SubagentTable { }
         if root.concept == "command": CommandTable { }
+        if root.concept == "skill": VerticalLayout {
+            spacing: 10px;
+            Text {
+                text: @tr("Browse catalog");
+                font-size: Theme.ui-sm;
+                font-weight: Theme.weight-semibold;
+                color: Theme.foreground-subtle;
+            }
+            SkillBrowse { }
+            Text {
+                text: @tr("Installed");
+                font-size: Theme.ui-sm;
+                font-weight: Theme.weight-semibold;
+                color: Theme.foreground-subtle;
+            }
+        }
         if root.concept == "skill": SkillGrid { }
         if root.concept == "hook": HookCards { }
+        if ConfigUi.hidden > 0: Rectangle {
+            height: 32px;
+            more-ta := TouchArea {
+                mouse-cursor: pointer;
+                clicked => {
+                    ConfigUi.show-more();
+                }
+            }
+            Text {
+                text: @tr("Show more ({0} left)", ConfigUi.hidden);
+                font-size: Theme.ui-sm;
+                color: more-ta.has-hover ? Theme.foreground : Theme.foreground-subtle;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
         if ConfigUi.editing && !ConfigUi.is-new: DetailCard { }
     }
 }

@@ -162,7 +162,7 @@ impl Auth {
         })?;
         let offer = state.offers.remove(index);
         while state.devices.len() >= MAX_DEVICES {
-            let Some(stale) = state
+            let Some(oldest) = state
                 .devices
                 .iter()
                 .enumerate()
@@ -171,7 +171,7 @@ impl Auth {
             else {
                 break;
             };
-            state.devices.remove(stale);
+            state.devices.remove(oldest);
         }
         let device = Device {
             id: hex(&random_bytes(16)),

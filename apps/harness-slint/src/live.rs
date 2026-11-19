@@ -102,7 +102,7 @@ pub(crate) fn row_file(
     let Some(location) = locations.first() else {
         return RowFile::default();
     };
-    let reading = kind.is_none_or(|k| k == "read");
+    let reading = kind.map_or(true, |k| k == "read");
     let (from, to) = read_span(content, location.line);
     let range = match (reading, from, to) {
         (true, f, t) if f > 0 && t >= f => span(f, t),
@@ -164,9 +164,9 @@ fn read_span(content: &[ToolContent], line: Option<u32>) -> (u32, u32) {
 
 /// Callbacks of the Live view. `workspace` resolves relative tool paths.
 pub(crate) fn install(window: &AppWindow) {
-    let live = window.global::<LiveUi>();
+    let live_ui = window.global::<LiveUi>();
     let weak = window.as_weak();
-    live.on_open(move |path, line| {
+    live_ui.on_open(move |path, line| {
         let Some(window) = weak.upgrade() else {
             return;
         };
@@ -191,7 +191,7 @@ pub(crate) fn install(window: &AppWindow) {
         window.global::<LiveUi>().set_open_tick(tick);
     });
     let weak = window.as_weak();
-    live.on_set_follow(move |follow| {
+    live_ui.on_set_follow(move |follow| {
         let Some(window) = weak.upgrade() else {
             return;
         };
@@ -207,7 +207,7 @@ pub(crate) fn install(window: &AppWindow) {
         }
     });
     let weak = window.as_weak();
-    live.on_refresh(move || {
+    live_ui.on_refresh(move || {
         if let Some(window) = weak.upgrade() {
             let shown = STATE.with(|cell| cell.borrow().shown.clone());
             render(&window, shown.as_ref());
@@ -247,6 +247,7 @@ pub(crate) fn clear(window: &AppWindow) {
         s.latest = None;
         s.trail.clear();
     });
+    window.global::<LiveUi>().set_who(SharedString::new());
     render(window, None);
 }
 
@@ -258,12 +259,44 @@ pub(crate) fn touch(
     content: &[ToolContent],
     locations: &[ToolLocation],
 ) {
+    touch_as(window, "", kind, content, locations);
+}
+
+/// A subagent under the open session read or edited a file: moves the view there only while the Live tab
+/// follows subagents too.
+pub(crate) fn touch_subagent(
+    window: &AppWindow,
+    who: &str,
+    kind: Option<&str>,
+    content: &[ToolContent],
+    locations: &[ToolLocation],
+) {
+    if window.global::<LiveUi>().get_follow_subagents() {
+        let who = if who.trim().is_empty() {
+            "Subagent"
+        } else {
+            who.trim()
+        };
+        touch_as(window, who, kind, content, locations);
+    }
+}
+
+fn touch_as(
+    window: &AppWindow,
+    who: &str,
+    kind: Option<&str>,
+    content: &[ToolContent],
+    locations: &[ToolLocation],
+) {
     let Some(target) =
         STATE.with(|cell| target_of(&cell.borrow().workspace, kind, content, locations))
     else {
         return;
     };
     let follow = window.global::<LiveUi>().get_follow();
+    if follow {
+        window.global::<LiveUi>().set_who(who.into());
+    }
     // A read reports twice (started, finished) with the same span and does not change the file: the
     // view already shows it.
     let same = STATE.with(|cell| {
@@ -605,7 +638,7 @@ mod tests {
             line,
         };
         assert_eq!(
-            row_file(Some("edit"), &[diff.clone()], &[loc(Some(10))]).range,
+            row_file(Some("edit"), std::slice::from_ref(&diff), &[loc(Some(10))]).range,
             "L10–11"
         );
         assert_eq!(row_file(Some("edit"), &[diff], &[]).range, "+2 −1");

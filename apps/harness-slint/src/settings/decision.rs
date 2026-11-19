@@ -43,7 +43,7 @@ fn providers(home: &Path) -> Vec<(String, String, String)> {
         .collect()
 }
 
-/// "OpenRouter · openrouter/auto".
+/// `OpenRouter · openrouter/auto`.
 fn option_label(label: &str, model: &str) -> String {
     if model.is_empty() {
         label.to_owned()
@@ -123,7 +123,7 @@ pub fn install(window: &AppWindow, home: &Path) {
         if let Some(window) = weak.upgrade() {
             // Saved as typed; the field keeps the text, so only the file is written.
             let mut config = decision::load(&h);
-            config.model = model.trim().to_owned();
+            model.trim().clone_into(&mut config.model);
             if let Err(error) = decision::save(&h, &config) {
                 window
                     .global::<DecisionUi>()

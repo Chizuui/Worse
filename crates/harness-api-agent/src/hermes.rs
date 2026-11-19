@@ -5,7 +5,7 @@
 //! store on the gateway's host. So a turn against it does not run Harness's tool loop and sends no tools. It
 //! sends the user's message with the session header and relays what Hermes streams back:
 //!
-//! - `data:` chunks in the OpenAI shape: `delta.content` (answer) and `delta.reasoning_content` (thinking);
+//! - `data:` chunks in the `OpenAI` shape: `delta.content` (answer) and `delta.reasoning_content` (thinking);
 //! - `event: hermes.tool.progress` with `{tool, label, toolCallId, status: "running" | "completed"}`;
 //! - `event: hermes.status` with `{kind, text}`;
 //! - `event: approval.request` with `{run_id, command, description, choices}`, answered with
@@ -112,7 +112,9 @@ pub(crate) fn approval_options(choices: &[String]) -> Vec<Value> {
     };
     let mut out: Vec<Value> = choices
         .iter()
-        .filter_map(|c| known(c).map(|(name, kind)| json!({"optionId": c, "name": name, "kind": kind})))
+        .filter_map(|c| {
+            known(c).map(|(name, kind)| json!({"optionId": c, "name": name, "kind": kind}))
+        })
         .collect();
     if out.is_empty() {
         out = vec![
@@ -136,7 +138,11 @@ pub async fn is_gateway(agent: &Agent) -> bool {
         _ => {}
     }
     let key = agent.provider.base_url.clone();
-    let file = agent.provider.state_dir.as_ref().map(|d| d.join("gateway.json"));
+    let file = agent
+        .provider
+        .state_dir
+        .as_ref()
+        .map(|d| d.join("gateway.json"));
     let mut hermes = None;
     if let Some(file) = &file {
         if let Ok(text) = tokio::fs::read_to_string(file).await {
@@ -190,7 +196,8 @@ pub(crate) fn is_capabilities(status: u16, body: &Value) -> bool {
     if (200..300).contains(&status) {
         return body.get("object").and_then(Value::as_str) == Some(CAPABILITIES_OBJECT);
     }
-    status == 401 && body.pointer("/error/code").and_then(Value::as_str) == Some("gateway_auth_failed")
+    status == 401
+        && body.pointer("/error/code").and_then(Value::as_str) == Some("gateway_auth_failed")
 }
 
 fn failure(agent: &Agent, text: &str) -> Value {
@@ -210,6 +217,7 @@ struct Turn {
 }
 
 /// One prompt turn against a Hermes gateway.
+#[allow(clippy::too_many_lines)]
 pub async fn run_turn(
     agent: &Agent,
     id: &str,
@@ -218,7 +226,9 @@ pub async fn run_turn(
     token: &CancellationToken,
 ) -> Reply {
     let provider = &agent.provider;
-    session.messages.push(json!({"role": "user", "content": user.clone()}));
+    session
+        .messages
+        .push(json!({"role": "user", "content": user.clone()}));
     let mut messages = Vec::new();
     if !session.cwd.is_empty() {
         // Hermes layers `system` messages on its own prompt for this request only.
@@ -249,7 +259,11 @@ pub async fn run_turn(
         let text = response.text().await.unwrap_or_default();
         let detail = serde_json::from_str::<Value>(&text)
             .ok()
-            .and_then(|v| v.pointer("/error/message").and_then(Value::as_str).map(str::to_owned))
+            .and_then(|v| {
+                v.pointer("/error/message")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
             .unwrap_or_else(|| text.chars().take(300).collect());
         return Err(match status {
             401 | 403 => failure(agent, "the gateway rejected the key. Use the API_SERVER_KEY of that gateway as the API key."),
@@ -268,10 +282,18 @@ pub async fn run_turn(
             next = tokio::time::timeout(IDLE_TIMEOUT, stream.next()) => next,
         };
         let bytes = match next {
-            Err(_) => return Err(llm::transient(&format!("{}: no data for 10 minutes", provider.label), None)),
+            Err(_) => {
+                return Err(llm::transient(
+                    &format!("{}: no data for 10 minutes", provider.label),
+                    None,
+                ))
+            }
             Ok(None) => break,
             Ok(Some(Err(e))) => {
-                return Err(llm::transient(&format!("{}: stream broken ({})", provider.label, e.without_url()), None))
+                return Err(llm::transient(
+                    &format!("{}: stream broken ({})", provider.label, e.without_url()),
+                    None,
+                ))
             }
             Ok(Some(Ok(bytes))) => bytes,
         };
@@ -287,7 +309,11 @@ pub async fn run_turn(
                 "" => chunk(agent, id, &mut turn, &value)?,
                 "hermes.tool.progress" => tool_progress(agent, id, &mut turn, &value),
                 "hermes.status" => {
-                    if let Some(text) = value.get("text").and_then(Value::as_str).filter(|t| !t.is_empty()) {
+                    if let Some(text) = value
+                        .get("text")
+                        .and_then(Value::as_str)
+                        .filter(|t| !t.is_empty())
+                    {
                         agent.update(id, &json!({"sessionUpdate": "agent_thought_chunk", "content": {"type": "text", "text": format!("\n{text}\n")}}));
                     }
                 }
@@ -302,7 +328,13 @@ pub async fn run_turn(
         }
     }
     if !done && turn.finish.is_none() {
-        return Err(llm::transient(&format!("{}: the gateway closed the stream before the answer finished", provider.label), None));
+        return Err(llm::transient(
+            &format!(
+                "{}: the gateway closed the stream before the answer finished",
+                provider.label
+            ),
+            None,
+        ));
     }
     if turn.finish.as_deref() == Some("error") && turn.content.trim().is_empty() {
         close_tools(agent, id, &mut turn, "failed");
@@ -311,16 +343,25 @@ pub async fn run_turn(
     Ok(finish(agent, id, session, turn, false))
 }
 
-/// A plain `data:` chunk in the OpenAI shape.
+/// A plain `data:` chunk in the `OpenAI` shape.
 fn chunk(agent: &Agent, id: &str, turn: &mut Turn, value: &Value) -> Result<(), Value> {
     if let Some(error) = value.get("error") {
-        let message = error.get("message").and_then(Value::as_str).map_or_else(|| error.to_string(), str::to_owned);
+        let message = error
+            .get("message")
+            .and_then(Value::as_str)
+            .map_or_else(|| error.to_string(), str::to_owned);
         return Err(failure(agent, &message));
     }
     if let Some(usage) = value.get("usage") {
-        let n = |keys: &[&str]| keys.iter().find_map(|k| usage.get(*k).and_then(Value::as_u64)).unwrap_or(0);
+        let n = |keys: &[&str]| {
+            keys.iter()
+                .find_map(|k| usage.get(*k).and_then(Value::as_u64))
+                .unwrap_or(0)
+        };
         turn.input_tokens = turn.input_tokens.max(n(&["prompt_tokens", "input_tokens"]));
-        turn.output_tokens = turn.output_tokens.max(n(&["completion_tokens", "output_tokens"]));
+        turn.output_tokens = turn
+            .output_tokens
+            .max(n(&["completion_tokens", "output_tokens"]));
     }
     let Some(choice) = value.pointer("/choices/0") else {
         return Ok(());
@@ -331,10 +372,18 @@ fn chunk(agent: &Agent, id: &str, turn: &mut Turn, value: &Value) -> Result<(), 
     let Some(delta) = choice.get("delta") else {
         return Ok(());
     };
-    if let Some(text) = delta.get("reasoning_content").and_then(Value::as_str).filter(|t| !t.is_empty()) {
+    if let Some(text) = delta
+        .get("reasoning_content")
+        .and_then(Value::as_str)
+        .filter(|t| !t.is_empty())
+    {
         agent.update(id, &json!({"sessionUpdate": "agent_thought_chunk", "content": {"type": "text", "text": text}}));
     }
-    if let Some(text) = delta.get("content").and_then(Value::as_str).filter(|t| !t.is_empty()) {
+    if let Some(text) = delta
+        .get("content")
+        .and_then(Value::as_str)
+        .filter(|t| !t.is_empty())
+    {
         turn.content.push_str(text);
         agent.update(id, &json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": text}}));
     }
@@ -350,15 +399,22 @@ fn tool_progress(agent: &Agent, id: &str, turn: &mut Turn, value: &Value) {
     }
     let tool = text("tool");
     if text("status") == "running" {
-        let label = if text("label").is_empty() { tool } else { text("label") };
+        let label = if text("label").is_empty() {
+            tool
+        } else {
+            text("label")
+        };
         turn.open.insert(call.to_owned());
-        agent.update(id, &json!({
-            "sessionUpdate": "tool_call",
-            "toolCallId": call,
-            "title": label,
-            "kind": tool_kind(tool),
-            "status": "in_progress"
-        }));
+        agent.update(
+            id,
+            &json!({
+                "sessionUpdate": "tool_call",
+                "toolCallId": call,
+                "title": label,
+                "kind": tool_kind(tool),
+                "status": "in_progress"
+            }),
+        );
     } else if turn.open.remove(call) {
         agent.update(id, &json!({"sessionUpdate": "tool_call_update", "toolCallId": call, "status": "completed"}));
     }
@@ -367,7 +423,10 @@ fn tool_progress(agent: &Agent, id: &str, turn: &mut Turn, value: &Value) {
 /// Tools still shown as running when the turn ends get a final status.
 fn close_tools(agent: &Agent, id: &str, turn: &mut Turn, status: &str) {
     for call in turn.open.drain() {
-        agent.update(id, &json!({"sessionUpdate": "tool_call_update", "toolCallId": call, "status": status}));
+        agent.update(
+            id,
+            &json!({"sessionUpdate": "tool_call_update", "toolCallId": call, "status": status}),
+        );
     }
 }
 
@@ -382,11 +441,19 @@ async fn approval(agent: &Agent, id: &str, turn: &mut Turn, value: &Value) {
     turn.approvals += 1;
     let command = text("command");
     let description = text("description");
-    let title = if description.is_empty() { "Hermes asks for approval" } else { description };
+    let title = if description.is_empty() {
+        "Hermes asks for approval"
+    } else {
+        description
+    };
     let choices: Vec<String> = value
         .get("choices")
         .and_then(Value::as_array)
-        .map(|list| list.iter().filter_map(|c| c.as_str().map(str::to_owned)).collect())
+        .map(|list| {
+            list.iter()
+                .filter_map(|c| c.as_str().map(str::to_owned))
+                .collect()
+        })
         .unwrap_or_default();
     let call = format!("hermes-approval-{}", turn.approvals);
     let mut tool = json!({
@@ -396,20 +463,32 @@ async fn approval(agent: &Agent, id: &str, turn: &mut Turn, value: &Value) {
         "status": "pending"
     });
     if !command.is_empty() {
-        tool["content"] = json!([{"type": "content", "content": {"type": "text", "text": command}}]);
+        tool["content"] =
+            json!([{"type": "content", "content": {"type": "text", "text": command}}]);
         tool["rawInput"] = json!({"command": command});
     }
     let response = agent
-        .request("session/request_permission", json!({"sessionId": id, "toolCall": tool, "options": approval_options(&choices)}))
+        .request(
+            "session/request_permission",
+            json!({"sessionId": id, "toolCall": tool, "options": approval_options(&choices)}),
+        )
         .await;
     let outcome = response.get("outcome").cloned().unwrap_or(Value::Null);
     let choice = if outcome.get("outcome").and_then(Value::as_str) == Some("selected") {
-        outcome.get("optionId").and_then(Value::as_str).unwrap_or("deny").to_owned()
+        outcome
+            .get("optionId")
+            .and_then(Value::as_str)
+            .unwrap_or("deny")
+            .to_owned()
     } else {
         "deny".to_owned()
     };
     let mut body = json!({"choice": choice});
-    if let Some(request_id) = value.get("request_id").and_then(Value::as_str).filter(|r| !r.is_empty()) {
+    if let Some(request_id) = value
+        .get("request_id")
+        .and_then(Value::as_str)
+        .filter(|r| !r.is_empty())
+    {
         body["request_id"] = json!(request_id);
     }
     let mut request = agent
@@ -423,20 +502,44 @@ async fn approval(agent: &Agent, id: &str, turn: &mut Turn, value: &Value) {
     // A failed answer leaves the run waiting; the gateway times the approval out by itself.
     let _ = request.send().await;
     // The row of the request itself is settled now; the command, if allowed, shows as its own tool row.
-    let status = if choice == "deny" { "failed" } else { "completed" };
-    agent.update(id, &json!({"sessionUpdate": "tool_call_update", "toolCallId": call, "status": status}));
+    let status = if choice == "deny" {
+        "failed"
+    } else {
+        "completed"
+    };
+    agent.update(
+        id,
+        &json!({"sessionUpdate": "tool_call_update", "toolCallId": call, "status": status}),
+    );
 }
 
 /// Ends the turn: keeps the answer for replay and reports why it stopped.
-fn finish(agent: &Agent, id: &str, session: &mut Session, mut turn: Turn, cancelled: bool) -> Value {
-    close_tools(agent, id, &mut turn, if cancelled { "failed" } else { "completed" });
+fn finish(
+    agent: &Agent,
+    id: &str,
+    session: &mut Session,
+    mut turn: Turn,
+    cancelled: bool,
+) -> Value {
+    close_tools(
+        agent,
+        id,
+        &mut turn,
+        if cancelled { "failed" } else { "completed" },
+    );
     if !turn.content.trim().is_empty() {
-        session.messages.push(json!({"role": "assistant", "content": turn.content}));
+        session
+            .messages
+            .push(json!({"role": "assistant", "content": turn.content}));
     }
     if cancelled || turn.finish.as_deref() == Some("cancelled") {
         return json!({"stopReason": "cancelled"});
     }
-    let stop = if turn.finish.as_deref() == Some("length") { "max_tokens" } else { "end_turn" };
+    let stop = if turn.finish.as_deref() == Some("length") {
+        "max_tokens"
+    } else {
+        "end_turn"
+    };
     json!({"stopReason": stop, "usage": {
         "inputTokens": turn.input_tokens,
         "outputTokens": turn.output_tokens,
@@ -446,20 +549,30 @@ fn finish(agent: &Agent, id: &str, session: &mut Session, mut turn: Turn, cancel
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
 
     fn frame(event: &str, data: &str) -> Frame {
-        Frame { event: event.to_owned(), data: data.to_owned() }
+        Frame {
+            event: event.to_owned(),
+            data: data.to_owned(),
+        }
     }
 
     #[test]
     fn sse_splits_frames_across_chunks() {
         let mut sse = Sse::default();
-        assert!(sse.feed(b"data: {\"a\":").is_empty());
+        assert_eq!(sse.feed(b"data: {\"a\":").len(), 0);
         assert_eq!(sse.feed(b"1}\n\n"), vec![frame("", "{\"a\":1}")]);
         // Named event, comment line, CRLF endings and two frames in one chunk.
         let out = sse.feed(b": keepalive\n\nevent: hermes.tool.progress\r\ndata: {\"tool\":\"terminal\"}\r\n\r\ndata: [DONE]\n\n");
-        assert_eq!(out, vec![frame("hermes.tool.progress", "{\"tool\":\"terminal\"}"), frame("", "[DONE]")]);
+        assert_eq!(
+            out,
+            vec![
+                frame("hermes.tool.progress", "{\"tool\":\"terminal\"}"),
+                frame("", "[DONE]")
+            ]
+        );
         // The event name does not leak into the next frame.
         assert_eq!(sse.feed(b"data: x\n\n"), vec![frame("", "x")]);
     }
@@ -488,11 +601,28 @@ mod tests {
         let ids = |choices: &[&str]| -> Vec<String> {
             approval_options(&choices.iter().map(|c| (*c).to_owned()).collect::<Vec<_>>())
                 .iter()
-                .map(|o| format!("{}:{}", o["optionId"].as_str().unwrap(), o["kind"].as_str().unwrap()))
+                .map(|o| {
+                    format!(
+                        "{}:{}",
+                        o["optionId"].as_str().unwrap(),
+                        o["kind"].as_str().unwrap()
+                    )
+                })
                 .collect()
         };
-        assert_eq!(ids(&["once", "session", "always", "deny"]), ["once:allow_once", "session:allow_always", "always:allow_always", "deny:reject_once"]);
-        assert_eq!(ids(&["once", "deny"]), ["once:allow_once", "deny:reject_once"]);
+        assert_eq!(
+            ids(&["once", "session", "always", "deny"]),
+            [
+                "once:allow_once",
+                "session:allow_always",
+                "always:allow_always",
+                "deny:reject_once"
+            ]
+        );
+        assert_eq!(
+            ids(&["once", "deny"]),
+            ["once:allow_once", "deny:reject_once"]
+        );
         // Nothing usable: the two safe choices.
         assert_eq!(ids(&[]), ["once:allow_once", "deny:reject_once"]);
         assert_eq!(ids(&["weird"]), ["once:allow_once", "deny:reject_once"]);
@@ -500,10 +630,22 @@ mod tests {
 
     #[test]
     fn capabilities_answers() {
-        assert!(is_capabilities(200, &json!({"object": "hermes.api_server.capabilities", "platform": "hermes-agent"})));
-        assert!(!is_capabilities(200, &json!({"object": "list", "data": []})));
+        assert!(is_capabilities(
+            200,
+            &json!({"object": "hermes.api_server.capabilities", "platform": "hermes-agent"})
+        ));
+        assert!(!is_capabilities(
+            200,
+            &json!({"object": "list", "data": []})
+        ));
         assert!(!is_capabilities(404, &Value::Null));
-        assert!(is_capabilities(401, &json!({"error": {"code": "gateway_auth_failed"}})));
-        assert!(!is_capabilities(401, &json!({"error": {"code": "invalid_api_key"}})));
+        assert!(is_capabilities(
+            401,
+            &json!({"error": {"code": "gateway_auth_failed"}})
+        ));
+        assert!(!is_capabilities(
+            401,
+            &json!({"error": {"code": "invalid_api_key"}})
+        ));
     }
 }

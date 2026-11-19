@@ -138,7 +138,7 @@ pub(crate) fn expand_tabs(text: &str) -> Cow<'_, str> {
         match ch {
             '\t' => {
                 let spaces = TAB_WIDTH - column % TAB_WIDTH;
-                out.extend(std::iter::repeat_n(' ', spaces));
+                out.extend(std::iter::repeat(' ').take(spaces));
                 column += spaces;
             }
             '\n' => {
@@ -206,30 +206,27 @@ fn styled(source: &str) -> Styled {
         let variant = |hex: &str| StyledText::from_markdown(&recolor(source, &spans, hex)).ok();
         variant(INLINE_CODE_LIGHT).zip(variant(INLINE_CODE_DARK))
     };
-    match parsed {
-        Some((light, dark)) => {
-            let (plain, links) = plain_text(source);
-            Styled {
-                light,
-                dark,
-                plain,
-                links,
-            }
+    if let Some((light, dark)) = parsed {
+        let (plain, links) = plain_text(source);
+        Styled {
+            light,
+            dark,
+            plain,
+            links,
         }
-        None => {
-            let (text, (plain, links)) = match StyledText::from_markdown(source) {
-                Ok(text) => (text, plain_text(source)),
-                Err(_) => (
-                    StyledText::from_plain_text(source),
-                    (source.to_string(), Vec::new()),
-                ),
-            };
-            Styled {
-                dark: text.clone(),
-                light: text,
-                plain,
-                links,
-            }
+    } else {
+        let (text, (plain, links)) = match StyledText::from_markdown(source) {
+            Ok(text) => (text, plain_text(source)),
+            Err(_) => (
+                StyledText::from_plain_text(source),
+                (source.to_string(), Vec::new()),
+            ),
+        };
+        Styled {
+            dark: text.clone(),
+            light: text,
+            plain,
+            links,
         }
     }
 }

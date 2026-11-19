@@ -366,7 +366,7 @@ mod tests {
     /// Writes a `cmd` stub; `body` runs inside `@echo off`.
     /// A fake tunnel binary. `body` is batch; on Unix it becomes an executable `sh` script (`ping -n 30` → `sleep 30`,
     /// `exit /b N` → `exit N`).
-    fn stub(dir: &PathBuf, name: &str, body: &str) -> PathBuf {
+    fn stub(dir: &std::path::Path, name: &str, body: &str) -> PathBuf {
         #[cfg(windows)]
         {
             let path = dir.join(name);

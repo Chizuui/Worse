@@ -2,7 +2,9 @@
 //! (`harness_agent_hub::recall`). The store is a small file; it is read and written on a worker thread and the
 //! rows are set back on the UI thread.
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use harness_agent_hub::recall::{self, Kind, Memory, NewMemory, Query, Store};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
@@ -15,17 +17,44 @@ const SHOWN_MAX: usize = 300;
 #[derive(Clone)]
 struct Ctx {
     home: PathBuf,
-    /// [`recall::project_key`] of the workspace the app was opened in.
-    project: String,
+    /// [`recall::project_key`] of the session's workspace.
+    project: Arc<Mutex<String>>,
     window: slint::Weak<AppWindow>,
+}
+
+thread_local! {
+    static CTX: RefCell<Option<Ctx>> = const { RefCell::new(None) };
+}
+
+impl Ctx {
+    fn project(&self) -> String {
+        self.project.lock().map(|p| p.clone()).unwrap_or_default()
+    }
+}
+
+pub fn set_workspace(workspace: &Path) {
+    let Some(ctx) = CTX.with(|cell| cell.borrow().clone()) else {
+        return;
+    };
+    let key = recall::project_key(&workspace.to_string_lossy());
+    if let Ok(mut project) = ctx.project.lock() {
+        if *project == key {
+            return;
+        }
+        *project = key;
+    }
+    reload(&ctx, None);
 }
 
 pub fn install(window: &AppWindow, home: &Path, workspace: &Path) {
     let ctx = Ctx {
         home: home.to_path_buf(),
-        project: recall::project_key(&workspace.to_string_lossy()),
+        project: Arc::new(Mutex::new(recall::project_key(
+            &workspace.to_string_lossy(),
+        ))),
         window: window.as_weak(),
     };
+    CTX.with(|cell| *cell.borrow_mut() = Some(ctx.clone()));
     let ui = window.global::<RecallUi>();
     let config = Store::new(home).config();
     ui.set_auto_recall(config.recall);
@@ -43,7 +72,7 @@ pub fn install(window: &AppWindow, home: &Path, workspace: &Path) {
         let new = NewMemory {
             kind: Kind::parse(&ui.get_draft_kind()),
             text: ui.get_draft().to_string(),
-            project: (!ui.get_draft_global()).then(|| c.project.clone()),
+            project: (!ui.get_draft_global()).then(|| c.project()),
             ..NewMemory::default()
         };
         let c = c.clone();
@@ -147,7 +176,12 @@ fn reload_later(ctx: Ctx, note: Option<(bool, String)>) {
 }
 
 fn show(ctx: &Ctx, query: &str, filter: &str, note: Option<(bool, String)>) {
-    let all = Store::new(&ctx.home).load();
+    let here = ctx.project();
+    let all: Vec<Memory> = Store::new(&ctx.home)
+        .load()
+        .into_iter()
+        .filter(|m| m.project.as_deref().map_or(true, |p| p == here))
+        .collect();
     let total = all.len();
     let wanted = |m: &&Memory| match filter {
         "memories" => m.kind != Kind::Episode,
@@ -181,7 +215,7 @@ fn show(ctx: &Ctx, query: &str, filter: &str, note: Option<(bool, String)>) {
                 m.id.clone(),
                 m.kind.as_str().to_owned(),
                 row_text(m),
-                meta(m, now, &ctx.project),
+                meta(m, now, &here),
                 m.pinned,
             )
         })

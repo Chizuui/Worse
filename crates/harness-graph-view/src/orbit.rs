@@ -307,9 +307,7 @@ impl Orbit {
         let grow = 0.35 + 0.65 * birth;
         let flat = view.camera.pitch.sin().abs();
         let line = unit.max(1.0);
-        for seen in &mut self.seen {
-            *seen = None;
-        }
+        self.seen.fill(None);
         let sun = lens.see(Vec3::ZERO);
         self.sun_seen = sun;
         let Some(sun) = sun else { return };

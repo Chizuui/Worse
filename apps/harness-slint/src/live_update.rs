@@ -67,10 +67,9 @@ pub fn is_shadow() -> bool {
 /// The executable a restart should run: the newest build (the source exe) for a shadow copy, else this process.
 #[must_use]
 pub fn launch_exe() -> PathBuf {
-    shadow_env().source.clone().map_or_else(
-        || std::env::current_exe().unwrap_or_else(|_| PathBuf::from("harness-slint")),
-        |source| source,
-    )
+    shadow_env().source.clone().unwrap_or_else(|| {
+        std::env::current_exe().unwrap_or_else(|_| PathBuf::from("harness-slint"))
+    })
 }
 
 /// Directory holding the shadow copies.
@@ -228,6 +227,7 @@ pub fn watch(window: slint::Weak<crate::ui::AppWindow>) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::{
         cleanup_in, copy_name, fingerprint, parse_fingerprint, shadow_env_from, ShadowEnv,
     };

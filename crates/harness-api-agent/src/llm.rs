@@ -367,7 +367,8 @@ pub fn content_text(content: Option<&Value>) -> Option<String> {
     }
 }
 
-const IMAGE_NOTE: &str = "[image attached, but this model cannot view images; say so instead of guessing its content]";
+const IMAGE_NOTE: &str =
+    "[image attached, but this model cannot view images; say so instead of guessing its content]";
 const IMAGE_GONE: &str = "[earlier image removed from context]";
 const IMAGE_COST: usize = 1500;
 
@@ -415,7 +416,10 @@ fn replace_images(message: &mut Value, note: &str) {
             if is_image(p) {
                 note.to_owned()
             } else {
-                p.get("text").and_then(Value::as_str).unwrap_or_default().to_owned()
+                p.get("text")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned()
             }
         })
         .collect::<Vec<_>>()
@@ -455,7 +459,9 @@ fn image_rejection(status: u16, body: &str) -> bool {
         return false;
     }
     let body = body.to_ascii_lowercase();
-    ["image", "vision", "modal"].iter().any(|w| body.contains(w))
+    ["image", "vision", "modal"]
+        .iter()
+        .any(|w| body.contains(w))
 }
 
 /// One text part carrying an Anthropic-compatible cache breakpoint.
@@ -511,6 +517,7 @@ pub fn with_cache_breakpoints(messages: &[Value]) -> Vec<Value> {
 }
 
 /// Streams one completion. Text and reasoning are forwarded as ACP updates while they arrive.
+#[allow(clippy::too_many_lines)]
 pub async fn complete(
     agent: &Agent,
     session: &str,
@@ -519,7 +526,9 @@ pub async fn complete(
     token: &CancellationToken,
 ) -> Result<Completion, Value> {
     let provider = &agent.provider;
-    let echoed = messages.iter().any(|m| m.get("reasoning_content").is_some());
+    let echoed = messages
+        .iter()
+        .any(|m| m.get("reasoning_content").is_some());
     // Prompt-cache breakpoints, dropped for good if the provider rejects them (HTTP 400). Reasoning echoes
     // are dropped the same way (older reasoners reject `reasoning_content` in the input).
     let mut marked = agent.cache_control() && provider.prompt_cache;
@@ -548,7 +557,10 @@ pub async fn complete(
         match send(agent, &payload, tools, token).await? {
             Sent::Ok(response) => break response,
             Sent::Cancelled => {
-                return Ok(Completion { cancelled: true, ..Completion::default() })
+                return Ok(Completion {
+                    cancelled: true,
+                    ..Completion::default()
+                })
             }
             Sent::Status(status, _, ref text)
                 if pictured && seeing && sends < 5 && image_rejection(status, text) =>
@@ -692,7 +704,10 @@ mod tests {
             json!({"role": "assistant", "content": null}),
         ]);
         assert!(out[0]["content"][0].get("cache_control").is_none());
-        assert_eq!(out[0]["content"][1]["cache_control"], json!({"type": "ephemeral"}));
+        assert_eq!(
+            out[0]["content"][1]["cache_control"],
+            json!({"type": "ephemeral"})
+        );
     }
 
     #[test]
@@ -709,7 +724,10 @@ mod tests {
             cache_tokens(&json!({"prompt_tokens_details": {"cached_tokens": 12}})),
             (12, 0)
         );
-        assert_eq!(cache_tokens(&json!({"prompt_cache_hit_tokens": 34})), (34, 0));
+        assert_eq!(
+            cache_tokens(&json!({"prompt_cache_hit_tokens": 34})),
+            (34, 0)
+        );
         assert_eq!(
             cache_tokens(&json!({"cache_read_input_tokens": 56, "cache_creation_input_tokens": 7})),
             (56, 7)
@@ -724,7 +742,9 @@ mod tests {
         assert!(has_images(&m));
         let out = strip_images(&m);
         assert!(!has_images(&out));
-        assert!(out[0]["content"].as_str().is_some_and(|c| c.starts_with("look") && c.contains("cannot view")));
+        assert!(out[0]["content"]
+            .as_str()
+            .is_some_and(|c| c.starts_with("look") && c.contains("cannot view")));
         assert!(has_images(&m));
     }
 
@@ -746,7 +766,10 @@ mod tests {
 
     #[test]
     fn rejection_needs_image_hint() {
-        assert!(image_rejection(400, "unknown variant `image_url`, expected `text`"));
+        assert!(image_rejection(
+            400,
+            "unknown variant `image_url`, expected `text`"
+        ));
         assert!(!image_rejection(400, "cache_control is not supported"));
         assert!(!image_rejection(500, "image"));
     }

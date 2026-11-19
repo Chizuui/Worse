@@ -72,7 +72,7 @@ fn role_of(value: i32) -> OrchestraRole {
     }
 }
 
-/// Brand dot of an agent (design palette): Claude, Codex, DeepSeek, agy, Gemini; accent otherwise.
+/// Brand dot of an agent (design palette): Claude, Codex, `DeepSeek`, agy, Gemini; accent otherwise.
 pub fn agent_color(id: &str) -> slint::Color {
     let id = id.to_ascii_lowercase();
     let rgb = if id.contains("claude") {
@@ -95,6 +95,7 @@ fn index(value: i32) -> Option<usize> {
     usize::try_from(value).ok()
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn install(window: &AppWindow) {
     STATE.with(|s| s.borrow_mut().window = Some(window.as_weak()));
     let ui = window.global::<OrchestraUi>();
@@ -132,7 +133,7 @@ pub fn install(window: &AppWindow) {
             }
         });
     });
-    ui.on_drop_node(|| save_now());
+    ui.on_drop_node(save_now);
     ui.on_set_role(|i, role| {
         edit(true, |s| {
             let Some(i) = index(i).filter(|i| *i < s.graph.nodes.len()) else {
@@ -318,6 +319,7 @@ fn set_error(text: &str) {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn render() {
     let Some(w) = window() else {
         return;
@@ -453,7 +455,7 @@ fn render() {
         }
         sync(&ui.get_agents(), all, |m| ui.set_agents(m));
         sync(&ui.get_connections(), connections, |m| {
-            ui.set_connections(m)
+            ui.set_connections(m);
         });
         sync(&ui.get_candidates(), candidates, |m| ui.set_candidates(m));
         let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);

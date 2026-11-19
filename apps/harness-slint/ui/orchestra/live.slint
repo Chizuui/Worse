@@ -8,6 +8,7 @@ import { ChatUi, SubagentRow, FleetGroup } from "../chat/globals.slint";
 import { AgentTint } from "../panels/common.slint";
 import { AgentLogo, AgentMark } from "../components/agent_logo.slint";
 import { SettingsUi } from "../settings/globals.slint";
+import { ArtClock } from "../components/ascii.slint";
 
 export global OrchLiveUi {
     in-out property <bool> open;
@@ -89,7 +90,7 @@ component Progress inherits Rectangle {
     border-radius: 2px;
     background: Theme.border;
     clip: true;
-    property <float> phase: Theme.reduce-motion ? 0.3 : Math.mod(animation-tick() / 1ms, 1800) / 1800;
+    property <float> phase: Theme.reduce-motion ? 0.3 : mod(ArtClock.busy-tick, 20) / 20;
     if root.status == 0 || root.status == 1: Rectangle {
         width: parent.width * 0.35;
         x: (parent.width * 1.35) * root.phase - parent.width * 0.35;

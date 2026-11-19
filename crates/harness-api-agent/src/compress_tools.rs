@@ -36,7 +36,8 @@ fn function(name: &str, description: &str, parameters: &Value) -> Value {
 }
 
 pub fn definitions() -> Vec<Value> {
-    let reference = json!({"type": "string", "description": "Message ref such as m12 (see context_status)"});
+    let reference =
+        json!({"type": "string", "description": "Message ref such as m12 (see context_status)"});
     vec![
         function(
             "context_compress",
@@ -79,17 +80,15 @@ fn parse_ref(value: Option<&Value>, prefix: char) -> Option<u64> {
     let value = value?;
     value.as_u64().or_else(|| {
         let text = value.as_str()?.trim();
-        text.strip_prefix(prefix)
-            .unwrap_or(text)
-            .parse()
-            .ok()
+        text.strip_prefix(prefix).unwrap_or(text).parse().ok()
     })
 }
 
 fn tokens(chars: usize) -> String {
     let t = chars / 4;
     if t >= 1000 {
-        format!("{:.1}k", t as f64 / 1000.0)
+        let tenths = (t + 50) / 100;
+        format!("{}.{}k", tenths / 10, tenths % 10)
     } else {
         t.to_string()
     }
@@ -127,16 +126,18 @@ pub fn run(
                 _ => Err("from and to must be message refs such as m12".into()),
             }
         }
-        "context_decompress" => match parse_ref(args.get("id"), 'f').and_then(|id| u32::try_from(id).ok()) {
-            Some(id) => folds.decompress(messages, id).map(|f| {
-                format!(
-                    "Restored f{id}: messages m{}-m{} are back in the context.",
-                    f.start,
-                    f.end - 1
-                )
-            }),
-            None => Err("id must be a fold id such as f3".into()),
-        },
+        "context_decompress" => {
+            match parse_ref(args.get("id"), 'f').and_then(|id| u32::try_from(id).ok()) {
+                Some(id) => folds.decompress(messages, id).map(|f| {
+                    format!(
+                        "Restored f{id}: messages m{}-m{} are back in the context.",
+                        f.start,
+                        f.end - 1
+                    )
+                }),
+                None => Err("id must be a fold id such as f3".into()),
+            }
+        }
         "context_search" => {
             let query = args.get("query").and_then(Value::as_str).unwrap_or("");
             search(folds, messages, query)
@@ -169,7 +170,9 @@ pub fn run(
 }
 
 fn snippet(text: &str, lower: &str, term: &str) -> String {
-    let at = lower.find(term).map_or(0, |pos| lower[..pos].chars().count());
+    let at = lower
+        .find(term)
+        .map_or(0, |pos| lower[..pos].chars().count());
     let start = at.saturating_sub(120);
     let piece: String = text.chars().skip(start).take(320).collect();
     let mut out = clip(&piece, 320);
@@ -180,7 +183,11 @@ fn snippet(text: &str, lower: &str, term: &str) -> String {
 }
 
 pub fn search(folds: &Folds, messages: &[Value], query: &str) -> Result<String, String> {
-    let terms: Vec<String> = query.to_lowercase().split_whitespace().map(str::to_owned).collect();
+    let terms: Vec<String> = query
+        .to_lowercase()
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect();
     if terms.is_empty() {
         return Err("query is empty".into());
     }
@@ -188,7 +195,10 @@ pub fn search(folds: &Folds, messages: &[Value], query: &str) -> Result<String, 
     for (i, message) in messages.iter().enumerate() {
         let text = text_of(message);
         let lower = text.to_lowercase();
-        let found: Vec<&String> = terms.iter().filter(|t| lower.contains(t.as_str())).collect();
+        let found: Vec<&String> = terms
+            .iter()
+            .filter(|t| lower.contains(t.as_str()))
+            .collect();
         if found.is_empty() {
             continue;
         }
@@ -200,18 +210,29 @@ pub fn search(folds: &Folds, messages: &[Value], query: &str) -> Result<String, 
         hits.push((
             found.len(),
             i,
-            format!("m{at} ({}{place}): {}", role(message), snippet(&text, &lower, found[0])),
+            format!(
+                "m{at} ({}{place}): {}",
+                role(message),
+                snippet(&text, &lower, found[0])
+            ),
         ));
     }
     for fold in &folds.folds {
         let lower = fold.summary.to_lowercase();
         let found = terms.iter().filter(|t| lower.contains(t.as_str())).count();
         if found > 0 {
-            let first = terms.iter().find(|t| lower.contains(t.as_str())).map_or("", |t| t.as_str());
+            let first = terms
+                .iter()
+                .find(|t| lower.contains(t.as_str()))
+                .map_or("", |t| t.as_str());
             hits.push((
                 found,
                 usize::MAX,
-                format!("f{} summary: {}", fold.id, snippet(&fold.summary, &lower, first)),
+                format!(
+                    "f{} summary: {}",
+                    fold.id,
+                    snippet(&fold.summary, &lower, first)
+                ),
             ));
         }
     }
@@ -220,14 +241,18 @@ pub fn search(folds: &Folds, messages: &[Value], query: &str) -> Result<String, 
     }
     let best = hits.iter().map(|h| h.0).max().unwrap_or(0);
     hits.retain(|h| h.0 == best);
-    hits.sort_by(|a, b| b.1.cmp(&a.1));
+    hits.sort_by_key(|h| std::cmp::Reverse(h.1));
     let total = hits.len();
     let mut out = String::new();
     for hit in hits.iter().take(SEARCH_HITS) {
         let _ = writeln!(out, "{}", hit.2);
     }
     if total > SEARCH_HITS {
-        let _ = writeln!(out, "… {} more matches; refine the query", total - SEARCH_HITS);
+        let _ = writeln!(
+            out,
+            "… {} more matches; refine the query",
+            total - SEARCH_HITS
+        );
     }
     Ok(out)
 }

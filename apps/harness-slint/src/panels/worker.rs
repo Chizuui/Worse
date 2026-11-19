@@ -4,6 +4,7 @@
 //! superseded refresh / search are dropped, never raced).
 
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use harness_core_api::diff::FileDiff;
@@ -103,6 +104,28 @@ struct Worker {
     size: Option<(u16, u16)>,
     terminal: Option<Terminal>,
     frame_due: Option<Instant>,
+}
+
+/// Per-worker cache of content checks (spec `file-safety.md` §4).
+fn content_cache() -> &'static harness_workspace::filetype::ContentCache {
+    static CACHE: OnceLock<harness_workspace::filetype::ContentCache> = OnceLock::new();
+    CACHE.get_or_init(harness_workspace::filetype::ContentCache::new)
+}
+
+/// Warning line for a workspace-relative path, joined with any existing notice.
+fn with_content_warning(root: Option<&PathBuf>, path: &str, notice: String) -> String {
+    let Some(root) = root else {
+        return notice;
+    };
+    let check = content_cache().inspect(&root.join(path));
+    let Some(warning) = check.warning else {
+        return notice;
+    };
+    if notice.is_empty() {
+        warning
+    } else {
+        format!("{notice} · {warning}")
+    }
 }
 
 /// Thread body: builds the runtime and runs the worker until `Cmd::Shutdown` / the channel closes.
@@ -702,6 +725,11 @@ impl Worker {
                 };
                 out.rows = fv.rows;
                 out.pairs = fv.pairs;
+                out.notice = with_content_warning(
+                    self.root.as_ref(),
+                    &file.path,
+                    std::mem::take(&mut out.notice),
+                );
             }
         }
         view::diff(&self.window, out);
@@ -822,14 +850,44 @@ impl Worker {
     }
 
     fn search_summary(&self, done: Option<(u64, u64, bool)>) -> String {
-        match done {
+        let mut out = match done {
             Some((matches, files, truncated)) => {
                 let more = if truncated { "+" } else { "" };
                 format!("{matches}{more} matches in {files} files")
             }
             None if self.search_files => format!("{} files", self.hits.len()),
             None => format!("{} matches…", self.hits.len()),
+        };
+        if !self.search_files {
+            return out;
         }
+        if let Some(warning) = self.content_summary() {
+            out.push_str(" · ");
+            out.push_str(&warning);
+        }
+        out
+    }
+
+    /// `n files have content that does not match the name`, over the visible file hits.
+    fn content_summary(&self) -> Option<String> {
+        let root = self.root.as_ref()?;
+        let mut suspect = 0_u32;
+        for hit in self.hits.iter().filter(|h| !h.is_dir) {
+            if content_cache()
+                .inspect(&root.join(&hit.path))
+                .warning
+                .is_some()
+            {
+                suspect += 1;
+            }
+        }
+        (suspect > 0).then(|| {
+            if suspect == 1 {
+                "1 file has content that does not match its name".to_owned()
+            } else {
+                format!("{suspect} files have content that does not match their names")
+            }
+        })
     }
 
     // ---- terminal ---------------------------------------------------------------------------------------------

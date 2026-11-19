@@ -8,6 +8,12 @@
 //!
 //! Nothing is polled for sessions without Machine mode. The files of earlier runs are removed at startup.
 
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::io::{Read, Seek, SeekFrom};
@@ -62,6 +68,7 @@ struct Event {
     t: u64,
 }
 
+#[allow(clippy::many_single_char_names)]
 fn parse(line: &str) -> Option<Event> {
     let v: Value = serde_json::from_str(line).ok()?;
     let kind = v.get("kind")?.as_str()?.to_owned();
@@ -178,7 +185,11 @@ fn tick(window: &AppWindow) {
     let events = read_new(&dir.join("events.jsonl"));
     let screen = window.global::<ScreenUi>();
     if events.is_empty() {
-        let idle = STATE.with(|cell| cell.borrow().last_event.is_none_or(|t| t.elapsed() > BUSY));
+        let idle = STATE.with(|cell| {
+            cell.borrow()
+                .last_event
+                .map_or(true, |t| t.elapsed() > BUSY)
+        });
         if idle && screen.get_busy() {
             screen.set_busy(false);
         }
@@ -306,6 +317,7 @@ fn load_shot(window: &AppWindow, path: PathBuf) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
 
     #[test]

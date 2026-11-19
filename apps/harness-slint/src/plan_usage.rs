@@ -64,7 +64,7 @@ pub fn refresh() {
     }
 }
 
-/// Saved agy accounts (from every Event::AgyAccounts); each gets its own usage row.
+/// Saved agy accounts (from every `Event::AgyAccounts`); each gets its own usage row.
 pub fn agy_accounts(result: &Result<api::AgyAccounts, String>) {
     let Ok(list) = result else {
         return;
@@ -254,12 +254,9 @@ async fn fetch_one(client: &reqwest::Client, account: Account) -> Fetched {
         .await;
     let mut row = failed(account, "");
     row.plan = plan;
-    let response = match response {
-        Ok(r) => r,
-        Err(_) => {
-            row.error = "Network error".into();
-            return row;
-        }
+    let Ok(response) = response else {
+        row.error = "Network error".into();
+        return row;
     };
     let status = response.status();
     if !status.is_success() {

@@ -28,6 +28,8 @@ mod board;
 mod dock;
 mod export;
 mod fleet;
+mod groups;
+mod history;
 mod thumbs;
 mod turns;
 
@@ -64,6 +66,8 @@ struct UiState {
     dock_state: dock::DockState,
     board: board::BoardState,
     thumbs: thumbs::Thumbs,
+    history: history::History,
+    fleet_view: fleet::FleetView,
 }
 
 thread_local! {
@@ -237,7 +241,12 @@ impl UiState {
                 images,
             } => {
                 row.kind = 0;
-                row.text = text.as_str().into();
+                row.text = match text.find("\n\n<harness-resume ") {
+                    Some(at) => {
+                        format!("{}\n\n(Resumed after an interruption)", &text[..at]).into()
+                    }
+                    None => text.as_str().into(),
+                };
                 (row.images, row.images_more) = self.row_images(id, images);
             }
             Item::Assistant {
@@ -254,8 +263,13 @@ impl UiState {
                 self.blocks.insert(id, model);
                 self.texts.insert(id, text.clone());
             }
-            Item::Tool { title, status, .. } => {
+            Item::Tool {
+                agent,
+                title,
+                status,
+            } => {
                 row.kind = 2;
+                row.agent = self.agent_name(agent).into();
                 row.title = one_line(title).into();
                 row.status = tool_status(*status);
                 let image: Vec<String> = thumbs::tool_image(title, &self.workspace)
@@ -294,8 +308,11 @@ impl UiState {
         }
         self.note_item(id, item);
         let row = self.chat_item(id, item);
-        self.rows.insert(id, self.chat.row_count());
+        let index = self.chat.row_count();
+        self.rows.insert(id, index);
         self.chat.push(row);
+        self.mark_continued(index);
+        self.regroup(index);
     }
 
     fn update_row(&self, id: ItemId, f: impl FnOnce(&mut ChatItem)) {
@@ -304,7 +321,11 @@ impl UiState {
         };
         if let Some(mut row) = self.chat.row_data(index) {
             f(&mut row);
+            let tool = row.kind == 2;
             self.chat.set_row_data(index, row);
+            if tool {
+                self.regroup(index);
+            }
         }
     }
 
@@ -354,6 +375,7 @@ impl UiState {
         self.blocks.clear();
         self.chat.set_vec(Vec::new());
         self.reset_turn_view();
+        let items = self.split_history(items);
         for (id, item) in items {
             self.push_item(*id, item);
         }
@@ -389,6 +411,9 @@ impl UiState {
         }));
         crate::chat::set_workspace(&path);
         crate::live::set_workspace(&path);
+        crate::security::set_workspace(&path);
+        crate::settings::recall::set_workspace(&path);
+        crate::settings::graph::set_workspace(&self.window, &path);
         crate::panels::set_workspace(path);
     }
 
@@ -433,6 +458,7 @@ impl UiState {
         self.texts.clear();
         self.blocks.clear();
         self.chat.set_vec(Vec::new());
+        self.clear_history();
         self.set_queue(&[]);
         self.window.set_paused(false);
         self.window.set_running(false);
@@ -771,7 +797,18 @@ impl UiState {
                 raw_input,
                 raw_output,
             } => {
-                if self.is_active(&session) {
+                if self.is_active(&session) && self.history.hides(id) {
+                    self.history.keep_detail(
+                        id,
+                        history::Detail {
+                            kind,
+                            content,
+                            locations,
+                            raw_input,
+                            raw_output,
+                        },
+                    );
+                } else if self.is_active(&session) {
                     self.tool_detail(
                         id,
                         kind.as_deref(),
@@ -784,6 +821,23 @@ impl UiState {
                     if self.window.get_running() {
                         crate::live::touch(&self.window, kind.as_deref(), &content, &locations);
                     }
+                }
+            }
+            Event::SubagentTool {
+                root,
+                title,
+                kind,
+                content,
+                locations,
+            } => {
+                if self.is_active(&root) {
+                    crate::live::touch_subagent(
+                        &self.window,
+                        &title,
+                        kind.as_deref(),
+                        &content,
+                        &locations,
+                    );
                 }
             }
             Event::Thought { session, text } => {
@@ -1026,8 +1080,7 @@ fn show_workspace(window: &AppWindow, workspace: &Path) {
     window.set_workspace_initial(SharedString::from(
         name.chars()
             .next()
-            .map(|c| c.to_uppercase().collect::<String>())
-            .unwrap_or_else(|| "H".to_owned()),
+            .map_or_else(|| "H".to_owned(), |c| c.to_uppercase().collect::<String>()),
     ));
 }
 
@@ -1103,6 +1156,8 @@ pub fn install(
         workspace: workspace.to_path_buf(),
         turn: turns::TurnState::default(),
         board: board::BoardState::default(),
+        history: history::History::default(),
+        fleet_view: fleet::FleetView::default(),
     };
     STATE.with(|cell| {
         if let Ok(mut guard) = cell.try_borrow_mut() {
@@ -1113,11 +1168,13 @@ pub fn install(
     wire_callbacks(window);
     install_open_folder(window);
     turns::wire(window);
+    history::wire(window);
     dock::wire(window);
     board::wire(window);
     with_state(|s| s.load_groups());
 }
 
+#[allow(clippy::too_many_lines)]
 fn wire_callbacks(window: &AppWindow) {
     window.on_new_session(|| with_state(|s| s.new_session(false, None)));
     window.on_new_worktree_session(|| with_state(|s| s.new_session(true, None)));
@@ -1244,6 +1301,7 @@ pub struct TranscriptRow {
 pub fn transcript() -> Vec<TranscriptRow> {
     let mut rows = Vec::new();
     with_state(|s| {
+        s.load_all_earlier();
         for i in 0..s.chat.row_count() {
             let Some(item) = s.chat.row_data(i) else {
                 continue;

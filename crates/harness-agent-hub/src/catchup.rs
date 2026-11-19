@@ -176,7 +176,8 @@ fn compact(turn: &ContextTurn) -> String {
 /// 85%, then one-line turns; the oldest are dropped with a note.
 #[must_use]
 pub fn render_history(turns: &[ContextTurn], budget: usize) -> String {
-    let tiers: [(fn(&ContextTurn) -> String, usize); 3] = [
+    type Tier = (fn(&ContextTurn) -> String, usize);
+    let tiers: [Tier; 3] = [
         (full, budget / 10 * 6),
         (condensed, budget / 100 * 85),
         (compact, budget),

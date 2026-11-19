@@ -66,6 +66,9 @@ export component ToolCard inherits VerticalLayout {
     in property <string> file;
     in property <int> file-line;
     in property <string> range;
+    in property <int> added;
+    in property <int> removed;
+    in property <bool> member;
     property <string> status-text: root.status == 0 ? @tr("Running") : root.status == 1 ? @tr("Awaiting permission") : root.status == 2 ? @tr("Done") : root.status == 3 ? @tr("Denied") : @tr("Failed");
     property <string> tone: root.status == 2 ? "success" : root.status == 1 ? "progress" : root.status == 0 ? "neutral" : root.status == 3 ? "warning" : "destructive";
     property <length> content-width: 400px;
@@ -107,15 +110,9 @@ export component ToolCard inherits VerticalLayout {
             }
         }
         HorizontalLayout {
-            padding-left: 8px;
+            padding-left: root.member ? 20px : 8px;
             padding-right: 8px;
-            spacing: 9px;
-            Icon {
-                y: (parent.height - self.height) / 2;
-                source: root.kind-icon;
-                size: Theme.icon-xs;
-                tint: tta.has-hover ? Theme.icon : Theme.icon-subtlest;
-            }
+            spacing: 8px;
             Text {
                 text: root.title;
                 font-family: Theme.art-font;
@@ -123,9 +120,62 @@ export component ToolCard inherits VerticalLayout {
                 color: tta.has-hover ? Theme.foreground : Theme.foreground-subtle;
                 vertical-alignment: center;
                 overflow: elide;
-                horizontal-stretch: 1;
+                horizontal-stretch: 0;
                 accessible-role: none;
                 animate color { duration: Theme.dur-hover; easing: ease-out-quint; }
+            }
+            if root.added > 0: Text {
+                text: "+" + root.added;
+                font-size: 12px;
+                color: Theme.success-surface-foreground;
+                vertical-alignment: center;
+            }
+            if root.removed > 0: Text {
+                text: "−" + root.removed;
+                font-size: 12px;
+                color: Theme.destructive-surface-foreground;
+                vertical-alignment: center;
+            }
+            if root.parts.length > 0: Image {
+                y: (parent.height - self.height) / 2;
+                width: 12px;
+                height: 12px;
+                source: Icons.chevron-right;
+                colorize: Theme.icon-subtle;
+                transform-rotation: root.expanded ? 90deg : 0deg;
+                animate transform-rotation { duration: Theme.dur-move; easing: ease-out-quint; }
+                accessible-role: none;
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+            if root.images-more > 0: Text {
+                text: "+" + root.images-more;
+                font-size: Theme.ui-sm;
+                color: Theme.foreground-subtle;
+                vertical-alignment: center;
+            }
+            for img in root.images: Rectangle {
+                y: (parent.height - self.height) / 2;
+                height: 18px;
+                width: max(12px, min(32px, 18px * img.image.width / max(1, img.image.height)));
+                border-radius: 3px;
+                border-width: 1px;
+                border-color: ita.has-hover ? Theme.border-hover : Theme.border;
+                clip: true;
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: img.image;
+                    image-fit: cover;
+                    accessible-role: none;
+                }
+                ita := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        ChatUi.open-path(img.path);
+                    }
+                }
             }
             // Line range chip: opens the file in the Live view at that line.
             if root.file != "" && root.range != "": Rectangle {
@@ -166,38 +216,17 @@ export component ToolCard inherits VerticalLayout {
                 tint: Theme.accent-fg;
                 clocked: true;
             }
-            if root.status == 2: Icon {
-                y: (parent.height - self.height) / 2;
-                source: Icons.check;
-                size: 14px;
-                tint: Theme.success-surface-foreground;
-            }
             if root.status == 4: Icon {
                 y: (parent.height - self.height) / 2;
                 source: Icons.circle-x;
                 size: 14px;
                 tint: Theme.destructive-surface-foreground;
             }
-            if root.parts.length > 0: Image {
-                y: (parent.height - self.height) / 2;
-                width: 14px;
-                height: 14px;
-                source: Icons.chevron-right;
-                colorize: Theme.icon-subtle;
-                transform-rotation: root.expanded ? 90deg : 0deg;
-                animate transform-rotation { duration: Theme.dur-move; easing: ease-out-quint; }
-                accessible-role: none;
-            }
         }
-    }
-    if root.images.length > 0: ImageStrip {
-        images: root.images;
-        more: root.images-more;
-        padding-left: 12px;
     }
     // Collapsed edit: the first changed lines, so a change can be seen without opening the row. Click opens it in
     // the Live view.
-    if !root.expanded && root.peek.length > 0: Rectangle {
+    if false && !root.expanded && root.peek.length > 0: Rectangle {
         property <length> line-h: Theme.code-size * 1.5;
         height: root.peek.length * self.line-h + 12px;
         border-radius: Theme.radius-md;
@@ -685,11 +714,19 @@ export component SubagentList inherits VerticalLayout {
                         }
                     }
                     if s.status == 0: ProgressTrack {
+                        on-busy-clock: true;
                         tint: Theme.accent-fg;
                     }
                     if s.status == 3: ProgressTrack {
                         ratio: 1;
                         tint: Theme.destructive-surface-foreground.with-alpha(0.5);
+                    }
+                    if s.scope != "": Text {
+                        text: @tr("Scope: ") + s.scope;
+                        font-size: 10px;
+                        color: Theme.muted;
+                        overflow: elide;
+                        accessible-role: none;
                     }
                     HorizontalLayout {
                         spacing: 6px;
@@ -747,6 +784,13 @@ export component SubagentList inherits VerticalLayout {
 // Background tasks of the open session (§9.17): one compact row per task (frame 01/05), Stop while running.
 export component BackgroundTaskList inherits VerticalLayout {
     spacing: 2px;
+    Timer {
+        interval: 1s;
+        running: ChatUi.background-tasks-running > 0;
+        triggered => {
+            ChatUi.subagent-action("tick", "");
+        }
+    }
     for t in ChatUi.background-tasks: Rectangle {
         property <bool> failed: !t.running && t.state != "completed";
         height: row.preferred-height + 12px;

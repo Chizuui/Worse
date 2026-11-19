@@ -28,6 +28,45 @@ pub struct Settings {
     /// Orchestra page: delegation defaults (settings redesign S3).
     #[serde(default)]
     pub orchestra: OrchestraSettings,
+    /// Security page (security-panel.md §5): dependency audit and commit gate.
+    #[serde(default)]
+    pub security: SecuritySettings,
+    #[serde(default)]
+    pub research: ResearchSettings,
+    /// Skill trigger health check (skill-health.md): the opt-in live check only.
+    #[serde(default)]
+    pub skill_health: SkillHealthSettings,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ResearchSettings {
+    pub fact_check: bool,
+}
+
+impl Default for ResearchSettings {
+    fn default() -> Self {
+        Self { fact_check: true }
+    }
+}
+
+/// Skill trigger health check (skill-health.md): the live check spends the user's quota, so it is off by default.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SkillHealthSettings {
+    /// Run skill-reach against a real CLI. Harness only builds the command; the user starts it.
+    pub live_check: bool,
+    /// skill-reach binary, resolved on `PATH` unless this is an absolute path.
+    pub binary: String,
+}
+
+impl Default for SkillHealthSettings {
+    fn default() -> Self {
+        Self {
+            live_check: false,
+            binary: "reach".into(),
+        }
+    }
 }
 
 impl Default for Settings {
@@ -44,6 +83,9 @@ impl Default for Settings {
             setup: SetupSettings::default(),
             remote: RemoteSettings::default(),
             orchestra: OrchestraSettings::default(),
+            security: SecuritySettings::default(),
+            research: ResearchSettings::default(),
+            skill_health: SkillHealthSettings::default(),
         }
     }
 }
@@ -59,7 +101,8 @@ impl Settings {
         let t = &mut self.general.terminal;
         t.font_size = t.font_size.clamp(8, 32);
         self.general.auto_archive_days = self.general.auto_archive_days.clamp(1, 3650);
-        self.orchestra.max_concurrent = self.orchestra.max_concurrent.clamp(1, 8);
+        self.orchestra.max_concurrent = self.orchestra.max_concurrent.max(1);
+        self.orchestra.max_nested_per_subagent = self.orchestra.max_nested_per_subagent.max(1);
         self.orchestra.canvas_zoom = self.orchestra.canvas_zoom.clamp(40, 200);
         // A privileged or zero port cannot be bound by an unprivileged process: fall back to the default.
         if self.remote.port < 1024 {
@@ -219,6 +262,7 @@ pub struct ProxySettings {
 /// Appearance page.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
+#[allow(clippy::struct_excessive_bools)]
 pub struct AppearanceSettings {
     pub theme: ThemePref,
     /// "jakarta" | "inter" | "system".
@@ -401,8 +445,12 @@ impl Default for RemoteSettings {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct OrchestraSettings {
-    /// Parallel subagents (1..=8); extra delegations wait in the queue.
+    /// Direct subagents running at once under one top-level chat (at least 1, no upper limit).
     pub max_concurrent: u16,
+    /// Subagents may start subagents of their own.
+    pub nested_subagents: bool,
+    /// Subagents one subagent may run at once under itself, its own quota apart from `max_concurrent` (at least 1).
+    pub max_nested_per_subagent: u16,
     /// Agent id used when a task does not name one (empty = first connected agent).
     pub default_agent: String,
     /// Permission mode subagents start in: "ask" | "acceptEdits" | "machine".
@@ -420,6 +468,8 @@ impl Default for OrchestraSettings {
     fn default() -> Self {
         Self {
             max_concurrent: 4,
+            nested_subagents: false,
+            max_nested_per_subagent: 4,
             default_agent: String::new(),
             default_mode: "acceptEdits".into(),
             auto_claim: true,
@@ -430,6 +480,36 @@ impl Default for OrchestraSettings {
     }
 }
 
+/// Commit gate for the dependency audit (security-panel.md §4).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CommitGate {
+    #[default]
+    Off,
+    Warn,
+    Block,
+}
+
+/// Security page (security-panel.md §5): dependency audit and file checks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct SecuritySettings {
+    pub commit_gate: CommitGate,
+    pub scan_on_lockfile_change: bool,
+    pub offline_scan: bool,
+    pub show_diff_badge: bool,
+}
+
+impl Default for SecuritySettings {
+    fn default() -> Self {
+        Self {
+            commit_gate: CommitGate::Off,
+            scan_on_lockfile_change: false,
+            offline_scan: false,
+            show_diff_badge: true,
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -444,6 +524,8 @@ mod tests {
         assert!(s.general.show_reasoning);
         assert_eq!(s.general.language, Language::System);
         assert_eq!(s.schema_version, SCHEMA_VERSION);
+        // 旧 settings.json 没有 skillHealth：缺省关闭，不改变既有的检查行为（skill-health.md §State owner）。
+        assert!(!s.skill_health.live_check);
         Ok(())
     }
 
@@ -471,6 +553,25 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn security_defaults_and_round_trip() -> Result<(), serde_json::Error> {
+        let s: Settings = serde_json::from_str("{}")?;
+        assert_eq!(s.security, SecuritySettings::default());
+        assert_eq!(s.security.commit_gate, CommitGate::Off);
+        assert!(!s.security.scan_on_lockfile_change);
+        assert!(s.security.show_diff_badge);
+
+        let s: Settings =
+            serde_json::from_str(r#"{"security":{"commitGate":"block","offlineScan":true}}"#)?;
+        assert_eq!(s.security.commit_gate, CommitGate::Block);
+        assert!(s.security.offline_scan);
+        let json = serde_json::to_value(&s)?;
+        assert_eq!(json["security"]["commitGate"], "block");
+        assert_eq!(json["security"]["showDiffBadge"], true);
+
+        assert!(serde_json::from_str::<Settings>(r#"{"security":{"commitGate":"nope"}}"#).is_err());
+        Ok(())
+    }
     #[test]
     fn remote_defaults_and_round_trip() -> Result<(), serde_json::Error> {
         // Missing `remote` in an old file: defaults, no auto-start.

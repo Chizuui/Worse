@@ -1,0 +1,240 @@
+// Performance page — records a short Perfetto trace of the shell (frame timing, agent bridge traffic, token
+// rate) so a slow interaction can be inspected at ui.perfetto.dev instead of guessed at.
+import { Theme } from "../theme/tokens.slint";
+import { Icon, Icons } from "../components/controls.slint";
+import { PageHeader, StatusLine, SetButton, SegmentedControl, CapsLabel, Pill } from "parts.slint";
+
+export global PerformanceUi {
+    in-out property <bool> recording;
+    in-out property <string> duration: "20";
+    in property <int> slices;
+    in property <string> elapsed;
+    in property <string> last-path;
+    in property <bool> truncated;
+    in property <string> status;
+    in property <bool> status-error;
+    callback toggle();
+    callback set-duration(string);
+    callback reveal();
+    callback open-perfetto();
+}
+
+component Rule inherits Rectangle {
+    height: 1px;
+    background: Theme.border;
+    accessible-role: none;
+}
+
+component TableHead inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> sub;
+    height: 44px;
+    padding-left: 16px;
+    padding-right: 16px;
+    spacing: 10px;
+    VerticalLayout {
+        alignment: center;
+        spacing: 2px;
+        horizontal-stretch: 1;
+        Text {
+            text: root.title;
+            font-size: 13px;
+            font-weight: Theme.weight-semibold;
+            color: Theme.foreground;
+        }
+        Text {
+            text: root.sub;
+            font-size: 11px;
+            color: Theme.icon-subtlest;
+        }
+    }
+    @children
+}
+
+component TrackRow inherits HorizontalLayout {
+    in property <string> name;
+    in property <string> detail;
+    in property <string> kind;
+    height: 32px;
+    padding-left: 16px;
+    padding-right: 16px;
+    spacing: 12px;
+    Text {
+        text: root.name;
+        font-size: 12px;
+        font-family: Theme.mono-font;
+        color: Theme.foreground;
+        width: 210px;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    Text {
+        text: root.detail;
+        font-size: 12px;
+        color: Theme.foreground-subtle;
+        horizontal-stretch: 1;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    Text {
+        text: root.kind;
+        font-size: 11px;
+        color: Theme.icon-subtlest;
+        vertical-alignment: center;
+        horizontal-alignment: right;
+    }
+}
+
+export component PerformancePage inherits VerticalLayout {
+    in property <bool> stacked;
+    spacing: 20px;
+
+    PageHeader {
+        title: @tr("Performance");
+        description: @tr("Records a short trace of what Harness is doing, then open it in ui.perfetto.dev to see where the time went.");
+    }
+
+    Rectangle {
+        background: Theme.card;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Theme.card-border;
+        VerticalLayout {
+            padding: 1px;
+            TableHead {
+                title: @tr("Record a trace");
+                sub: @tr("Saved to the traces folder of your data directory");
+                if PerformanceUi.recording: VerticalLayout {
+                    alignment: center;
+                    Pill {
+                        height: 16px;
+                        text: @tr("Recording");
+                        tint: Theme.destructive;
+                    }
+                }
+            }
+            Rule { }
+            VerticalLayout {
+                padding-top: 14px;
+                padding-left: 16px;
+                padding-right: 16px;
+                padding-bottom: 16px;
+                spacing: 12px;
+                HorizontalLayout {
+                    spacing: 10px;
+                    SegmentedControl {
+                        label: @tr("Duration");
+                        current: PerformanceUi.duration;
+                        options: [
+                            { id: "10", label: @tr("10 s") },
+                            { id: "20", label: @tr("20 s") },
+                            { id: "30", label: @tr("30 s") },
+                        ];
+                        select(id) => {
+                            PerformanceUi.set-duration(id);
+                        }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        SetButton {
+                            text: PerformanceUi.recording ? @tr("Stop and save") : @tr("Record");
+                            variant: PerformanceUi.recording ? "destructive" : "primary";
+                            clicked => {
+                                PerformanceUi.toggle();
+                            }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: PerformanceUi.recording ? PerformanceUi.elapsed : @tr("{0} slices captured", PerformanceUi.slices);
+                        font-size: 11px;
+                        color: Theme.muted;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                    if PerformanceUi.last-path != "": SetButton {
+                        text: @tr("Open in Perfetto");
+                        variant: "secondary";
+                        clicked => {
+                            PerformanceUi.open-perfetto();
+                        }
+                    }
+                    if PerformanceUi.last-path != "": SetButton {
+                        text: @tr("Show in folder");
+                        variant: "ghost";
+                        clicked => {
+                            PerformanceUi.reveal();
+                        }
+                    }
+                }
+                if PerformanceUi.last-path != "": Text {
+                    text: PerformanceUi.last-path;
+                    font-size: 11px;
+                    font-family: Theme.mono-font;
+                    color: Theme.foreground-subtle;
+                    wrap: word-wrap;
+                    overflow: elide;
+                }
+                if PerformanceUi.truncated: StatusLine {
+                    text: @tr("The buffer filled up: the trace only covers the start of the recording.");
+                    error: true;
+                }
+                StatusLine {
+                    text: PerformanceUi.status;
+                    error: PerformanceUi.status-error;
+                }
+                Text {
+                    text: @tr("Then drag the file onto ui.perfetto.dev. Nothing leaves this machine.");
+                    font-size: 11px;
+                    color: Theme.icon-subtlest;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        background: Theme.card;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Theme.card-border;
+        VerticalLayout {
+            padding: 1px;
+            TableHead {
+                title: @tr("What is captured");
+                sub: @tr("Tracks in the trace");
+            }
+            Rule { }
+            VerticalLayout {
+                padding-top: 8px;
+                padding-bottom: 8px;
+                spacing: 0px;
+                TrackRow {
+                    name: @tr("frame");
+                    detail: @tr("How long each UI frame took to render");
+                    kind: @tr("slice");
+                }
+                TrackRow {
+                    name: @tr("frame_time");
+                    detail: @tr("Frame duration as a counter");
+                    kind: @tr("counter");
+                }
+                TrackRow {
+                    name: @tr("tokens_per_second");
+                    detail: @tr("Agent output rate while streaming");
+                    kind: @tr("counter");
+                }
+                TrackRow {
+                    name: @tr("bridge_send / bridge_recv");
+                    detail: @tr("Messages between the app and the agent process");
+                    kind: @tr("slice");
+                }
+            }
+        }
+    }
+}

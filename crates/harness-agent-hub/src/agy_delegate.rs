@@ -67,7 +67,7 @@ pub(crate) fn agy_role(ctx: &HubCtx, agent: &AgentId, session: &SessionId) -> Op
     }
     Some(if ctx.routers.is_router(session) {
         Role::Router
-    } else if ctx.subagents.is_child(session) {
+    } else if ctx.subagents.is_child(session) && !ctx.config.delegation.nested() {
         Role::Child
     } else {
         Role::Parent

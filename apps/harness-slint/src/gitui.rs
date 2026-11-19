@@ -22,7 +22,7 @@ use harness_core_api::workspace::{
     CommitResult, GitBranches, GitLogPage, GitLogRow, PushProgress, PushResult, SwitchOutcome,
 };
 use harness_core_api::ApiError;
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel, Weak};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
 
 use crate::panels::{git, GitCall, GitReply};
 use crate::ui::{AppWindow, BranchRow, ChatUi, GitUi, GraphRow, PanelGit};
@@ -237,6 +237,15 @@ fn commit(w: &AppWindow, push_after: bool) {
     }
     let ui = w.global::<GitUi>();
     let include_unstaged = ui.get_include_unstaged();
+    let changed = commit_paths(w, include_unstaged);
+    let gate = crate::security::verdict(&changed);
+    if matches!(gate, crate::security::gate::Verdict::Block(_)) {
+        let text = gate.notice().unwrap_or_default();
+        return fail(w, &ApiError::Conflict(text));
+    }
+    // `warn` and `skipped` both commit, and both say why in the result line.
+    let warned = gate.notice();
+    w.global::<PanelGit>().set_notice(SharedString::new());
     ui.set_busy(true);
     set_result(&ui, "", "", "");
     ask(
@@ -254,11 +263,28 @@ fn commit(w: &AppWindow, push_after: bool) {
             let short: String = r.hash.chars().take(7).collect();
             open(w, if push_after { "push" } else { "" });
             set_result(&w.global::<GitUi>(), "committed", &short, &r.summary);
+            if let Some(text) = &warned {
+                w.global::<PanelGit>().set_notice(sv(text));
+            }
             if push_after {
                 push(w);
             }
         },
     );
+}
+
+/// Paths the commit covers: the staged rows, plus the unstaged ones when `include_unstaged` is on.
+fn commit_paths(w: &AppWindow, include_unstaged: bool) -> Vec<String> {
+    let git = w.global::<PanelGit>();
+    let mut paths: Vec<String> = git
+        .get_staged()
+        .iter()
+        .map(|row| row.path.to_string())
+        .collect();
+    if include_unstaged {
+        paths.extend(git.get_unstaged().iter().map(|row| row.path.to_string()));
+    }
+    paths
 }
 
 fn push(w: &AppWindow) {

@@ -216,7 +216,11 @@ async fn start_listed(spec: &Value) -> Result<(Server, Vec<Value>), String> {
 
 /// The first sentence of a tool description, for the `mcp_load_tools` result.
 fn first_sentence(text: &str) -> String {
-    let line = text.lines().find(|l| !l.trim().is_empty()).unwrap_or("").trim();
+    let line = text
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or("")
+        .trim();
     let end = line.find(". ").map_or(line.len(), |i| i + 1);
     line[..end].chars().take(160).collect()
 }
@@ -424,7 +428,11 @@ impl McpSet {
                 names.join("\n")
             ));
         }
-        let max = if words.is_empty() { LOAD_ALL_MAX } else { LOAD_MAX };
+        let max = if words.is_empty() {
+            LOAD_ALL_MAX
+        } else {
+            LOAD_MAX
+        };
         let picked: Vec<(String, String)> = rank(tools, &words, max)
             .into_iter()
             .map(|t| (t.function.clone(), first_sentence(&t.description)))
@@ -514,7 +522,10 @@ mod tests {
     fn rank_prefers_more_matching_words() {
         let tools = [
             tool("mcp__d__application-deploy", "Deploy an application"),
-            tool("mcp__d__application-readLogs", "Read deploy logs of an application"),
+            tool(
+                "mcp__d__application-readLogs",
+                "Read deploy logs of an application",
+            ),
             tool("mcp__d__backup-create", "Create a backup"),
         ];
         let picked = rank(&tools, &["deploy", "logs"], 15);
@@ -525,7 +536,10 @@ mod tests {
 
     #[test]
     fn deferred_servers_get_the_load_tool() {
-        let set = McpSet::new(&[json!({"name": "harness-memory"}), json!({"name": "dokploy-mcp"})]);
+        let set = McpSet::new(&[
+            json!({"name": "harness-memory"}),
+            json!({"name": "dokploy-mcp"}),
+        ]);
         assert_eq!(set.deferred(), vec!["dokploy-mcp"]);
         assert!(McpSet::handles(LOAD_TOOL));
         assert!(McpSet::handles("mcp__dokploy-mcp__x"));

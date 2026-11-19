@@ -1,4 +1,4 @@
-﻿// General + Appearance pages — design frames "S1 · General" and "S2 · Appearance" (FigCraft), 1:1.
+// General + Appearance pages — design frames "S1 · General" and "S2 · Appearance" (FigCraft), 1:1.
 // Designed cards come first in design order; settings the design does not show (terminal, network, conversation,
 // archive, storage, window & code) follow under "ADVANCED" so no feature is lost.
 import { Theme } from "../theme/tokens.slint";
@@ -254,6 +254,17 @@ export component GeneralPage inherits VerticalLayout {
             key: "general.groupFileChanges";
             title: @tr("Group file changes");
             description: @tr("Collapse consecutive edits into one row.");
+        }
+    }
+    Group {
+        title: @tr("Research");
+        note: @tr("Deep research reports");
+        BoolRow {
+            first: true;
+            stacked: root.stacked;
+            key: "research.factCheck";
+            title: @tr("Fact-check reports");
+            description: @tr("Check every claim in a deep research report against its sources and flag the unsupported ones.");
         }
     }
     Group {

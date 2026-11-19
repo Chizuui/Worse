@@ -208,6 +208,7 @@ fn view(c: &Connection, row: Row) -> Result<CardView, HubError> {
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn link_card(
     c: &Connection,
     workspace_key: &str,

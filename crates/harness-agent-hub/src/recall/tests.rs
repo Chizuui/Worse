@@ -1,3 +1,4 @@
+#![allow(clippy::useless_vec, clippy::assert_is_empty)]
 use super::*;
 
 fn store() -> (Store, PathBuf) {

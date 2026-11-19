@@ -15,6 +15,9 @@ import { OrchestraPage } from "orchestra.slint";
 import { InboxPage, SourceDialog, InboxUi } from "inbox.slint";
 import { ImportPage } from "import.slint";
 import { RemotePage } from "remote.slint";
+import { SecurityPage } from "security.slint";
+import { PerformancePage, PerformanceUi } from "performance.slint";
+export { PerformanceUi }
 
 export { FallbackRow }
 
@@ -30,6 +33,7 @@ global NavIcons {
         if id == "orchestra" { return Icons.network; }
         if id == "inbox" { return Icons.inbox; }
         if id == "remote" { return Icons.monitor; }
+        if id == "security" { return Icons.shield-check; }
         if id == "shortcuts" { return Icons.keyboard; }
         if id == "instructions" { return Icons.file-text; }
         if id == "memory" { return Icons.brain; }
@@ -41,6 +45,7 @@ global NavIcons {
         if id == "projects" { return Icons.folders; }
         if id == "archive" { return Icons.archive; }
         if id == "import" { return Icons.download; }
+        if id == "performance" { return Icons.clock; }
         Icons.settings-2
     }
 }
@@ -385,6 +390,11 @@ export component SettingsShell inherits Rectangle {
                 width: parent.width - (root.narrow ? 0px : 6px);
                 height: parent.height - 44px - (root.narrow ? 0px : 6px);
                 content-width: self.visible-width;
+                scrolled => {
+                    if ConfigUi.hidden > 0 && -self.viewport-y + self.visible-height >= self.viewport-height - 600px {
+                        ConfigUi.show-more();
+                    }
+                }
                 VerticalLayout {
                     width: content-scroll.visible-width;
                     alignment: start;
@@ -450,6 +460,12 @@ export component SettingsShell inherits Rectangle {
                         }
                     }
                     if SettingsUi.page == "import": ImportPage {
+                        stacked: root.stacked;
+                    }
+                    if SettingsUi.page == "security": SecurityPage {
+                        stacked: root.stacked;
+                    }
+                    if SettingsUi.page == "performance": PerformancePage {
                         stacked: root.stacked;
                     }
                     if SettingsUi.page == "remote": RemotePage {

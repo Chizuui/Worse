@@ -1,3 +1,10 @@
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+
+use std::fmt::Write as _;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -92,7 +99,7 @@ pub fn run() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn point_schema(extra: Value) -> Value {
+fn point_schema(extra: &Value) -> Value {
     let mut properties = json!({
         "x": {"type": "number", "description": "X in pixels of the last screenshot"},
         "y": {"type": "number", "description": "Y in pixels of the last screenshot"}
@@ -110,12 +117,12 @@ fn tools() -> Value {
         {"name": "screenshot", "description": "Capture a monitor of this computer (primary by default). Coordinates of the other tools are pixels of the last screenshot.",
          "inputSchema": {"type": "object", "properties": {"monitor": {"type": "integer", "description": "Monitor index from the screenshot text"}}}},
         {"name": "click", "description": "Click at a point of the last screenshot.",
-         "inputSchema": point_schema(json!({"button": {"type": "string", "enum": ["left", "right", "middle"]}, "count": {"type": "integer", "description": "1 = click, 2 = double click"}}))},
-        {"name": "move", "description": "Move the mouse to a point of the last screenshot.", "inputSchema": point_schema(json!({}))},
+         "inputSchema": point_schema(&json!({"button": {"type": "string", "enum": ["left", "right", "middle"]}, "count": {"type": "integer", "description": "1 = click, 2 = double click"}}))},
+        {"name": "move", "description": "Move the mouse to a point of the last screenshot.", "inputSchema": point_schema(&json!({}))},
         {"name": "drag", "description": "Drag with the left button from (x, y) to (to_x, to_y).",
          "inputSchema": {"type": "object", "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "to_x": {"type": "number"}, "to_y": {"type": "number"}}, "required": ["x", "y", "to_x", "to_y"]}},
         {"name": "scroll", "description": "Scroll at a point; dy > 0 scrolls down, dx > 0 scrolls right (wheel notches).",
-         "inputSchema": point_schema(json!({"dx": {"type": "integer"}, "dy": {"type": "integer"}}))},
+         "inputSchema": point_schema(&json!({"dx": {"type": "integer"}, "dy": {"type": "integer"}}))},
         {"name": "type", "description": "Type text into the focused control.",
          "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}},
         {"name": "key", "description": "Press keys, e.g. \"enter\", \"ctrl+c\", \"alt+tab\", \"ctrl+shift+t\". Several combos may be separated by spaces.",
@@ -379,7 +386,8 @@ impl Server {
             scale
         );
         for (i, m) in monitors.iter().enumerate() {
-            info.push_str(&format!(
+            let _ = write!(
+                info,
                 "\n{i}: {} {}x{} at {},{}{}",
                 m.name().unwrap_or_default(),
                 m.width().unwrap_or_default(),
@@ -391,7 +399,7 @@ impl Server {
                 } else {
                     ""
                 }
-            ));
+            );
         }
         Ok(json!({"content": [
             {"type": "image", "data": base64(&png), "mimeType": "image/png"},
@@ -659,6 +667,7 @@ fn base64(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
 
     #[test]

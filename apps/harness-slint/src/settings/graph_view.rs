@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use harness_graph_view::{Engine, Graph, Overlay, Palette, Style};
 use slint::{ComponentHandle, Image, Model, ModelRc, Rgba8Pixel, SharedPixelBuffer, VecModel};
@@ -22,6 +22,7 @@ use crate::ui::{AppWindow, GraphHit, GraphLabel, GraphUi, Theme};
 
 /// Nodes listed at most: search results, and a chosen node's neighbours.
 const LIST: usize = 60;
+const FRAME_BUDGET: Duration = Duration::from_millis(16);
 
 enum Cmd {
     Graph(Option<Arc<Graph>>),
@@ -287,6 +288,22 @@ pub fn install(window: &AppWindow, home: &Path, workspace: &Path) {
     });
 }
 
+pub fn set_workspace(window: &AppWindow, workspace: &Path) {
+    window.global::<GraphUi>().set_view_title(
+        workspace
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default()
+            .into(),
+    );
+    VIEW.with(|cell| {
+        if let Some(view) = cell.borrow_mut().as_mut() {
+            view.workspace = workspace.to_path_buf();
+        }
+    });
+    show(window, None);
+}
+
 /// Shows `graph` (or clears the picture); on the UI thread.
 pub fn show(window: &AppWindow, graph: Option<Arc<Graph>>) {
     let ui = window.global::<GraphUi>();
@@ -436,7 +453,10 @@ fn work(inbox: &Receiver<Cmd>, window: &slint::Weak<AppWindow>) {
         for cmd in std::iter::once(first).chain(inbox.try_iter()) {
             match cmd {
                 Cmd::Tick => tick = true,
-                Cmd::Shown => waiting = false,
+                Cmd::Shown => {
+                    waiting = false;
+                    tick = true;
+                }
                 Cmd::Graph(graph) => {
                     engine = graph.map(|graph| {
                         let mut engine = Engine::new(graph, style);
@@ -546,6 +566,9 @@ fn work(inbox: &Receiver<Cmd>, window: &slint::Weak<AppWindow>) {
         if width == 0 || height == 0 {
             continue;
         }
+        if let Some(rest) = FRAME_BUDGET.checked_sub(last.elapsed()) {
+            std::thread::sleep(rest);
+        }
         let now = Instant::now();
         let passed = now.duration_since(last).as_secs_f32();
         last = now;
@@ -581,6 +604,7 @@ fn work(inbox: &Receiver<Cmd>, window: &slint::Weak<AppWindow>) {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

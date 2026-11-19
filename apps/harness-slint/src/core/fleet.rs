@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use harness_core_api::{self as api, EventKind, HubEvent};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct FleetSession {
     pub id: String,
     pub title: String,
@@ -29,6 +29,8 @@ pub(super) struct Fleet {
     children: HashMap<String, String>,
     order: Vec<String>,
     open: Option<String>,
+    shown: Option<Vec<FleetSession>>,
+    tool_meta: HashMap<String, (Option<String>, Vec<api::ToolLocation>)>,
 }
 
 impl Fleet {
@@ -118,7 +120,80 @@ impl Fleet {
         }
     }
 
-    pub(super) fn snapshot(&self) -> Vec<FleetSession> {
+    /// A file tool call of a subagent under the open session `open`, as an event for the Live tab. Tool updates
+    /// often omit the kind or locations, so the last ones seen per tool call fill them in.
+    pub(super) fn subagent_tool(&mut self, open: &str, event: &HubEvent) -> Option<super::Event> {
+        let session = event.session_id.as_ref()?.0.as_str();
+        let (EventKind::ToolCall { tool, .. } | EventKind::ToolCallUpdated { tool, .. }) =
+            &event.kind
+        else {
+            return None;
+        };
+        let root = self.root_of(session)?;
+        if root != open {
+            return None;
+        }
+        if self.tool_meta.len() > 512 {
+            self.tool_meta.clear();
+        }
+        let meta = self.tool_meta.entry(tool.tool_call_id.clone()).or_default();
+        if tool.kind.is_some() {
+            meta.0.clone_from(&tool.kind);
+        }
+        if !tool.locations.is_empty() {
+            meta.1.clone_from(&tool.locations);
+        }
+        let (kind, locations) = meta.clone();
+        let has_diff = tool
+            .content
+            .iter()
+            .any(|c| matches!(c, api::ToolContent::Diff { .. }));
+        if locations.is_empty() && !has_diff {
+            return None;
+        }
+        Some(super::Event::SubagentTool {
+            root,
+            title: self.subagent_title(session),
+            kind,
+            content: tool.content.clone(),
+            locations,
+        })
+    }
+
+    /// Top-level session `id` belongs to, when `id` is a subagent.
+    pub(super) fn root_of(&self, id: &str) -> Option<String> {
+        let mut current = self.children.get(id)?;
+        for _ in 0..64 {
+            match self.children.get(current) {
+                Some(parent) => current = parent,
+                None => break,
+            }
+        }
+        Some(current.clone())
+    }
+
+    /// Title of a subagent session: its task title, else the session title.
+    pub(super) fn subagent_title(&self, id: &str) -> String {
+        let parent = self.children.get(id).and_then(|p| self.entries.get(p));
+        parent
+            .and_then(|e| e.subagents.iter().find(|s| s.session_id.0 == id))
+            .map(|s| s.title.clone())
+            .filter(|t| !t.is_empty())
+            .or_else(|| self.titles.get(id).cloned())
+            .unwrap_or_default()
+    }
+
+    /// The snapshot when it differs from the last one returned here (`None` = nothing to send).
+    pub(super) fn changed(&mut self) -> Option<Vec<FleetSession>> {
+        let next = self.snapshot();
+        if self.shown.as_ref() == Some(&next) {
+            return None;
+        }
+        self.shown = Some(next.clone());
+        Some(next)
+    }
+
+    fn snapshot(&self) -> Vec<FleetSession> {
         let open = self.open.as_deref();
         self.order
             .iter()

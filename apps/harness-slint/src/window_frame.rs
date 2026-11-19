@@ -107,7 +107,7 @@ fn set_dark(window: &AppWindow, dark: bool) {
             slint::TimerMode::Repeated,
             std::time::Duration::from_millis(50),
             move || {
-                let done = weak.upgrade().is_none_or(|w| apply(w.window()));
+                let done = weak.upgrade().map_or(true, |w| apply(w.window()));
                 if done {
                     RETRY.with(slint::Timer::stop);
                 }

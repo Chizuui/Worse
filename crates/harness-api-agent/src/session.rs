@@ -202,7 +202,11 @@ fn system_prompt(agent: &Agent, session: &Session, instructions: &str) -> String
 
 /// The request messages: the system prompt, then the history. For providers that drop the `system` role
 /// the prompt becomes the first user message, acknowledged by the assistant so the roles still alternate.
-pub(crate) fn request_messages(system: &str, history: &[Value], system_as_user: bool) -> Vec<Value> {
+pub(crate) fn request_messages(
+    system: &str,
+    history: &[Value],
+    system_as_user: bool,
+) -> Vec<Value> {
     let mut messages = Vec::with_capacity(history.len() + 2);
     if system_as_user {
         messages.push(json!({"role": "user", "content": format!(
@@ -228,7 +232,10 @@ pub fn prompt_content(prompt: Option<&Value>) -> Value {
         .filter(|b| b.get("type").and_then(Value::as_str) == Some("image"))
         .filter_map(|b| {
             let data = b.get("data").and_then(Value::as_str)?;
-            let mime = b.get("mimeType").and_then(Value::as_str).unwrap_or("image/png");
+            let mime = b
+                .get("mimeType")
+                .and_then(Value::as_str)
+                .unwrap_or("image/png");
             Some(llm::image_part(mime, data))
         })
         .collect();
@@ -244,6 +251,7 @@ pub fn prompt_content(prompt: Option<&Value>) -> Value {
 }
 
 /// One prompt turn: model call → tools → model call … until the model answers without tools.
+#[allow(clippy::too_many_lines)]
 pub async fn run_turn(
     agent: &Agent,
     id: &str,
@@ -312,7 +320,9 @@ pub async fn run_turn(
                     .messages
                     .push(json!({"role": "assistant", "content": completion.content}));
             }
-            session.messages.push(json!({"role": "user", "content": CUT_OFF_NOTE}));
+            session
+                .messages
+                .push(json!({"role": "user", "content": CUT_OFF_NOTE}));
             continue;
         }
         if !completion.cancelled
@@ -323,7 +333,10 @@ pub async fn run_turn(
             empty_answers += 1;
             if empty_answers > EMPTY_RETRIES {
                 return Err(llm::transient(
-                    &format!("{}: the model returned an empty response", agent.provider.label),
+                    &format!(
+                        "{}: the model returned an empty response",
+                        agent.provider.label
+                    ),
                     None,
                 ));
             }
@@ -350,7 +363,9 @@ pub async fn run_turn(
             return Ok(json!({"stopReason": "cancelled"}));
         }
         if completion.tool_calls.is_empty() {
-            return Ok(json!({"stopReason": "end_turn", "usage": usage(input_tokens, output_tokens, cached_read, cached_write)}));
+            return Ok(
+                json!({"stopReason": "end_turn", "usage": usage(input_tokens, output_tokens, cached_read, cached_write)}),
+            );
         }
         let cwd = PathBuf::from(&session.cwd);
         let mode = session.mode.clone();
@@ -391,7 +406,9 @@ pub async fn run_turn(
         if !images.is_empty() {
             let mut parts = vec![json!({"type": "text", "text": "Images returned by read_file:"})];
             parts.extend(images);
-            session.messages.push(json!({"role": "user", "content": parts}));
+            session
+                .messages
+                .push(json!({"role": "user", "content": parts}));
             llm::prune_images(&mut session.messages, KEEP_IMAGES);
         }
         if token.is_cancelled() {
@@ -430,7 +447,9 @@ mod request_messages_tests {
         let m = request_messages("be brief", &history, true);
         assert_eq!(m.len(), 3);
         assert_eq!(m[0]["role"], "user");
-        assert!(m[0]["content"].as_str().is_some_and(|c| c.contains("be brief")));
+        assert!(m[0]["content"]
+            .as_str()
+            .is_some_and(|c| c.contains("be brief")));
         assert_eq!(m[1], json!({"role": "assistant", "content": "Understood."}));
         assert_eq!(m[2]["content"], "hi");
         assert!(m.iter().all(|x| x["role"] != "system"));

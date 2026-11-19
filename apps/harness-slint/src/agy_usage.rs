@@ -28,7 +28,9 @@ pub(crate) struct AgySlot {
 type RawBar = (String, f32, Option<i64>);
 
 /// Last successful quota per account id: (plan, bars, fetched at). Only numbers, no tokens.
-static LAST: Mutex<Option<HashMap<String, (String, Vec<RawBar>, i64)>>> = Mutex::new(None);
+type Snapshot = (String, Vec<RawBar>, i64);
+
+static LAST: Mutex<Option<HashMap<String, Snapshot>>> = Mutex::new(None);
 
 fn user_agent() -> String {
     let os = match std::env::consts::OS {
@@ -156,22 +158,20 @@ async fn fetch_one(client: &reqwest::Client, target: &str, id: &str, label: &str
                 .lock()
                 .ok()
                 .and_then(|last| last.as_ref()?.get(id).cloned());
-            match cached {
-                Some((plan, bars, at)) => shown(id, label, plan, &bars, Some(at)),
-                None => {
-                    let mut out = row(id, label, &error);
-                    if error.starts_with("Login expired") && target != AGY_LIVE_TARGET {
-                        out.error =
-                            "Login expired; switch to this account once to refresh it".into();
-                    }
-                    out
+            if let Some((plan, bars, at)) = cached {
+                shown(id, label, plan, &bars, Some(at))
+            } else {
+                let mut out = row(id, label, &error);
+                if error.starts_with("Login expired") && target != AGY_LIVE_TARGET {
+                    out.error = "Login expired; switch to this account once to refresh it".into();
                 }
+                out
             }
         }
     }
 }
 
-/// Display row; s_of marks numbers remembered from an earlier check. A passed reset reads as unused.
+/// Display row; `s_of` marks numbers remembered from an earlier check. A passed reset reads as unused.
 fn shown(id: &str, label: &str, plan: String, bars: &[RawBar], as_of: Option<i64>) -> Fetched {
     let now = now_secs();
     let mut out = row(id, label, "");
@@ -310,7 +310,7 @@ fn group(models: &Value) -> [Option<(f32, Option<i64>)>; 3] {
             continue;
         };
         let reset = quota["resetTime"].as_str().and_then(parse_rfc3339);
-        if worst[slot].is_none_or(|(r, _)| remaining < r) {
+        if worst[slot].map_or(true, |(r, _)| remaining < r) {
             worst[slot] = Some((remaining, reset));
         }
     }
@@ -372,7 +372,7 @@ mod tests {
             &bars,
             Some(now - 1500),
         );
-        assert!(row.error.is_empty());
+        assert_eq!(row.error, "");
         assert_eq!(row.bars[1].1, 0.0);
         assert!(row.bars[0].2.starts_with("Resets in"));
         assert!(row.summary.ends_with("(as of 25m ago)"));

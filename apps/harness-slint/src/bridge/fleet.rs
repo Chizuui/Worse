@@ -1,4 +1,6 @@
-use slint::{ComponentHandle, ModelRc, VecModel};
+use std::rc::Rc;
+
+use slint::{ComponentHandle, Model, ModelRc, VecModel};
 
 use harness_core_api::SubagentStatus;
 
@@ -16,8 +18,44 @@ fn int(n: usize) -> i32 {
     i32::try_from(n).unwrap_or(i32::MAX)
 }
 
+/// Orchestra models kept across `Event::Fleet` updates, so a subagent's new activity line changes one card
+/// instead of rebuilding every group and card on the canvas.
+#[derive(Default)]
+pub(super) struct FleetView {
+    groups: Option<Rc<VecModel<FleetGroup>>>,
+    subagents: Vec<Rc<VecModel<SubagentRow>>>,
+}
+
+fn same_group(a: &FleetGroup, b: &FleetGroup) -> bool {
+    a.id == b.id
+        && a.title == b.title
+        && a.prompt == b.prompt
+        && a.agent == b.agent
+        && a.agent_name == b.agent_name
+        && a.running == b.running
+        && a.open == b.open
+        && a.y == b.y
+        && a.height == b.height
+        && a.total == b.total
+        && a.active == b.active
+}
+
+fn sync_rows<T: Clone + PartialEq + 'static>(model: &VecModel<T>, rows: Vec<T>) {
+    let count = rows.len();
+    for (index, row) in rows.into_iter().enumerate() {
+        match model.row_data(index) {
+            Some(old) if old == row => {}
+            Some(_) => model.set_row_data(index, row),
+            None => model.push(row),
+        }
+    }
+    while model.row_count() > count {
+        model.remove(model.row_count() - 1);
+    }
+}
+
 impl UiState {
-    pub(super) fn fleet(&self, list: &[FleetSession]) {
+    pub(super) fn fleet(&mut self, list: &[FleetSession]) {
         let ui = self.window.global::<ChatUi>();
         ui.set_now_s(now_s());
         let mut y = 0;
@@ -25,6 +63,7 @@ impl UiState {
         let mut waiting = 0;
         let mut sessions = 0;
         let mut groups = Vec::with_capacity(list.len());
+        let mut rows = Vec::with_capacity(list.len());
         for s in list {
             let active: Vec<SubagentRow> = s
                 .subagents
@@ -58,14 +97,47 @@ impl UiState {
                 height,
                 total: int(s.subagents.len()),
                 active: n,
-                subagents: ModelRc::new(VecModel::from(active)),
+                subagents: ModelRc::default(),
             });
+            rows.push(active);
             y += height + GROUP_GAP;
         }
         ui.set_fleet_running(int(running));
         ui.set_fleet_waiting(int(waiting));
         ui.set_fleet_sessions(int(sessions));
         ui.set_fleet_height((y - GROUP_GAP).max(0));
-        ui.set_fleet(ModelRc::new(VecModel::from(groups)));
+        drop(ui);
+        self.show_fleet(groups, rows);
+    }
+
+    fn show_fleet(&mut self, groups: Vec<FleetGroup>, rows: Vec<Vec<SubagentRow>>) {
+        let ui = self.window.global::<ChatUi>();
+        let view = &mut self.fleet_view;
+        let model = if let Some(model) = &view.groups {
+            model.clone()
+        } else {
+            let model = Rc::new(VecModel::default());
+            ui.set_fleet(ModelRc::from(model.clone()));
+            view.groups = Some(model.clone());
+            model
+        };
+        let count = groups.len();
+        for (index, (mut group, active)) in groups.into_iter().zip(rows).enumerate() {
+            if view.subagents.len() <= index {
+                view.subagents.push(Rc::new(VecModel::default()));
+            }
+            let subs = view.subagents[index].clone();
+            sync_rows(&subs, active);
+            group.subagents = ModelRc::from(subs);
+            match model.row_data(index) {
+                Some(old) if same_group(&old, &group) => {}
+                Some(_) => model.set_row_data(index, group),
+                None => model.push(group),
+            }
+        }
+        while model.row_count() > count {
+            model.remove(model.row_count() - 1);
+        }
+        view.subagents.truncate(count);
     }
 }

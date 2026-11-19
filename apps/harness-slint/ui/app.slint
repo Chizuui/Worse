@@ -31,7 +31,7 @@ export { ScreenUi, ScreenAct }
 // Agent A's panel globals are reachable from Rust through this re-export.
 export * from "panels/globals.slint";
 import { SettingsShell, FallbackRow } from "settings/shell.slint";
-import { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow, RecallUi, RecallRow, GraphUi, DecisionUi } from "settings/globals.slint";
+import { SettingsUi, DiffUi, ConfigUi, SkillsUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, SkillRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow, RecallUi, RecallRow, GraphUi, DecisionUi } from "settings/globals.slint";
 import { SelectOption, ConfirmDialog } from "settings/parts.slint";
 import { Labels } from "settings/labels.slint";
 import { AgentLogo, AgentMark } from "components/agent_logo.slint";
@@ -41,7 +41,7 @@ import { OverviewPanel } from "panels/overview.slint";
 import { CommandCenter, ResultList } from "chat/palette.slint";
 import { WhiteboardUi, WhiteboardDialog, WbStroke } from "chat/whiteboard.slint";
 import { FindBar } from "chat/find.slint";
-import { DockUi, OptionRow, PickerBar, PickerMenu, FailureBanner } from "chat/dock.slint";
+import { DockUi, OptionRow, PickerBar, PickerMenu, FailureBanner, ResumeBanner } from "chat/dock.slint";
 import { GitUi, BranchRow, GraphRow, GitDialogs } from "panels/gitops.slint";
 import { PanelGit } from "panels/globals.slint";
 // §9.10 first-run setup dialog (src/setup.rs).
@@ -54,14 +54,18 @@ import { ImportUi, ImportRow } from "settings/import.slint";
 import { RemoteUi, RemoteDevice } from "settings/remote.slint";
 export { RemoteUi, RemoteDevice }
 export { ImportUi, ImportRow }
+import { SecurityUi, VulnRow } from "settings/globals.slint";
+import { PerformanceUi } from "settings/performance.slint";
 import { BoardUi, BoardPage, BoardCard, BoardColumn } from "board/board.slint";
 import { OrchLiveUi, OrchestraLive } from "orchestra/live.slint";
+export { SecurityUi, VulnRow }
+export { PerformanceUi }
 export { BoardUi, BoardCard, BoardColumn }
 export { OrchestraUi, OrchNode, OrchEdge, OrchLink, OrchAgent, OrchConn }
 export { InboxUi, InboxSourceRow, InboxTicketRow, InboxTriggerRow, InboxNotice }
 export { SetupUi, SetupRow }
 export { ChatUi, FleetGroup, PaletteRow, ChipRow, ToolPart, OutputRow, UsagePart, PlanLimit, PlanBar, ChangeRow, PlanRow, GroupRow, ScheduleRow, WhiteboardUi, WbStroke, DockUi, OptionRow, GitUi, BranchRow, GraphRow }
-export { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow, SelectOption, FallbackRow, Labels, RecallUi, RecallRow, GraphUi, DecisionUi }
+export { SettingsUi, DiffUi, ConfigUi, DocUi, ShortcutsUi, AgentsUi, AccountRow, AgyAccountRow, ProviderRow, ProjectsUi, ArchiveUi, NavEntry, DiffLine, ResRow, FormField, ShortcutRow, AgentCard, ProjectRow, ArchiveRow, SelectOption, FallbackRow, Labels, RecallUi, RecallRow, GraphUi, DecisionUi, SkillsUi, SkillRow }
 
 // Title bar drag handle: a plain press starts the move (Rust drags the window and still detects
 // double-clicks there). While the window is maximized the press only arms the drag — the native
@@ -162,6 +166,21 @@ export struct ChatItem {
     range: string,
     // Assistant message: generation speed of its turn ("41 tok/s · 85 tokens", or "≈ 38 tok/s" when estimated).
     speed: string,
+    group: int,
+    group-label: string,
+    group-open: bool,
+    group-state: int,
+    folded: bool,
+    continued: bool,
+    added: int,
+    removed: int,
+    group-added: int,
+    group-removed: int,
+    group-images: [ChatImage],
+    group-images-more: int,
+    member: bool,
+    turn-end: bool,
+    head: bool,
 }
 
 // header: on the first row of a section: "pinned", a timeline group id ("today", "yesterday", "week", "month",
@@ -627,10 +646,12 @@ component ChatRow inherits VerticalLayout {
     in property <bool> hit;
     // The session runs (turn actions that rewrite history are disabled; the hub would answer Busy).
     in property <bool> busy;
+    in property <bool> continued;
     callback link(string);
     // Tool and thinking rows are flat one-liners: they stack tight; messages keep their breathing room.
-    padding-top: root.item.kind == 2 || root.item.kind == 5 ? 1px : 8px;
-    padding-bottom: root.item.kind == 2 || root.item.kind == 5 ? 1px : 8px;
+    property <bool> hide: !root.hit && (root.item.folded || (root.item.group > 0 && !root.item.group-open));
+    padding-top: root.item.folded && !root.hit ? 0px : root.item.kind == 2 || root.item.kind == 5 ? 1px : root.continued ? 4px : 8px;
+    padding-bottom: root.item.folded && !root.hit ? 0px : root.item.kind == 2 || root.item.kind == 5 ? 1px : 8px;
     // User message: right-aligned bubble (`bg-user-bubble rounded-xl`), at most 80% of the column.
     if root.item.kind == 0: Rectangle {
         min-width: ul.min-width;
@@ -744,15 +765,15 @@ component ChatRow inherits VerticalLayout {
         ata := TouchArea {
             al := VerticalLayout {
                 spacing: 6px;
-                HorizontalLayout {
+                if !root.continued || root.item.status != 1: HorizontalLayout {
                     spacing: 8px;
                     alignment: start;
-                    height: 24px;
-                    AgentTile {
+                    height: root.continued ? 18px : 24px;
+                    if !root.continued: AgentTile {
                         y: (parent.height - self.height) / 2;
                         name: root.item.agent;
                     }
-                    Text {
+                    if !root.continued: Text {
                         text: root.item.agent;
                         font-size: Theme.ui-caption;
                         font-weight: Theme.weight-semibold;
@@ -832,7 +853,7 @@ component ChatRow inherits VerticalLayout {
                     dir: root.item.change-dir;
                     note: root.item.change-note;
                 }
-                if root.item.status != 0: HorizontalLayout {
+                if root.item.status != 0 && root.item.turn-end: HorizontalLayout {
                     alignment: start;
                     height: Theme.control-sm;
                     MessageAction {
@@ -883,8 +904,110 @@ component ChatRow inherits VerticalLayout {
             }
         }
     }
+    if (root.item.kind == 2 || root.item.kind == 5) && root.item.head: HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        height: 24px;
+        padding-top: 6px;
+        AgentTile {
+            y: (parent.height - self.height) / 2;
+            name: root.item.agent;
+        }
+        Text {
+            text: root.item.agent;
+            font-size: Theme.ui-caption;
+            font-weight: Theme.weight-semibold;
+            color: Theme.foreground;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
     // Tool call: ZCode's inline tool row (icon + title + status) that expands into its content (R8).
-    if root.item.kind == 2: ToolCard {
+    if root.item.group > 0: Rectangle {
+        height: 28px;
+        border-radius: Theme.radius-md;
+        background: gta.has-hover ? Theme.hover : Theme.hover.with-alpha(0);
+        accessible-role: AccessibleRole.button;
+        accessible-label: root.item.group-label;
+        accessible-description: root.item.group-open ? "expanded" : "collapsed";
+        accessible-action-default => {
+            ChatUi.toggle-group(root.item.id);
+        }
+        gta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                ChatUi.toggle-group(root.item.id);
+            }
+        }
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 8px;
+            spacing: 8px;
+            alignment: start;
+            Text {
+                text: root.item.group-label;
+                font-size: Theme.ui-caption;
+                color: gta.has-hover ? Theme.foreground : Theme.foreground-subtle;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+            if root.item.group-added > 0: Text {
+                text: "+" + root.item.group-added;
+                font-size: Theme.ui-caption;
+                color: Theme.success-surface-foreground;
+                vertical-alignment: center;
+            }
+            if root.item.group-removed > 0: Text {
+                text: "−" + root.item.group-removed;
+                font-size: Theme.ui-caption;
+                color: Theme.destructive-surface-foreground;
+                vertical-alignment: center;
+            }
+            Icon {
+                y: (parent.height - self.height) / 2;
+                source: root.item.group-open ? Icons.chevron-down : Icons.chevron-right;
+                size: Theme.icon-xs;
+                tint: gta.has-hover ? Theme.icon : Theme.icon-subtlest;
+            }
+            if root.item.group-state == 0: Spinner {
+                y: (parent.height - self.height) / 2;
+                size: 13px;
+            }
+            if root.item.group-state == 4: Icon {
+                y: (parent.height - self.height) / 2;
+                source: Icons.circle-alert;
+                size: 13px;
+                tint: Theme.destructive;
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+            if root.item.group-images-more > 0: Text {
+                text: "+" + root.item.group-images-more;
+                font-size: Theme.ui-sm;
+                color: Theme.foreground-subtle;
+                vertical-alignment: center;
+            }
+            for img in root.item.group-images: Rectangle {
+                y: (parent.height - self.height) / 2;
+                height: 18px;
+                width: max(12px, min(32px, 18px * img.image.width / max(1, img.image.height)));
+                border-radius: 3px;
+                border-width: 1px;
+                border-color: Theme.border;
+                clip: true;
+                Image {
+                    width: parent.width;
+                    height: parent.height;
+                    source: img.image;
+                    image-fit: cover;
+                    accessible-role: none;
+                }
+            }
+        }
+    }
+    if root.item.kind == 2 && !root.hide: ToolCard {
         id: root.item.id;
         title: root.item.title;
         status: root.item.status;
@@ -898,9 +1021,12 @@ component ChatRow inherits VerticalLayout {
         file: root.item.file;
         file-line: root.item.file-line;
         range: root.item.range;
+        added: root.item.added;
+        removed: root.item.removed;
+        member: root.item.member;
     }
     // Thinking (live agent thought): collapsed line, expands to the text.
-    if root.item.kind == 5: ThinkingRow {
+    if root.item.kind == 5 && !root.hide: ThinkingRow {
         id: root.item.id;
         text: root.item.text;
         preview: root.item.title;
@@ -3424,7 +3550,7 @@ export component AppWindow inherits Window {
     }
     // Busy clock: while a turn runs or Orchestra has live subagents / tasks (the tool spinner, the
     // "Thinking" line and the level bars all step on it, so they redraw together).
-    property <bool> busy-on-screen: !Theme.reduce-motion && ArtClock.visible && (root.running || ChatUi.subagents-running + ChatUi.background-tasks-running > 0);
+    property <bool> busy-on-screen: !Theme.reduce-motion && ArtClock.visible && (root.running || ChatUi.subagents-running + ChatUi.background-tasks-running + ChatUi.fleet-running > 0);
     busy-clock := Timer {
         interval: ArtClock.busy-period;
         running: root.busy-on-screen;
@@ -3454,6 +3580,19 @@ export component AppWindow inherits Window {
     in property <string> workspace-name;
     // User bubble max width (80% of the chat column), written from the panel's changed-width callback.
     property <length> bubble-max: 600px;
+
+    function open-memory-graph() {
+        if GraphUi.view-wide {
+            GraphUi.view-wide = false;
+            return;
+        }
+        BoardUi.open = false;
+        OrchLiveUi.open = false;
+        if !GraphUi.has-graph {
+            GraphUi.refresh();
+        }
+        GraphUi.view-wide = true;
+    }
 
     function do-send() {
         if root.draft != "" || ChatUi.chips.length > 0 {
@@ -3647,10 +3786,12 @@ export component AppWindow inherits Window {
         }
 
         MidnightBackdrop {
+            visible: !GraphUi.view-wide;
             width: parent.width;
             height: parent.height;
         }
         HorizontalLayout {
+            visible: !GraphUi.view-wide;
             // Liquid-glass redesign: sidebar, chat and side pane float as rounded glass cards over the backdrop.
             padding: Theme.frame-gap;
             spacing: Theme.frame-gap;
@@ -4019,6 +4160,32 @@ export component AppWindow inherits Window {
                             }
                         }
                     }
+                    if !root.narrow: Rectangle {
+                        y: (parent.height - self.height) / 2;
+                        height: 28px;
+                        width: memory-t.preferred-width + 20px;
+                        border-radius: Theme.radius-md;
+                        background: GraphUi.view-wide ? Theme.raised : (mmta.has-hover ? Theme.hover : transparent);
+                        accessible-role: button;
+                        accessible-label: @tr("Memory");
+                        accessible-action-default => {
+                            root.open-memory-graph();
+                        }
+                        memory-t := Text {
+                            text: @tr("Memory");
+                            font-size: Theme.ui-caption;
+                            color: mmta.has-hover || GraphUi.view-wide ? Theme.foreground : Theme.muted;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                            accessible-role: none;
+                        }
+                        mmta := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => {
+                                root.open-memory-graph();
+                            }
+                        }
+                    }
                     // Orchestra · N (design 01: accent pill with a dot; N = running subagents + tasks). Opens Settings > Orchestra.
                     orch-btn := Rectangle {
                         property <int> live: ChatUi.subagents-running + ChatUi.background-tasks-running;
@@ -4251,7 +4418,14 @@ export component AppWindow inherits Window {
                                         self.content-y = self.bottom-y;
                                     }
                                 }
+                                property <length> prev-h;
+                                property <bool> anchoring;
                                 changed content-height => {
+                                    if self.anchoring {
+                                        self.anchoring = false;
+                                        self.content-y = max(self.bottom-y, min(0px, self.content-y - (self.content-height - self.prev-h)));
+                                    }
+                                    self.prev-h = self.content-height;
                                     self.follow();
                                 }
                                 changed visible-height => {
@@ -4266,6 +4440,11 @@ export component AppWindow inherits Window {
                                         root.stick-bottom = true;
                                     }
                                     self.last-y = self.content-y;
+                                    if ChatUi.has-earlier && !self.anchoring && !root.stick-bottom && self.content-y > -400px {
+                                        self.anchoring = true;
+                                        self.prev-h = self.content-height;
+                                        ChatUi.load-earlier();
+                                    }
                                 }
                                 scrolled => {
                                     root.stick-bottom = false;
@@ -4290,6 +4469,7 @@ export component AppWindow inherits Window {
                                     ChatRow {
                                         horizontal-stretch: 1;
                                         item: item;
+                                        continued: item.continued;
                                         hit: parent.hit;
                                         busy: root.running;
                                         bubble-max: root.bubble-max;
@@ -4415,6 +4595,7 @@ export component AppWindow inherits Window {
                                     }
                                 }
                                 if DockUi.failure-shown: FailureBanner { }
+                                if DockUi.resume-shown: ResumeBanner { }
                                 if root.perm-visible: PermissionCard {
                                     title: root.perm-title;
                                     detail: root.perm-detail;
@@ -5263,6 +5444,7 @@ export component AppWindow inherits Window {
         // Settings is a centred modal over a dimmed backdrop (click outside or Esc closes); full window only when
         // the window is too small for a dialog.
         if root.settings-open: settings-overlay := Rectangle {
+            visible: !GraphUi.view-wide;
             property <bool> modal: !root.narrow && root.width >= 760px && root.height >= 520px;
             background: self.modal ? Theme.scrim : transparent;
             TouchArea {
@@ -5322,6 +5504,60 @@ export component AppWindow inherits Window {
             wide: true;
             width: 100%;
             height: 100%;
+        }
+        if GraphUi.view-wide && !GraphUi.has-graph: Rectangle {
+            width: 100%;
+            height: 100%;
+            background: Theme.canvas;
+            TouchArea { }
+            empty-keys := FocusScope {
+                init => {
+                    self.focus();
+                }
+                key-pressed(event) => {
+                    if event.text == Key.Escape {
+                        GraphUi.view-wide = false;
+                        return accept;
+                    }
+                    return reject;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                spacing: 14px;
+                Text {
+                    text: GraphUi.checked ? @tr("This project has no memory graph yet") : @tr("Loading the memory graph…");
+                    font-size: Theme.ui-lg;
+                    font-weight: Theme.weight-medium;
+                    color: Theme.foreground;
+                    horizontal-alignment: center;
+                }
+                if GraphUi.checked: Text {
+                    text: @tr("Build it with Graphify in Settings › Memory › Graph.");
+                    font-size: Theme.ui-sm;
+                    color: Theme.muted;
+                    horizontal-alignment: center;
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+                    if GraphUi.checked: Button {
+                        text: @tr("Open settings");
+                        variant: "primary";
+                        clicked => {
+                            GraphUi.view-wide = false;
+                            root.settings-open = true;
+                            SettingsUi.open-page("memory");
+                        }
+                    }
+                    Button {
+                        text: @tr("Close");
+                        clicked => {
+                            GraphUi.view-wide = false;
+                        }
+                    }
+                }
+            }
         }
         if AgentsUi.provider-open: ProviderDialog { }
     }

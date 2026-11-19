@@ -330,6 +330,10 @@ pub(crate) async fn blocks(
             }
             ContextItem::Research => {
                 out.push(json!({"type": "text", "text": crate::research::INSTRUCTIONS}));
+                out.push(json!({"type": "text", "text": crate::research_figures::INSTRUCTIONS}));
+                if ctx.config.fact_check.on() {
+                    out.push(json!({"type": "text", "text": crate::factcheck::INSTRUCTIONS}));
+                }
             }
         }
     }

@@ -96,6 +96,7 @@ impl Store {
         connection.execute_batch(SCHEMA)?;
         ensure_archive_column(&connection)?;
         crate::store_chat::migrate(&connection)?;
+        crate::journal::migrate(&connection)?;
         let version: i64 = connection.pragma_query_value(None, "user_version", |r| r.get(0))?;
         if version == 0 {
             connection.pragma_update(None, "user_version", SCHEMA_VERSION)?;
@@ -112,6 +113,7 @@ impl Store {
             "UPDATE turn_attempts SET status='interrupted' WHERE status='running'",
             [],
         )?;
+        crate::journal::mark_orphans(&connection)?;
         Ok(Self {
             connection: Arc::new(Mutex::new(connection)),
         })
@@ -353,6 +355,21 @@ pub(crate) fn load_turns(
     c: &Connection,
     session: &SessionId,
 ) -> Result<Vec<(TurnView, Option<String>)>, HubError> {
+    load_turns_inner(c, session, false)
+}
+
+pub(crate) fn load_turns_slim(
+    c: &Connection,
+    session: &SessionId,
+) -> Result<Vec<(TurnView, Option<String>)>, HubError> {
+    load_turns_inner(c, session, true)
+}
+
+fn load_turns_inner(
+    c: &Connection,
+    session: &SessionId,
+    slim: bool,
+) -> Result<Vec<(TurnView, Option<String>)>, HubError> {
     let mut statement = c.prepare(
         "SELECT id,seq,user_text,agent_id,assistant_text,status,stop_reason,error,created_at,finished_at,client_message_id,
                 context_json,usage_json,context_usage_json,origin_json
@@ -393,7 +410,12 @@ pub(crate) fn load_turns(
     )?;
     let mut events_statement =
         c.prepare("SELECT kind,payload FROM turn_events WHERE turn_id=?1 ORDER BY idx")?;
-    for (turn, _) in &mut turns {
+    let keep_from = if slim {
+        turns.len().saturating_sub(FULL_TURNS)
+    } else {
+        0
+    };
+    for (index, (turn, _)) in turns.iter_mut().enumerate() {
         turn.attempts = attempts_statement
             .query_map(params![turn.id.as_str()], |r| {
                 Ok(TurnAttempt {
@@ -421,8 +443,57 @@ pub(crate) fn load_turns(
         }
         let last_attempt = turn.attempts.last().map_or(1, |a| a.attempt);
         turn.segments = build_segments(&turn.assistant_text, last_attempt, &marks);
+        if index < keep_from {
+            slim_turn(turn);
+        }
     }
     Ok(turns)
+}
+
+const FULL_TURNS: usize = 8;
+const SLIM_TEXT: usize = 256;
+
+fn clip(text: &mut String) {
+    if text.len() > SLIM_TEXT {
+        let mut end = SLIM_TEXT;
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        text.truncate(end);
+        text.push_str("\n…");
+        text.shrink_to_fit();
+    }
+}
+
+fn slim_turn(turn: &mut TurnView) {
+    {
+        for tool in &mut turn.tool_calls {
+            tool.raw_output = None;
+            if let Some(input) = tool.raw_input.as_mut() {
+                clip(input);
+            }
+            for content in &mut tool.content {
+                match content {
+                    harness_core_api::ToolContent::Text { text } => clip(text),
+                    harness_core_api::ToolContent::Diff {
+                        path,
+                        old_text,
+                        new_text,
+                    } => {
+                        let size = new_text.len() + old_text.as_ref().map_or(0, String::len);
+                        if size > SLIM_TEXT * 2 {
+                            *content = harness_core_api::ToolContent::Text {
+                                text: format!("Edited {path} (diff not kept for older turns)"),
+                            };
+                        }
+                    }
+                    harness_core_api::ToolContent::Terminal { .. } => {}
+                }
+            }
+            tool.content.shrink_to_fit();
+        }
+    }
+    turn.tool_calls.shrink_to_fit();
 }
 
 /// Folds one stored turn event into the view.

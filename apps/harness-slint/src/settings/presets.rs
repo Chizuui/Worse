@@ -283,7 +283,7 @@ fn row(p: &Preset) -> ProviderPreset {
     }
 }
 
-/// First letter or digit of a name, upper-cased ("OpenRouter" → "O").
+/// First letter or digit of a name, upper-cased (`OpenRouter` → `O`).
 pub(super) fn letter(name: &str) -> String {
     name.chars()
         .find(|c| c.is_alphanumeric())
@@ -490,7 +490,7 @@ async fn list_models(url: &str, key: Option<&str>) -> Result<Vec<String>, String
     Ok(model_ids(&body))
 }
 
-/// Model ids of a `/models` answer: OpenAI's `{"data": [{"id"}]}`, or a bare list, or Ollama's
+/// Model ids of a `/models` answer: `OpenAI`'s `{"data": [{"id"}]}`, or a bare list, or Ollama's
 /// `{"models": [{"name"}]}`. Sorted, duplicates dropped.
 pub(super) fn model_ids(body: &serde_json::Value) -> Vec<String> {
     let list = body
@@ -516,6 +516,7 @@ pub(super) fn model_ids(body: &serde_json::Value) -> Vec<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::assert_is_empty)]
 mod tests {
     use super::{filtered, find, kind_of, model_ids, PRESETS};
 

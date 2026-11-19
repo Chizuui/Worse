@@ -103,6 +103,7 @@ pub(super) fn render(detail: &SessionDetail, name: &dyn Fn(&str) -> String) -> S
     out
 }
 
+#[allow(clippy::too_many_lines)]
 fn render_turn(out: &mut String, turn: &TurnView, name: &dyn Fn(&str) -> String) {
     let _ = writeln!(out, "## [User] · {}\n", date(turn.created_at));
     let _ = writeln!(out, "{}\n", turn.user_text.trim_end());

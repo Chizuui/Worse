@@ -8,14 +8,18 @@
 mod background;
 mod compress;
 mod compress_tools;
+mod factcheck;
+mod factcheck_claims;
 mod hermes;
-mod web;
-mod web_text;
 mod llm;
 mod mcp;
+mod papers;
 mod project_docs;
 mod session;
 mod tools;
+mod web;
+mod web_search;
+mod web_text;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -89,10 +93,15 @@ impl Provider {
                 .parse()
                 .unwrap_or(DEFAULT_MAX_TOKENS),
             prompt_cache: !matches!(
-                var("HARNESS_PROVIDER_PROMPT_CACHE").to_ascii_lowercase().as_str(),
+                var("HARNESS_PROVIDER_PROMPT_CACHE")
+                    .to_ascii_lowercase()
+                    .as_str(),
                 "0" | "false"
             ),
-            system_role: match var("HARNESS_PROVIDER_SYSTEM_ROLE").to_ascii_lowercase().as_str() {
+            system_role: match var("HARNESS_PROVIDER_SYSTEM_ROLE")
+                .to_ascii_lowercase()
+                .as_str()
+            {
                 "system" => SystemRole::System,
                 "user" => SystemRole::User,
                 _ => SystemRole::Auto,
@@ -341,7 +350,11 @@ impl Agent {
             _ => {}
         }
         let key = format!("{}|{}", self.provider.base_url, self.provider.model);
-        let file = self.provider.state_dir.as_ref().map(|d| d.join("system-role.json"));
+        let file = self
+            .provider
+            .state_dir
+            .as_ref()
+            .map(|d| d.join("system-role.json"));
         let mut honored = None;
         if let Some(file) = &file {
             if let Ok(text) = tokio::fs::read_to_string(file).await {
@@ -358,7 +371,8 @@ impl Agent {
                 if let Some(dir) = file.parent() {
                     let _ = tokio::fs::create_dir_all(dir).await;
                 }
-                let _ = tokio::fs::write(file, json!({"key": key, "systemHonored": h}).to_string()).await;
+                let _ = tokio::fs::write(file, json!({"key": key, "systemHonored": h}).to_string())
+                    .await;
             }
         }
         // Unknown (probe failed): keep the standard `system` role for this request, probe again next turn.

@@ -166,7 +166,7 @@ impl SessionActor {
             .store
             .run(move |c| {
                 Ok((
-                    store::load_turns(c, &id)?,
+                    store::load_turns_slim(c, &id)?,
                     store::load_handles(c, &id)?,
                     store::load_prefs(c, &id)?,
                 ))
@@ -1206,19 +1206,19 @@ impl SessionActor {
         }
     }
 
-    async fn flush_thought(&mut self) {
+    async fn flush_thought(&mut self) -> bool {
         let Some(running) = self.running.as_mut() else {
-            return;
+            return false;
         };
         if running.thought.trim().is_empty() {
             running.thought.clear();
-            return;
+            return false;
         }
         let text = std::mem::take(&mut running.thought);
         let turn_id = running.turn_id.clone();
         let text_offset = running.text.len();
         let Some(turn) = self.turn_mut(&turn_id) else {
-            return;
+            return true;
         };
         let thought = harness_core_api::ThoughtView {
             attempt: turn.attempts.last().map_or(1, |a| a.attempt),
@@ -1228,8 +1228,10 @@ impl SessionActor {
         turn.thoughts.push(thought.clone());
         let payload = serde_json::to_value(&thought).unwrap_or(Value::Null);
         self.append_event(&turn_id, "thought", payload).await;
+        true
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn on_update(&mut self, update: &Value) {
         let Some(running) = self.running.as_mut() else {
             return;
@@ -1250,12 +1252,22 @@ impl SessionActor {
                 else {
                     return;
                 };
-                let text = text.to_owned();
+                let mut text = text.to_owned();
                 if kind == "agent_message_chunk" {
-                    self.flush_thought().await;
+                    let after_thought = self.flush_thought().await;
                     let Some(running) = self.running.as_mut() else {
                         return;
                     };
+                    if after_thought
+                        && running
+                            .text
+                            .chars()
+                            .last()
+                            .is_some_and(|c| !c.is_whitespace())
+                        && text.chars().next().is_some_and(|c| !c.is_whitespace())
+                    {
+                        text.insert_str(0, "\n\n");
+                    }
                     running.text.push_str(&text);
                     self.emit(EventKind::MessageDelta {
                         turn_id,
@@ -1379,6 +1391,7 @@ impl SessionActor {
         }
     }
 
+    #[allow(clippy::too_many_lines, clippy::single_match_else)]
     async fn on_permission_request(
         &mut self,
         connection: Arc<AcpConnection>,
@@ -1449,6 +1462,52 @@ impl SessionActor {
             };
             self.record_permission(&view, decision).await;
             return;
+        }
+        if let Some(scope) = self.ctx.scope_of(&self.row.id) {
+            let paths = scope_paths(&self.row.workspace_path, &view.tool);
+            if let Some(reason) =
+                crate::delegate::blocked(&scope, &view.tool, &paths, crate::util::now_ms())
+            {
+                let option = view
+                    .options
+                    .iter()
+                    .find(|o| matches!(o.kind, PermissionOptionKind::RejectOnce))
+                    .or_else(|| {
+                        view.options
+                            .iter()
+                            .find(|o| matches!(o.kind, PermissionOptionKind::RejectAlways))
+                    })
+                    .cloned();
+                let decision = match option {
+                    Some(option) => {
+                        connection.respond(
+                            &rpc_id,
+                            json!({"outcome": {"outcome": "selected", "optionId": option.option_id}}),
+                        );
+                        PermissionDecision::Selected {
+                            option_id: option.option_id,
+                            kind: option.kind,
+                        }
+                    }
+                    None => {
+                        connection.respond(&rpc_id, json!({"outcome": {"outcome": "cancelled"}}));
+                        PermissionDecision::Cancelled
+                    }
+                };
+                if let Some(mut subagent) = self.ctx.subagents.get(&self.row.id) {
+                    subagent.activity = format!(
+                        "Scope denied: {} ({reason})",
+                        if view.tool.title.is_empty() {
+                            "a tool"
+                        } else {
+                            view.tool.title.as_str()
+                        }
+                    );
+                    self.ctx.put_subagent(subagent).await;
+                }
+                self.record_permission(&view, decision).await;
+                return;
+            }
         }
         if self.ctx.machine.is_on(self.row.id.as_str()) {
             let allow = view
@@ -2169,6 +2228,14 @@ fn tool_output(call: &ToolCallView) -> String {
         return call.raw_output.clone().unwrap_or_default();
     }
     parts.join("\n")
+}
+
+/// Paths a permission request touches, relative to the workspace, for the scope check (§9.8.2).
+fn scope_paths(workspace: &str, tool: &ToolCallView) -> Vec<String> {
+    tool.locations
+        .iter()
+        .map(|location| crate::delegate::relative_to(workspace, &location.path))
+        .collect()
 }
 
 fn tool_view(value: &Value) -> ToolCallView {

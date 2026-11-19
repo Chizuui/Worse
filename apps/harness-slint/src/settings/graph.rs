@@ -2,6 +2,7 @@
 //! Finds the tool, builds or refreshes the graph with `graphify update <project>` (code only: no model, no
 //! API key), opens the graph and its report, and holds the switch that gives the graph to agents.
 
+use std::fmt::Write as _;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -21,13 +22,14 @@ const LOG_LINES: usize = 14;
 #[derive(Clone)]
 struct Ctx {
     home: PathBuf,
-    workspace: PathBuf,
+    workspace: Arc<Mutex<PathBuf>>,
     window: slint::Weak<AppWindow>,
     /// One command at a time.
     busy: Arc<AtomicBool>,
 }
 
 /// What the page shows, gathered off the UI thread.
+#[allow(clippy::struct_excessive_bools)]
 struct State {
     /// The graph for the picture, when there is one.
     graph: Option<Arc<Graph>>,
@@ -40,13 +42,47 @@ struct State {
     give_agents: bool,
 }
 
+thread_local! {
+    static CTX: std::cell::RefCell<Option<Ctx>> = const { std::cell::RefCell::new(None) };
+}
+
+impl Ctx {
+    fn root(&self) -> PathBuf {
+        self.workspace.lock().map(|w| w.clone()).unwrap_or_default()
+    }
+}
+
+pub fn set_workspace(window: &AppWindow, workspace: &Path) {
+    let Some(ctx) = CTX.with(|cell| cell.borrow().clone()) else {
+        return;
+    };
+    if let Ok(mut root) = ctx.workspace.lock() {
+        if root.as_path() == workspace {
+            return;
+        }
+        *root = workspace.to_path_buf();
+    }
+    let ui = window.global::<GraphUi>();
+    ui.set_project(workspace.to_string_lossy().as_ref().into());
+    ui.set_has_graph(false);
+    ui.set_checked(false);
+    ui.set_summary(slint::SharedString::default());
+    ui.set_has_html(false);
+    ui.set_has_report(false);
+    graph_view::set_workspace(window, workspace);
+    if ui.get_view_wide() {
+        refresh(&ctx, None);
+    }
+}
+
 pub fn install(window: &AppWindow, home: &Path, workspace: &Path) {
     let ctx = Ctx {
         home: home.to_path_buf(),
-        workspace: workspace.to_path_buf(),
+        workspace: Arc::new(Mutex::new(workspace.to_path_buf())),
         window: window.as_weak(),
         busy: Arc::new(AtomicBool::new(false)),
     };
+    CTX.with(|cell| *cell.borrow_mut() = Some(ctx.clone()));
     let ui = window.global::<GraphUi>();
     ui.set_install_command(graphify::INSTALL_COMMAND.into());
     ui.set_project(workspace.to_string_lossy().as_ref().into());
@@ -58,7 +94,7 @@ pub fn install(window: &AppWindow, home: &Path, workspace: &Path) {
 
     let c = ctx.clone();
     ui.on_build(move || {
-        let workspace = c.workspace.clone();
+        let workspace = c.root();
         run(
             &c,
             vec![Box::new(move || build_command(&workspace))],
@@ -80,7 +116,7 @@ pub fn install(window: &AppWindow, home: &Path, workspace: &Path) {
             );
         };
         let mut steps = installer.steps();
-        let workspace = c.workspace.clone();
+        let workspace = c.root();
         steps.push(Box::new(move || build_command(&workspace)));
         run(
             &c,
@@ -91,9 +127,9 @@ pub fn install(window: &AppWindow, home: &Path, workspace: &Path) {
     });
 
     let c = ctx.clone();
-    ui.on_open_html(move || open_path(&graphify::paths(&c.workspace).html));
+    ui.on_open_html(move || open_path(&graphify::paths(&c.root()).html));
     let c = ctx.clone();
-    ui.on_open_report(move || open_path(&graphify::paths(&c.workspace).report));
+    ui.on_open_report(move || open_path(&graphify::paths(&c.root()).report));
 
     let c = ctx;
     ui.on_set_give_agents(move |on| {
@@ -246,16 +282,16 @@ fn summary(stats: graphify::Stats, updated: Option<&str>) -> String {
         grouped(stats.links)
     );
     if stats.communities > 0 {
-        text.push_str(&format!(" · {} communities", grouped(stats.communities)));
+        let _ = write!(text, " · {} communities", grouped(stats.communities));
     }
     if let Some(age) = updated {
-        text.push_str(&format!(" · updated {age}"));
+        let _ = write!(text, " · updated {age}");
     }
     text
 }
 
-fn gather(ctx: &Ctx) -> State {
-    let files = graphify::paths(&ctx.workspace);
+fn gather(root: &Path, home: &Path) -> State {
+    let files = graphify::paths(root);
     let graph_text = std::fs::read_to_string(&files.graph).ok();
     let graph = graph_text.as_deref().and_then(Graph::parse).map(Arc::new);
     let graph_summary = graph_text.map(|text| {
@@ -277,7 +313,7 @@ fn gather(ctx: &Ctx) -> State {
         summary: graph_summary,
         has_html: files.html.is_file(),
         has_report: files.report.is_file(),
-        give_agents: recall::Store::new(&ctx.home).config().graph,
+        give_agents: recall::Store::new(home).config().graph,
     }
 }
 
@@ -285,12 +321,16 @@ fn gather(ctx: &Ctx) -> State {
 fn refresh(ctx: &Ctx, note: Option<String>) {
     let ctx = ctx.clone();
     spawn(move || {
-        let state = gather(&ctx);
+        let root = ctx.root();
+        let state = gather(&root, &ctx.home);
         let weak = ctx.window.clone();
         let _ = slint::invoke_from_event_loop(move || {
             let Some(window) = weak.upgrade() else {
                 return;
             };
+            if ctx.root() != root {
+                return;
+            }
             let ui = window.global::<GraphUi>();
             ui.set_installed(state.cli.is_some());
             ui.set_cli_path(
@@ -303,6 +343,7 @@ fn refresh(ctx: &Ctx, note: Option<String>) {
             ui.set_mcp(state.mcp);
             ui.set_install_plan(state.plan.into());
             ui.set_has_graph(state.summary.is_some());
+            ui.set_checked(true);
             ui.set_summary(state.summary.unwrap_or_default().into());
             ui.set_has_html(state.has_html);
             ui.set_has_report(state.has_report);
@@ -434,6 +475,7 @@ pub(super) fn open_path(path: &Path) {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{grouped, summary, Installer};
     use harness_agent_hub::graphify::Stats;

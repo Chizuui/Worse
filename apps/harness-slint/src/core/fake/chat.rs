@@ -82,6 +82,7 @@ impl FakeCore {
         out
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(super) async fn chat_call(&mut self, call: ChatCall) {
         match call {
             ChatCall::Rename {
@@ -183,10 +184,10 @@ impl FakeCore {
             | ChatCall::StartCard(_, reply)
             | ChatCall::MoveCard { reply, .. } => unsupported(reply, "the board"),
             ChatCall::DeleteCard(_, reply) | ChatCall::UnlinkBoard(_, reply) => {
-                unsupported(reply, "the board")
+                unsupported(reply, "the board");
             }
             ChatCall::LinkBoard(_, reply) | ChatCall::SyncBoard(_, reply) => {
-                unsupported(reply, "the board")
+                unsupported(reply, "the board");
             }
             ChatCall::InboxStatus(reply) => {
                 let _ = reply.send(Ok(api::InboxStatus::default()));
@@ -204,6 +205,12 @@ impl FakeCore {
             | ChatCall::PostTicket(_, reply)
             | ChatCall::StopTicket(_, reply)
             | ChatCall::DiscardTicket(_, reply) => unsupported(reply, "the inbox"),
+            ChatCall::ResumableRun { reply, .. } => {
+                let _ = reply.send(Ok(None));
+            }
+            ChatCall::ResumeRun { reply, .. } | ChatCall::DiscardRun { reply, .. } => {
+                unsupported(reply, "resumable runs");
+            }
         }
     }
 }

@@ -131,6 +131,8 @@ impl Env {
             import_roots: harness_import::ImportRoots::default(),
             schedule_min_interval_secs: 1,
             agy_creds: harness_agent_hub::SharedAgyCredStore::default(),
+            delegation: harness_agent_hub::DelegationPolicy::default(),
+            fact_check: harness_agent_hub::FactCheckPolicy::default(),
         }
     }
 

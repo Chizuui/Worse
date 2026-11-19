@@ -134,6 +134,7 @@ component FileRowView inherits Rectangle {
     in property <string> status;
     in property <int> added;
     in property <int> removed;
+    in property <int> vulns;
     in property <bool> current;
     callback clicked();
     height: 28px;
@@ -168,6 +169,22 @@ component FileRowView inherits Rectangle {
             color: root.current ? Theme.foreground : Theme.foreground-subtle;
             overflow: elide;
             vertical-alignment: center;
+        }
+        Rectangle {
+            visible: root.vulns > 0;
+            height: 17px;
+            width: 26px;
+            horizontal-stretch: 0;
+            border-radius: Theme.radius-full;
+            background: Theme.destructive.with-alpha(0.16);
+            Text {
+                text: root.vulns > 99 ? "99+" : "" + root.vulns;
+                font-size: Theme.ui-xs;
+                font-weight: Theme.weight-medium;
+                color: Theme.destructive;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
         }
         Text {
             horizontal-stretch: 0;
@@ -279,6 +296,7 @@ export component DiffPanel inherits Rectangle {
                     status: f.status;
                     added: f.added;
                     removed: f.removed;
+                    vulns: f.vulns;
                     current: i == PanelDiff.current-file;
                     clicked => {
                         PanelDiff.select-file(i);

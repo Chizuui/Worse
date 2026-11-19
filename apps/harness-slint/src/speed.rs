@@ -15,6 +15,12 @@
 //! The live clock only runs while text arrives: a gap of more than two seconds (a tool is running, the agent
 //! waits for an approval) is not generation time.
 
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
@@ -157,6 +163,10 @@ pub(crate) fn text(window: &AppWindow, row: Option<ItemId>, chars: usize) {
             return None;
         }
         s.shown = Some(now);
+        let sample = rate(s.chars as f64 / CHARS_PER_TOKEN, s.streaming);
+        if let Some(sample) = sample {
+            harness_perf::counter_float(harness_perf::Counter::TokensPerSecond, sample);
+        }
         estimated(s.chars, s.streaming)
     });
     if let Some(label) = label {
@@ -167,7 +177,7 @@ pub(crate) fn text(window: &AppWindow, row: Option<ItemId>, chars: usize) {
 /// Once a second while a turn runs: the live label goes away when no text arrived for a while (a tool is
 /// running), so it never shows a stale rate.
 pub(crate) fn tick(window: &AppWindow) {
-    let stale = STATE.with(|cell| cell.borrow().last.is_none_or(|t| t.elapsed() > GAP));
+    let stale = STATE.with(|cell| cell.borrow().last.map_or(true, |t| t.elapsed() > GAP));
     let ui = window.global::<ChatUi>();
     if stale && !ui.get_speed().is_empty() {
         ui.set_speed(slint::SharedString::new());
@@ -196,6 +206,9 @@ pub(crate) fn finish(window: &AppWindow) -> Option<(ItemId, String)> {
 pub(crate) fn reported(tokens: u64) -> Option<(ItemId, String)> {
     STATE.with(|cell| {
         let (row, time) = cell.borrow_mut().awaiting.take()?;
+        if let Some(sample) = rate(tokens as f64, time) {
+            harness_perf::counter_float(harness_perf::Counter::TokensPerSecond, sample);
+        }
         exact(tokens, time).map(|label| (row, label))
     })
 }

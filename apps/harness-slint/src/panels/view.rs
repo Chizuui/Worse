@@ -16,6 +16,25 @@ fn s(text: &str) -> SharedString {
     SharedString::from(text)
 }
 
+/// Lockfile badge (spec `security-panel.md` §6): advisories the last scan found *in that* lockfile, when the setting
+/// is on. The report carries the scanned path, so the badge counts only rows from this file.
+fn vulns_for(path: &str) -> i32 {
+    let name = path.rsplit(['/', '\\']).next().unwrap_or(path);
+    if !crate::security::gate::is_lockfile(name) {
+        return 0;
+    }
+    let enabled = crate::settings::current().is_some_and(|s| s.security.show_diff_badge);
+    if !enabled {
+        return 0;
+    }
+    let wanted = path.replace('\\', "/");
+    let count = crate::security::rows()
+        .iter()
+        .filter(|row| row.source.replace('\\', "/").ends_with(&wanted))
+        .count();
+    i32::try_from(count).unwrap_or(i32::MAX)
+}
+
 fn model<T: Clone + 'static>(items: Vec<T>) -> ModelRc<T> {
     ModelRc::from(Rc::new(VecModel::from(items)))
 }
@@ -177,6 +196,7 @@ pub(crate) fn diff(window: &Weak<AppWindow>, view: DiffView) {
                     status: s(status),
                     added: int(*added),
                     removed: int(*removed),
+                    vulns: vulns_for(path),
                 })
                 .collect(),
         ));

@@ -196,6 +196,7 @@ pub fn place_dragged(window: &slint::Window, saved: Option<Rect>, fraction: f64,
     let width = restored.2 - restored.0;
     let height = restored.3 - restored.1;
     let fraction = fraction.clamp(0.0, 1.0);
+    #[allow(clippy::cast_possible_truncation)]
     let left = cursor_x - (fraction * f64::from(width)).round() as i32;
     let top = cursor_y - top;
     let target = (left, top, left + width, top + height);

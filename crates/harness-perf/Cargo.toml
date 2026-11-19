@@ -1,0 +1,12 @@
+[package]
+name = "harness-perf"
+version = "0.1.0"
+description = "Perfetto trace recorder: hand-written protobuf encoder, no native SDK (spec performance-recorder.md)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

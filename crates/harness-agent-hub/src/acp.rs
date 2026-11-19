@@ -157,10 +157,20 @@ impl AcpConnection {
         tokio::spawn(async move {
             let mut stdin = stdin;
             while let Some(line) = rx.recv().await {
-                if stdin.write_all(line.as_bytes()).await.is_err()
-                    || stdin.write_all(b"\n").await.is_err()
-                    || stdin.flush().await.is_err()
-                {
+                let write = harness_perf::span_with(
+                    "bridge_send",
+                    vec![(
+                        "bytes",
+                        harness_perf::AnnotatedValue::Int(
+                            i64::try_from(line.len()).unwrap_or(i64::MAX),
+                        ),
+                    )],
+                );
+                let written = stdin.write_all(line.as_bytes()).await.is_ok()
+                    && stdin.write_all(b"\n").await.is_ok()
+                    && stdin.flush().await.is_ok();
+                write.end();
+                if !written {
                     break;
                 }
             }
@@ -191,7 +201,19 @@ impl AcpConnection {
                     continue;
                 }
                 match serde_json::from_str::<Value>(&line) {
-                    Ok(message) => dispatch(&reader_state, &weak, &message),
+                    Ok(message) => {
+                        let read = harness_perf::span_with(
+                            "bridge_recv",
+                            vec![(
+                                "bytes",
+                                harness_perf::AnnotatedValue::Int(
+                                    i64::try_from(line.len()).unwrap_or(i64::MAX),
+                                ),
+                            )],
+                        );
+                        dispatch(&reader_state, &weak, &message);
+                        read.end();
+                    }
                     Err(error) => tracing::debug!(%error, "non-JSON line from agent"),
                 }
             }

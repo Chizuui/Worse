@@ -14,6 +14,7 @@
 mod atomic;
 mod collate;
 mod error;
+pub mod filetype;
 mod node_path;
 mod ops;
 mod path_identity;
