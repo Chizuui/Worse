@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://rraahh133.github.io/Worse/sitemap.xml

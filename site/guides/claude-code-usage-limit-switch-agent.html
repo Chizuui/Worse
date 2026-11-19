@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Claude Code usage limit reached? Switch agent and keep working | Worse Harness</title>
+<meta name="description" content="When Claude Code hits its usage limit, continue the same session on Codex, another Claude account, Antigravity or an API model such as DeepSeek, with the transcript intact. Automatic failover with Worse Harness.">
+<link rel="canonical" href="https://rraahh133.github.io/Worse/guides/claude-code-usage-limit-switch-agent.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Claude Code usage limit reached? Switch agent and keep working">
+<meta property="og:description" content="Continue the same session on Codex, another Claude account or an API model when Claude Code hits its limit.">
+<meta property="og:url" content="https://rraahh133.github.io/Worse/guides/claude-code-usage-limit-switch-agent.html">
+<meta property="og:image" content="https://rraahh133.github.io/Worse/brand/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../brand/app-icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "Switch agent automatically when Claude Code hits its usage limit",
+  "tool": [{"@type": "HowToTool", "name": "Worse Harness"}],
+  "step": [
+    {"@type": "HowToStep", "name": "Add more than one agent", "text": "Set up a second agent: Codex, another Claude Code account, Antigravity, or an OpenAI-compatible API provider such as DeepSeek."},
+    {"@type": "HowToStep", "name": "Set the fallback order", "text": "In Settings, Agents, arrange the fallback order. Enabled agents join it."},
+    {"@type": "HowToStep", "name": "Keep working", "text": "When the session's agent hits a usage limit, Harness switches to the next ready agent in the order and continues the turn with the transcript intact."}
+  ]
+}
+</script>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <a class="brand" href="../">Worse Harness</a>
+  <a href="claude-code-and-codex-together.html">Claude Code + Codex guide</a>
+  <a href="https://github.com/rraahh133/Worse/releases/latest">Download</a>
+  <a href="https://github.com/rraahh133/Worse">GitHub</a>
+</nav>
+<article>
+<h1>Claude Code hit its usage limit? Switch agent and keep working</h1>
+<p class="lead" style="margin:0">A usage limit in the middle of a task usually means waiting hours for the reset, or starting over in another tool and explaining everything again. Worse Harness continues the same session on another agent instead, with the conversation intact.</p>
+
+<h2>What you can fail over to</h2>
+<ul>
+  <li><strong>Another Claude Code account.</strong> Harness keeps several Claude accounts as separate profiles.</li>
+  <li><strong>Codex</strong>, <strong>Antigravity</strong> or <strong>Command Code</strong>, if you use them.</li>
+  <li><strong>An API model</strong> through any OpenAI-compatible endpoint: DeepSeek, OpenRouter, OpenAI, Gemini, Groq, Mistral, Kimi, Qwen, or a local model in Ollama or LM Studio. Harness runs it as a full agent with file and shell tools.</li>
+  <li><strong>Several API keys</strong> for one service. They are used in turn, and a key at its limit is skipped until it resets.</li>
+</ul>
+
+<h2>Set it up</h2>
+<ol>
+  <li><a href="https://github.com/rraahh133/Worse/releases/latest">Download Worse Harness</a> and set up at least two agents. For an API model open <strong>Settings → Agents → API providers → Add provider</strong>, pick a preset and paste the key; the endpoint and a model are filled in for you.</li>
+  <li>In <strong>Settings → Agents</strong>, arrange the <strong>Fallback order</strong>. Every enabled agent joins it; turn an agent off to take it out.</li>
+  <li>Work as usual. Each session uses the agent you picked.</li>
+</ol>
+
+<h2>What happens at the limit</h2>
+<p>Harness recognises the usage-limit error of each agent. When the session's agent hits it, Harness switches to the next ready agent in your fallback order and continues the turn. The transcript belongs to Harness, not to one vendor's CLI, so the next agent sees the same conversation. You can switch back to the first agent by hand once its limit resets.</p>
+
+<h2>Spend the limit more slowly</h2>
+<p>You can also make the expensive agent last longer by handing routine work to a cheaper one. The built-in <code>harness-delegate</code> MCP server lets Claude Code start a subagent on, for example, a DeepSeek model for boilerplate edits or tests, and get the result back automatically. See <a href="claude-code-and-codex-together.html">how to use Claude Code and Codex together</a>.</p>
+
+<p style="margin-top:40px"><a class="btn primary" href="https://github.com/rraahh133/Worse/releases/latest">Download Worse Harness</a></p>
+</article>
+<footer>Worse Harness is an independent open-source project. Claude Code is a product of Anthropic. · <a href="https://github.com/rraahh133/Worse">GitHub</a></footer>
+</div>
+</body>
+</html>

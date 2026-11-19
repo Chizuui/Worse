@@ -6,14 +6,24 @@
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-f4f4f5?style=flat-square&labelColor=08090a"></a>
   <img alt="Built with Rust" src="https://img.shields.io/badge/built%20with-Rust-f4f4f5?style=flat-square&labelColor=08090a">
   <img alt="Platforms: Windows, macOS, Linux" src="https://img.shields.io/badge/platforms-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-c8f04a?style=flat-square&labelColor=08090a">
+  <a href="https://github.com/rraahh133/Worse/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/rraahh133/Worse?style=flat-square&labelColor=08090a&color=f4f4f5"></a>
+  <a href="https://github.com/rraahh133/Worse/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/rraahh133/Worse/total?style=flat-square&labelColor=08090a&color=f4f4f5"></a>
 </p>
 
-# Worse Harness
+# Worse Harness: a desktop GUI for Claude Code, Codex and other AI coding agents
 
-**A native desktop orchestrator for AI coding agents.** Worse Harness (Harness for short) runs the coding agents you already
-use (Claude Code, Codex, Antigravity, Command Code, a Hermes gateway, or any OpenAI-compatible model such
-as DeepSeek) side by side in one fast Rust app, keeps every conversation in one place, and moves work
-between agents when one of them runs out of quota.
+**Run Claude Code, Codex, Antigravity and any OpenAI-compatible coding agent side by side in one native
+desktop app.** Worse Harness (Harness for short) runs the coding agents you already use (Claude Code,
+Codex, Antigravity, Command Code, a Hermes gateway, or any OpenAI-compatible model such as DeepSeek) in
+one fast Rust app, keeps every conversation in one place, and moves work to another agent when one of
+them hits its usage limit.
+
+<p align="center">
+  <a href="https://github.com/rraahh133/Worse/releases/latest/download/Worse-Harness-windows-x64.zip"><img alt="Download for Windows" src="https://img.shields.io/badge/Download-Windows%20x64-c8f04a?style=for-the-badge&labelColor=08090a"></a>
+  <a href="https://github.com/rraahh133/Worse/releases/latest/download/Worse-Harness-macos-universal.zip"><img alt="Download for macOS" src="https://img.shields.io/badge/Download-macOS-f4f4f5?style=for-the-badge&labelColor=08090a"></a>
+  <a href="https://github.com/rraahh133/Worse/releases/latest/download/Worse-Harness-linux-x64.tar.gz"><img alt="Download for Linux" src="https://img.shields.io/badge/Download-Linux%20x64-f4f4f5?style=for-the-badge&labelColor=08090a"></a>
+  <br><sub><a href="https://rraahh133.github.io/Worse/">Website</a> · <a href="#why-not-just-use-the-cli">Why not just use the CLI?</a> · <a href="https://github.com/rraahh133/Worse/discussions">Discussions</a></sub>
+</p>
 
 <p align="center">
   <img src="docs/screenshots/home-dark.webp" alt="Harness on an empty session: the block wordmark, the ASCII bunny and four starters" width="100%">
@@ -31,6 +41,7 @@ between agents when one of them runs out of quota.
 
 - [Screenshots](#screenshots)
 - [Concept](#concept)
+- [Why not just use the CLI?](#why-not-just-use-the-cli)
 - [Features](#features)
 - [How it works](#how-it-works)
 - [Supported agents](#supported-agents)
@@ -117,6 +128,25 @@ history and its own usage limits. Harness puts a single desktop app in front of 
   coordinate who edits which files.
 - **Native and fast.** The product is a single Rust executable with a [Slint](https://slint.dev)
   UI: no Electron, no webview for the main window, low memory and instant start.
+
+## Why not just use the CLI?
+
+Harness does not replace the Claude Code, Codex or Antigravity CLIs: it runs them. What it adds is
+what one CLI per terminal cannot do on its own.
+
+| | Agent CLIs in terminals | Worse Harness |
+| --- | --- | --- |
+| Several agents on one project | one terminal each, separate histories | one window, one session list, agent picker per session |
+| Usage limit reached | stop and wait for the reset, or start over elsewhere | the session continues on the next agent or account, transcript intact |
+| History | stored by each CLI in its own format | one local SQLite store: search, resume, fork, import |
+| Agents helping each other | copy and paste between terminals | subagents through MCP, results pushed back to the parent |
+| Several accounts or API keys | swap logins by hand | Claude accounts, Antigravity accounts and key pools in turn |
+| Seeing what the agent does | scrolling text | live code view, diff, git, terminal and the agent's screen beside the chat |
+| Away from the desk | SSH into the machine | pair your phone and steer sessions from it |
+| Cheaper models (DeepSeek, OpenRouter, Ollama, …) | a separate tool per provider | any OpenAI-compatible endpoint as a full agent with tools |
+
+If you only ever use one agent with one account, the CLI is enough. Harness is for when you switch
+between agents, hit limits, or want them to work as a team.
 
 ## Features
 
@@ -274,13 +304,29 @@ in the `Authorization` header.
 
 ## Getting started
 
-### Prerequisites
+### Download
+
+Prebuilt binaries are on the [latest release](https://github.com/rraahh133/Worse/releases/latest):
+
+| Platform | File | Run |
+| --- | --- | --- |
+| Windows 10/11 x64 | [`Worse-Harness-windows-x64.zip`](https://github.com/rraahh133/Worse/releases/latest/download/Worse-Harness-windows-x64.zip) | unzip, run `Worse-Harness.exe` |
+| macOS 11+ (Apple silicon and Intel) | [`Worse-Harness-macos-universal.zip`](https://github.com/rraahh133/Worse/releases/latest/download/Worse-Harness-macos-universal.zip) | unzip, right-click `Harness.app` → **Open** the first time |
+| Linux x64 | [`Worse-Harness-linux-x64.tar.gz`](https://github.com/rraahh133/Worse/releases/latest/download/Worse-Harness-linux-x64.tar.gz) | extract, run `worse-harness` (needs GTK3) |
+
+The app checks for new releases and updates itself. You still need at least one agent from
+[Supported agents](#supported-agents); the first-run setup finds installed CLIs and installs missing
+ACP adapters.
+
+### Build from source
+
+#### Prerequisites
 
 - Rust stable (pinned by `rust-toolchain.toml`).
 - At least one agent from [Supported agents](#supported-agents).
 - Linux: GTK3 development packages.
 
-### Build and run
+#### Build and run
 
 ```powershell
 git clone https://github.com/rraahh133/Worse.git
@@ -298,7 +344,7 @@ cargo build -p harness-slint --profile quick   # target/quick/harness-slint
 Harness opens the current directory (or the last workspace) as the project. Use
 **New session ▾ → Open folder…** to work in another folder.
 
-### macOS
+#### macOS (from CI artifacts)
 
 Download `Harness-macos-universal.zip` from the
 [macos-release workflow](.github/workflows/macos.yml) artifacts, unzip, then right-click

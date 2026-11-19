@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Worse Harness: desktop GUI for Claude Code, Codex and AI coding agents</title>
+<meta name="description" content="Native Rust desktop app to run Claude Code, Codex, Antigravity and any OpenAI-compatible AI coding agent side by side, with quota failover, subagents, MCP and phone remote. Free and open source.">
+<link rel="canonical" href="https://rraahh133.github.io/Worse/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Worse Harness">
+<meta property="og:title" content="Worse Harness: desktop GUI for Claude Code, Codex and AI coding agents">
+<meta property="og:description" content="Run Claude Code, Codex, Antigravity and any OpenAI-compatible coding agent side by side. When one hits its usage limit, the session continues on the next.">
+<meta property="og:url" content="https://rraahh133.github.io/Worse/">
+<meta property="og:image" content="https://rraahh133.github.io/Worse/brand/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Worse Harness: desktop GUI for Claude Code, Codex and AI coding agents">
+<meta name="twitter:description" content="Run Claude Code, Codex, Antigravity and any OpenAI-compatible coding agent side by side, with quota failover.">
+<meta name="twitter:image" content="https://rraahh133.github.io/Worse/brand/social-preview.png">
+<link rel="icon" href="brand/app-icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Worse Harness",
+  "alternateName": "Harness",
+  "description": "Native Rust desktop app to run Claude Code, Codex, Antigravity and any OpenAI-compatible AI coding agent side by side, with quota failover, subagents, MCP and phone remote.",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Windows 10, Windows 11, macOS 11+, Linux",
+  "url": "https://rraahh133.github.io/Worse/",
+  "downloadUrl": "https://github.com/rraahh133/Worse/releases/latest",
+  "image": "https://rraahh133.github.io/Worse/brand/social-preview.png",
+  "screenshot": "https://rraahh133.github.io/Worse/screenshots/chat-panel-dark.webp",
+  "license": "https://www.apache.org/licenses/LICENSE-2.0",
+  "isAccessibleForFree": true,
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+  "codeRepository": "https://github.com/rraahh133/Worse",
+  "programmingLanguage": "Rust"
+}
+</script>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <a class="brand" href="./">Worse Harness</a>
+  <a href="guides/claude-code-and-codex-together.html">Guides</a>
+  <a href="https://github.com/rraahh133/Worse/releases/latest">Download</a>
+  <a href="https://github.com/rraahh133/Worse">GitHub</a>
+</nav>
+
+<section class="hero">
+  <img class="banner" src="brand/banner.svg" alt="Worse Harness: one harness for every coding agent">
+  <h1>A desktop GUI for Claude Code, Codex and other AI coding agents</h1>
+  <p class="lead">Run Claude Code, Codex, Antigravity, Command Code and any OpenAI-compatible model such as DeepSeek side by side in one native Rust app. When one agent hits its usage limit, the session continues on the next.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/rraahh133/Worse/releases/latest/download/Worse-Harness-windows-x64.zip">Download for Windows</a>
+    <a class="btn" href="https://github.com/rraahh133/Worse/releases/latest/download/Worse-Harness-macos-universal.zip">macOS</a>
+    <a class="btn" href="https://github.com/rraahh133/Worse/releases/latest/download/Worse-Harness-linux-x64.tar.gz">Linux</a>
+    <a class="btn" href="https://github.com/rraahh133/Worse">Source on GitHub</a>
+  </div>
+  <p class="small">Free and open source (Apache-2.0). Your transcripts stay on your machine.</p>
+  <img class="shot" src="screenshots/chat-panel-dark.webp" alt="A Harness session with the side panel open: overview, git, terminal and files beside the chat" width="1040">
+</section>
+
+<h2>What it does</h2>
+<div class="grid">
+  <div class="card"><h3>Every agent in one window</h3><p>Claude Code, Codex, Antigravity, Command Code, a Hermes gateway, or any OpenAI-compatible API (OpenRouter, DeepSeek, Ollama, LM Studio and more). Each session keeps its own agent.</p></div>
+  <div class="card"><h3>Quota failover</h3><p>When an agent runs out of quota, Harness continues the same session on the next agent or account in your order, with the transcript intact.</p></div>
+  <div class="card"><h3>Subagents</h3><p>Through a built-in MCP server an agent can hand work to other agents, for example a cheap API model for routine edits, and gets the results back automatically.</p></div>
+  <div class="card"><h3>One history</h3><p>Conversations live in a local SQLite store, not inside one vendor's CLI: search, resume, fork and import them whichever agent wrote them.</p></div>
+  <div class="card"><h3>Watch the work</h3><p>Live code view of the file being edited, diff, git, terminal, and the agent's screen when it uses your computer.</p></div>
+  <div class="card"><h3>From your phone</h3><p>Pair a phone once and follow or steer sessions from it, through your own tunnel.</p></div>
+</div>
+
+<h2>Why not just use the CLI?</h2>
+<table>
+  <tr><th></th><th>Agent CLIs in terminals</th><th>Worse Harness</th></tr>
+  <tr><td>Several agents</td><td>one terminal each, separate histories</td><td>one window, agent picker per session</td></tr>
+  <tr><td>Usage limit reached</td><td>wait for the reset</td><td>continue on the next agent or account</td></tr>
+  <tr><td>History</td><td>each CLI's own format</td><td>one local store: search, resume, fork</td></tr>
+  <tr><td>Agents helping each other</td><td>copy and paste</td><td>subagents over MCP</td></tr>
+  <tr><td>Cheaper models</td><td>a separate tool per provider</td><td>any OpenAI-compatible endpoint as a full agent</td></tr>
+</table>
+
+<h2>Guides</h2>
+<div class="grid">
+  <div class="card"><h3><a href="guides/claude-code-and-codex-together.html">How to use Claude Code and Codex together</a></h3><p>Run both agents on the same project and let one delegate to the other.</p></div>
+  <div class="card"><h3><a href="guides/claude-code-usage-limit-switch-agent.html">Switch agent when Claude Code hits its usage limit</a></h3><p>Keep working when a limit resets hours from now: failover to Codex, another account or an API model.</p></div>
+</div>
+
+<h2>Supported agents</h2>
+<table>
+  <tr><th>Agent</th><th>How Harness runs it</th></tr>
+  <tr><td>Claude Code</td><td><code>claude-agent-acp</code> over the Agent Client Protocol</td></tr>
+  <tr><td>Codex</td><td><code>codex-acp</code></td></tr>
+  <tr><td>Antigravity</td><td><code>agy acp</code></td></tr>
+  <tr><td>Command Code</td><td><code>command-code acp</code> or the Command Code API</td></tr>
+  <tr><td>Hermes Agent</td><td>the gateway's API server</td></tr>
+  <tr><td>Any OpenAI-compatible API</td><td>Harness's built-in agent: DeepSeek, OpenRouter, OpenAI, Gemini, Groq, Mistral, Ollama, LM Studio and more</td></tr>
+</table>
+
+<footer>
+  Worse Harness is an independent open-source project. Claude Code, Codex and Antigravity are products of their respective owners.
+  · <a href="https://github.com/rraahh133/Worse">GitHub</a>
+  · <a href="https://github.com/rraahh133/Worse/discussions">Discussions</a>
+  · <a href="https://github.com/rraahh133/Worse/blob/main/LICENSE">Apache-2.0</a>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How to use Claude Code and Codex together on one project | Worse Harness</title>
+<meta name="description" content="Run Claude Code and Codex side by side on the same codebase, keep one history, and let one agent delegate tasks to the other as a subagent. Step-by-step with Worse Harness.">
+<link rel="canonical" href="https://rraahh133.github.io/Worse/guides/claude-code-and-codex-together.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How to use Claude Code and Codex together on one project">
+<meta property="og:description" content="Run Claude Code and Codex side by side, keep one history, and let one agent delegate to the other.">
+<meta property="og:url" content="https://rraahh133.github.io/Worse/guides/claude-code-and-codex-together.html">
+<meta property="og:image" content="https://rraahh133.github.io/Worse/brand/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../brand/app-icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "How to use Claude Code and Codex together on one project",
+  "tool": [{"@type": "HowToTool", "name": "Worse Harness"}],
+  "step": [
+    {"@type": "HowToStep", "name": "Install both agents", "text": "Install and sign in to Claude Code and Codex, then install their ACP adapters: npm i -g @agentclientprotocol/claude-agent-acp @agentclientprotocol/codex-acp"},
+    {"@type": "HowToStep", "name": "Open the project in Harness", "text": "Start Worse Harness in the project folder, or use New session, Open folder."},
+    {"@type": "HowToStep", "name": "Pick an agent per session", "text": "Choose Claude Code or Codex in the composer's agent picker; each session remembers its agent."},
+    {"@type": "HowToStep", "name": "Delegate between agents", "text": "Ask one agent to hand a task to the other; the harness-delegate MCP server runs it as a subagent and returns the result."}
+  ]
+}
+</script>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <a class="brand" href="../">Worse Harness</a>
+  <a href="claude-code-usage-limit-switch-agent.html">Usage limit guide</a>
+  <a href="https://github.com/rraahh133/Worse/releases/latest">Download</a>
+  <a href="https://github.com/rraahh133/Worse">GitHub</a>
+</nav>
+<article>
+<h1>How to use Claude Code and Codex together on one project</h1>
+<p class="lead" style="margin:0">Claude Code and Codex are good at different things, and each has its own usage limit. Running them in two terminals works, but you end up with two histories and a lot of copy and paste. Worse Harness runs both in one window on the same codebase.</p>
+
+<h2>1. Install both agents</h2>
+<ol>
+  <li>Install and sign in to <a href="https://github.com/anthropics/claude-code">Claude Code</a> (<code>claude</code>) and <a href="https://github.com/openai/codex">Codex</a> (<code>codex</code>) as usual.</li>
+  <li>Install their Agent Client Protocol adapters:<br><code>npm i -g @agentclientprotocol/claude-agent-acp @agentclientprotocol/codex-acp</code></li>
+  <li><a href="https://github.com/rraahh133/Worse/releases/latest">Download Worse Harness</a> and start it. The first-run setup finds the installed CLIs and can install a missing adapter for you.</li>
+</ol>
+<p>Harness never reads your credential files. Each CLI keeps its own login.</p>
+
+<h2>2. Open the project</h2>
+<p>Harness opens the current folder, or the last one you used. To work in another folder use <strong>New session ▾ → Open folder…</strong>. Sessions are grouped by folder in the Projects tree.</p>
+
+<h2>3. Pick an agent per session</h2>
+<p>The composer has an agent picker. Choose <strong>Claude Code</strong> for one session and <strong>Codex</strong> for another. Each session keeps the agent you picked, and you can switch an existing session to the other agent at any time without losing the conversation. Every transcript is stored by Harness in one local database, so you can search, resume and fork it whichever agent wrote it.</p>
+
+<h2>4. Let one agent delegate to the other</h2>
+<p>Harness gives every agent a built-in MCP server, <code>harness-delegate</code>. With it, an agent can start a subagent on another agent and gets the result pushed back automatically. Ask for it in plain words, for example:</p>
+<p><code>Ask Codex to write the unit tests for src/parser.rs while you refactor the CLI.</code></p>
+<p>Subagents claim the files they edit, so two agents do not overwrite each other. You can follow each subagent in the team strip of the session. The number of subagents that run at once is set in <strong>Settings → Orchestra</strong>.</p>
+
+<h2>5. Watch both of them work</h2>
+<p>The side pane shows the diff of the turn, git, a terminal and a live view of the file the agent is editing, so you can review what either agent changed before you commit.</p>
+
+<p style="margin-top:40px"><a class="btn primary" href="https://github.com/rraahh133/Worse/releases/latest">Download Worse Harness</a> &nbsp; <a href="claude-code-usage-limit-switch-agent.html">Next: keep working when Claude Code hits its usage limit →</a></p>
+</article>
+<footer>Worse Harness is an independent open-source project. Claude Code and Codex are products of Anthropic and OpenAI. · <a href="https://github.com/rraahh133/Worse">GitHub</a></footer>
+</div>
+</body>
+</html>
