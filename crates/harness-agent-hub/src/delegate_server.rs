@@ -575,7 +575,7 @@ async fn delegate(
     // No agent named: the decision model picks one (and a model), when one is set. Its pick is checked like
     // a named agent below; without a pick the rules decide as before.
     let mut routed: Option<crate::decision::Choice> = None;
-    if agent.is_none() && args["session_id"].as_str().is_none_or(str::is_empty) {
+    if agent.is_none() && args["session_id"].as_str().map_or(true, str::is_empty) {
         let candidates = candidates(hub, team.as_deref(), &parent.active_agent).await;
         match crate::decision::choose(&hub.ctx.config.home, &task, &candidates).await {
             Ok(choice) => {

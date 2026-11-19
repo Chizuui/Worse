@@ -123,6 +123,23 @@ Seen on Windows, reproduced on Linux with the build of the time:
   told it what Harness is. A fresh agent session now starts with a `<harness>` block naming the tool servers
   it has (memory, delegate, computer, graph) and what each is for (`crates/harness-agent-hub/src/about.rs`).
 
+### 3.8 Selecting across blocks, and the Settings list (2026-11-19)
+
+- **A selection stopped at the end of a paragraph.** Every paragraph, heading, list item and code block of an
+  answer is a text field of its own, and a field's selection ends at its edge: dragging down from one
+  paragraph into the next selected nothing there. Now the drag carries on (`chat/select.rs`, `RichSelect`).
+  A field that is being dragged in keeps the mouse to itself, so the page cannot hear where the pointer is;
+  the pointer is followed through the window's own events instead, and the page is told the span between
+  the block the drag began in and the pointer. That block's selection runs to its end (to its start when
+  dragging upwards), and every block in the span selects itself whole. Ctrl+C in the first block copies its
+  part and theirs, top to bottom, one block a line. The next click anywhere ends it. Limits: the block the
+  pointer ends in is taken whole, not up to the pointer; a user's own message and a code block without
+  syntax colours can start such a selection but do not join one; the chat does not scroll by itself while
+  dragging.
+- **Settings list.** With the list long enough to scroll, the highlighted row ran under the scrollbar and a
+  half-scrolled row sat on the rule above the version. Rows now end short of the scrollbar and there is a
+  little room above the rule.
+
 ## 4. Team strip
 
 A session that delegated work shows, above the composer, one lane per subagent that is still working: agent,

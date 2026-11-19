@@ -8,6 +8,7 @@
 
 mod export;
 mod fuzzy;
+mod select;
 mod whiteboard;
 
 use std::cell::RefCell;
@@ -1554,8 +1555,32 @@ fn install_drop(window: &AppWindow) {
             }
         }
     };
-    window.window().on_winit_window_event(move |_, event| {
+    select::install(window, |text| {
+        with_state(|s| s.copy(text));
+    });
+    let weak = window.as_weak();
+    window.window().on_winit_window_event(move |shell, event| {
         match event {
+            // Where the pointer is while a text selection is dragged from one block of the chat into the
+            // next (`select`).
+            WindowEvent::CursorMoved { position, .. } => {
+                if let Some(window) = weak.upgrade() {
+                    #[allow(clippy::cast_possible_truncation)]
+                    select::moved(
+                        &window,
+                        (position.y / f64::from(shell.scale_factor())) as f32,
+                    );
+                }
+            }
+            WindowEvent::MouseInput {
+                state,
+                button: slint::winit_030::winit::event::MouseButton::Left,
+                ..
+            } => {
+                if let Some(window) = weak.upgrade() {
+                    select::button(&window, state.is_pressed());
+                }
+            }
             WindowEvent::HoveredFile(_) => drop_hover(true),
             WindowEvent::HoveredFileCancelled => drop_hover(false),
             WindowEvent::DroppedFile(path) => dropped(path),

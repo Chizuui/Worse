@@ -339,6 +339,19 @@ export global ChatUi {
     in property <string> toast;
     callback copy(string);
     pure callback link-at([MdLink], int) -> string;
+    // ---- selecting text across blocks (`chat::select`) ----
+    // A selection that began in one text block is being dragged, or stands; the part of the window between
+    // that block and the pointer (blocks in it select themselves whole).
+    in property <bool> drag-on;
+    in property <length> drag-lo;
+    in property <length> drag-hi;
+    // the block the drag began in has a selection: its top and bottom
+    callback drag-begin(length, length);
+    // a block joined or left the selection: its top and left in whole pixels, and its text
+    callback drag-join(int, int, string);
+    callback drag-part(int, int);
+    // copy: the first block's text, the two ends of its selection (bytes), its top and left
+    callback drag-copy(string, int, int, int, int);
     callback dismiss-error();
 
     // Labels of the command-center actions that are not keymap commands.

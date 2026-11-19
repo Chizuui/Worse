@@ -299,14 +299,17 @@ export component SettingsShell inherits Rectangle {
                     vertical-stretch: 1;
                     content-height: max(self.visible-height, nav.preferred-height);
                     nav := Nav {
-                        width: parent.width;
+                        // When the list scrolls, its rows end short of the scrollbar instead of running under it.
+                        width: parent.width - (self.preferred-height > nav-scroll.visible-height ? 10px : 0px);
                         height: max(parent.height, self.preferred-height);
                         rail: root.rail;
                         list-mode: root.narrow;
                     }
                 }
-                // "nav foot": 1px #24272D rule, gap 6, then version / "New build ready" spaceBetween.
+                // "nav foot": 1px #24272D rule, gap 6, then version / "New build ready" spaceBetween. A little room
+                // above the rule, so a half-scrolled row does not sit on it.
                 if !root.rail && (root.version != "" || root.update-ready): VerticalLayout {
+                    padding-top: 8px;
                     spacing: 6px;
                     Rectangle {
                         height: 1px;
