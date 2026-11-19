@@ -426,33 +426,99 @@ export global RecallUi {
     callback set-auto-capture(bool);
 }
 
-// One node of the graph picture.
-export struct GraphNode {
-    // position in the unit square
-    x: float,
-    y: float,
-    label: string,
-    // community index, for the colour
+// A name floating over the graph picture: a community's, at the middle of its stars or under its planet.
+export struct GraphLabel {
+    // index of the community (what `view-focus-cluster` takes)
+    cluster: int,
+    x: length,
+    y: length,
+    alpha: float,
+    // its best connected node
+    title: string,
+    // "50 nodes"
+    note: string,
+    // colour slot (0 = the largest community; -1 = "other")
     tone: int,
-    degree: int,
-    // always shows its name (the most connected nodes)
-    named: bool,
+}
+
+// A node in a list beside the picture: a search result, or one of the chosen node's neighbours.
+export struct GraphHit {
+    index: int,
+    title: string,
+    // "23 links · src/client.py"
+    note: string,
+    tone: int,
 }
 
 // Settings › Memory › Graph: the project's Graphify knowledge graph (`harness_agent_hub::graphify`).
 export global GraphUi {
-    // ---- the picture: the most connected nodes of the graph ----
-    in property <[GraphNode]> view-nodes;
-    // SVG path of the links, in a 1000 × 532 box
-    in property <string> view-links;
-    // the links of the selected node
-    in property <string> view-focus;
-    in property <int> view-selected: -1;
-    // "client.py · src/client.py · 23 links · connects to …"
-    in property <string> view-detail;
-    // "The 160 most connected of 4,210 nodes"
+    // ---- the picture: drawn in Rust (`harness-graph-view`), frame by frame, while it is on screen ----
+    in property <image> view-frame;
+    // a graph is loaded and its first frame has arrived
+    in property <bool> view-ready;
+    // "orbit": a flat solar system in the theme's colours; "space": a galaxy around a black hole, in 3D
+    in-out property <string> view-style: "orbit";
+    in-out property <bool> view-paused;
+    // the picture fills the window
+    in-out property <bool> view-wide;
+    // still moving by itself (a frame clock keeps running while it is)
+    in property <bool> view-busy: true;
+    in property <[GraphLabel]> view-labels;
+    // where the project's name goes: under the hole, under the sun
+    in property <length> core-x;
+    in property <length> core-y;
+    in property <float> core-alpha;
+    // the project's folder name
+    in property <string> view-title;
+    // "300 of 4,210 nodes · 520 links"
     in property <string> view-note;
-    callback view-select(int);
+    in property <string> view-fps;
+    // the community being looked at (-1: all of them)
+    in property <int> view-focus: -1;
+    in property <string> view-focus-name;
+    // the node under the pointer
+    in property <bool> tip-shown;
+    in property <length> tip-x;
+    in property <length> tip-y;
+    in property <string> tip-title;
+    in property <string> tip-note;
+    // the chosen node
+    in property <int> view-selected: -1;
+    in property <length> sel-x;
+    in property <length> sel-y;
+    in property <string> sel-title;
+    in property <string> sel-note;
+    in property <string> sel-group;
+    // its file can be opened
+    in property <bool> sel-has-source;
+    in property <[GraphHit]> sel-links;
+    // the list of nodes (search)
+    in-out property <bool> list-open;
+    in-out property <string> list-query;
+    in property <[GraphHit]> list-hits;
+    // the canvas's size changed
+    callback view-resized(length, length);
+    // 0 moved, 1 pressed, 2 dragged, 3 released, 4 left
+    callback view-pointer(int, length, length);
+    // above 1 comes closer
+    callback view-zoom(float);
+    // the frame clock
+    callback view-tick();
+    callback view-reset();
+    callback view-set-style(string);
+    callback view-set-paused(bool);
+    // hold still (paused, window in the background, reduced motion); second: also skip the arrival
+    callback view-rest(bool, bool);
+    // the theme's colours changed
+    callback view-themed();
+    // room the panel takes on the right
+    callback view-inset(length);
+    // look at one community (-1: all again)
+    callback view-focus-cluster(int);
+    // choose a node from a list (-1: none)
+    callback view-pick(int);
+    callback view-search(string);
+    callback view-open-source();
 
     // the `graphify` command was found
     in property <bool> installed;
@@ -460,8 +526,9 @@ export global GraphUi {
     in property <bool> mcp;
     in property <string> cli-path;
     in property <string> install-command;
-    // "uv" | "pipx" | "" (nothing here can install it: the command is only shown)
-    in property <string> installer;
+    // What "Set up Graphify" will run, in words ("winget install astral-sh.uv, then uv tool install …"); "" when
+    // nothing on this computer can install it.
+    in property <string> install-plan;
     in property <string> project;
     in property <bool> has-graph;
     // "1,204 nodes · 3,310 links · 18 communities · updated 2h ago"

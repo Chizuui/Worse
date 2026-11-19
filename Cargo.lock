@@ -2832,6 +2832,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "harness-graph-view"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "harness-host"
 version = "0.1.0"
 dependencies = [
@@ -2991,6 +2998,7 @@ dependencies = [
  "harness-agent-hub",
  "harness-api-agent",
  "harness-core-api",
+ "harness-graph-view",
  "harness-platform",
  "harness-remote",
  "harness-settings",

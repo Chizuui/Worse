@@ -47,6 +47,44 @@ pub fn paths(workspace: &Path) -> Paths {
     }
 }
 
+/// Env override of the `uv` command (tests use a stand-in).
+pub const ENV_UV: &str = "HARNESS_UV";
+
+fn user_home() -> Option<PathBuf> {
+    std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+}
+
+/// Directories where Python tool installers put launchers, beyond `PATH`: a shell started before the install,
+/// or the Windows desktop session, often does not have them on `PATH`.
+fn tool_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(home) = user_home() {
+        // `uv tool`, `pipx`, and `pip install --user` on Unix.
+        dirs.push(home.join(".local").join("bin"));
+        dirs.push(home.join(".cargo").join("bin"));
+    }
+    if cfg!(windows) {
+        // `pip install --user`: %APPDATA%\Python\Python3xx\Scripts.
+        if let Some(roaming) = std::env::var_os("APPDATA").filter(|v| !v.is_empty()) {
+            if let Ok(entries) = std::fs::read_dir(PathBuf::from(roaming).join("Python")) {
+                dirs.extend(entries.flatten().map(|e| e.path().join("Scripts")));
+            }
+        }
+        // winget's shims (uv installed with winget).
+        if let Some(local) = std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty()) {
+            dirs.push(
+                PathBuf::from(local)
+                    .join("Microsoft")
+                    .join("WinGet")
+                    .join("Links"),
+            );
+        }
+    }
+    dirs
+}
+
 fn find(env: &str, program: &str) -> Option<PathBuf> {
     if let Some(custom) = std::env::var_os(env).filter(|v| !v.is_empty()) {
         let path = PathBuf::from(custom);
@@ -55,14 +93,17 @@ fn find(env: &str, program: &str) -> Option<PathBuf> {
     if let Some(found) = crate::agents::resolve_program(program) {
         return Some(found);
     }
-    // `uv tool` and `pipx` put their launchers here; a shell started before the install, or the Windows
-    // desktop session, may not have it on PATH.
-    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })?;
-    let file = PathBuf::from(home)
-        .join(".local")
-        .join("bin")
-        .join(format!("{program}{}", std::env::consts::EXE_SUFFIX));
-    file.is_file().then_some(file)
+    let file = format!("{program}{}", std::env::consts::EXE_SUFFIX);
+    tool_dirs()
+        .into_iter()
+        .map(|dir| dir.join(&file))
+        .find(|path| path.is_file())
+}
+
+/// The `uv` command (Astral's Python tool installer), if installed.
+#[must_use]
+pub fn uv() -> Option<PathBuf> {
+    find(ENV_UV, "uv")
 }
 
 /// The `graphify` command, if installed.

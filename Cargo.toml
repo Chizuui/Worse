@@ -68,3 +68,10 @@ codegen-units = 256
 
 [profile.quick.package."*"]
 opt-level = 2
+
+# The graph picture is drawn pixel by pixel on the CPU; unoptimised it would crawl in a debug build.
+[profile.dev.package.harness-graph-view]
+opt-level = 3
+
+[profile.quick.package.harness-graph-view]
+opt-level = 3

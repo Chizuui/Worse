@@ -47,6 +47,7 @@ import { PanelGit } from "panels/globals.slint";
 // §9.10 first-run setup dialog (src/setup.rs).
 import { SetupUi, SetupRow, SetupDialog } from "setup.slint";
 import { ProviderDialog } from "settings/agents.slint";
+import { GraphCanvas } from "settings/graph_canvas.slint";
 import { OrchestraUi, OrchNode, OrchEdge, OrchLink, OrchAgent, OrchConn } from "settings/orchestra.slint";
 import { InboxUi, InboxSourceRow, InboxTicketRow, InboxTriggerRow, InboxNotice } from "settings/inbox.slint";
 import { ImportUi, ImportRow } from "settings/import.slint";
@@ -5266,6 +5267,12 @@ export component AppWindow inherits Window {
         }
         // 设置页里也能打开（Settings › Agents › Set up agents…），所以放在 SettingsShell 之后，叠在其上。
         if SetupUi.open: SetupDialog { }
+        // The picture of the project graph over the whole window (Settings › Memory › Graph, "Fill the window").
+        if GraphUi.view-wide: GraphCanvas {
+            wide: true;
+            width: 100%;
+            height: 100%;
+        }
         if AgentsUi.provider-open: ProviderDialog { }
     }
 }

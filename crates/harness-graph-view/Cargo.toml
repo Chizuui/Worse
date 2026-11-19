@@ -1,0 +1,13 @@
+[package]
+name = "harness-graph-view"
+version = "0.1.0"
+description = "Draws a project's knowledge graph on the CPU: a flat solar system, or a galaxy around a black hole seen through a 3D camera."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

@@ -156,8 +156,10 @@ history and its own usage limits. Harness puts a single desktop app in front of 
   picks the agent and model of a delegated task that names none, instead of "the first available"
   ([docs](docs/specs/harness/decision-model.md)).
 - [Graphify](https://github.com/Graphify-Labs/graphify) support: build the project's knowledge graph
-  from Settings (code only, no model), and every agent gets the graph's query tools and a note on how to
-  use them ([docs](docs/specs/harness/graphify.md)).
+  from Settings (code only, no model; one button installs the tool first when it is missing), and every
+  agent gets the graph's query tools and a note on how to use them. The graph is drawn in the app in two
+  styles: a simple solar system, and a galaxy of stars around a black hole with a camera you can turn
+  ([docs](docs/specs/harness/graphify.md)).
 - Several API keys for one service (all Command Code keys; providers with the same endpoint and
   model) form a pool: new sessions and subagents take the keys in turn (round robin), and a key at
   its usage limit is skipped until it resets.
