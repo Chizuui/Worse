@@ -442,17 +442,24 @@ impl SessionActor {
                     .await;
             }
             "failed" if !cancelling => {
-                let error = summary.unwrap_or_else(|| "background turn failed".into());
-                self.end_running(
-                    TurnStatus::Failed,
-                    None,
-                    Some(error.clone()),
-                    TurnOutcome::Failed {
-                        error,
-                        class: ErrorClass::Fatal,
-                    },
-                )
-                .await;
+                let Some((turn_id, agent, text)) = self
+                    .running
+                    .as_ref()
+                    .map(|r| (r.turn_id.clone(), r.agent.clone(), r.text.clone()))
+                else {
+                    return;
+                };
+                let message = summary
+                    .filter(|s| !s.trim().is_empty())
+                    .or_else(|| Some(text.trim().to_owned()).filter(|t| !t.is_empty()))
+                    .unwrap_or_else(|| "background turn failed".into());
+                let info = crate::quota::AgentErrorInfo {
+                    code: None,
+                    message,
+                    data: None,
+                };
+                self.on_attempt_failed(&turn_id, &agent, info, crate::failure::Phase::Prompt)
+                    .await;
             }
             _ => {
                 self.end_running(

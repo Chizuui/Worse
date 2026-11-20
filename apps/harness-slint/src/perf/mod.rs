@@ -54,6 +54,10 @@ pub(crate) fn install(window: &AppWindow, data_dir: &Path) {
 }
 
 fn install_frame_timing(window: &AppWindow) {
+    if !crate::gpu_rendering() {
+        frame_timing_unavailable();
+        return;
+    }
     let result = window.window().set_rendering_notifier(|state, _api| {
         let now = Instant::now();
         match state {
@@ -81,12 +85,16 @@ fn install_frame_timing(window: &AppWindow) {
         }
     });
     if result.is_err() {
-        with_ui(|ui| {
-            ui.set_status(SharedString::from(
-                "Frame timing is not available with this renderer; other tracks are still recorded.",
-            ));
-        });
+        frame_timing_unavailable();
     }
+}
+
+fn frame_timing_unavailable() {
+    with_ui(|ui| {
+        ui.set_status(SharedString::from(
+            "Frame timing is not available with this renderer; other tracks are still recorded.",
+        ));
+    });
 }
 
 fn toggle() {

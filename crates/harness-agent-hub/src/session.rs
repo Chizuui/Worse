@@ -158,7 +158,13 @@ pub(crate) struct SessionActor {
     tasks: Vec<background::Tracked>,
 }
 
+const ACTOR_IDLE: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+
 impl SessionActor {
+    fn evictable(&self) -> bool {
+        !self.busy() && self.tasks.is_empty() && self.snapshotted.is_empty()
+    }
+
     /// Loads a session from the store and starts its actor task.
     pub(crate) async fn spawn(ctx: Arc<HubCtx>, row: SessionRow) -> ApiResult<ActorTx> {
         let id = row.id.clone();
@@ -221,7 +227,13 @@ impl SessionActor {
     }
 
     async fn run(mut self, mut rx: mpsc::UnboundedReceiver<ActorMsg>) {
-        while let Some(message) = rx.recv().await {
+        loop {
+            let message = match tokio::time::timeout(ACTOR_IDLE, rx.recv()).await {
+                Ok(Some(message)) => message,
+                Ok(None) => break,
+                Err(_) if self.evictable() => break,
+                Err(_) => continue,
+            };
             let shutdown = match message {
                 ActorMsg::Cmd(SessionCmd::Shutdown(reply)) => {
                     self.on_shutdown().await;
@@ -941,6 +953,9 @@ impl SessionActor {
             if let Some(graph) = self.graph_block().await {
                 blocks.push(text_block(&graph));
             }
+            if let Some(map) = self.map_block().await {
+                blocks.push(text_block(&map));
+            }
             if let Some(notes) = self.notes_block().await {
                 blocks.push(text_block(&notes));
                 notes_pushed = true;
@@ -1056,18 +1071,26 @@ impl SessionActor {
         );
         let home = self.ctx.config.home.clone();
         let workspace = self.row.workspace_path.clone();
-        let graph = tokio::task::spawn_blocking(move || {
-            crate::recall::Store::new(&home).config().graph
-                && crate::graphify::mcp_server(&workspace).is_some()
+        let (graph, concise) = tokio::task::spawn_blocking(move || {
+            let config = crate::recall::Store::new(&home).config();
+            (
+                config.graph && crate::graphify::mcp_server(&workspace).is_some(),
+                config.concise,
+            )
         })
         .await
-        .unwrap_or(false);
-        crate::about::block(crate::about::Attached {
+        .unwrap_or((false, true));
+        let mut text = crate::about::block(crate::about::Attached {
             delegate: delegate && !child,
             child: delegate && child,
             computer,
             graph,
-        })
+        });
+        if concise {
+            text.push('\n');
+            text.push_str(crate::about::STYLE);
+        }
+        text
     }
 
     /// The note about the project's Graphify graph; `None` without a graph or with the switch off.
@@ -1079,6 +1102,20 @@ impl SessionActor {
                 return None;
             }
             crate::graphify::prompt_block(&workspace, crate::recall::now_ms())
+        })
+        .await
+        .ok()
+        .flatten()
+    }
+
+    async fn map_block(&self) -> Option<String> {
+        let home = self.ctx.config.home.clone();
+        let workspace = self.row.workspace_path.clone();
+        tokio::task::spawn_blocking(move || {
+            if !crate::recall::Store::new(&home).config().graph {
+                return None;
+            }
+            crate::project_map::prompt_block(&home, &workspace)
         })
         .await
         .ok()

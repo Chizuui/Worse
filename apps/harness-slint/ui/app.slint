@@ -784,6 +784,7 @@ component ChatRow inherits VerticalLayout {
                     if root.item.status == 0: Spinner {
                         y: (parent.height - self.height) / 2;
                         size: 13px;
+                        clocked: true;
                     }
                     if root.item.status == 0: Text {
                         text: @tr("Streaming…");
@@ -973,6 +974,7 @@ component ChatRow inherits VerticalLayout {
             if root.item.group-state == 0: Spinner {
                 y: (parent.height - self.height) / 2;
                 size: 13px;
+                clocked: true;
             }
             if root.item.group-state == 4: Icon {
                 y: (parent.height - self.height) / 2;
@@ -1056,6 +1058,24 @@ component ChatRow inherits VerticalLayout {
                 horizontal-stretch: 1;
                 accessible-role: none;
             }
+        }
+    }
+    if root.item.kind == 7: Rectangle {
+        height: earlier.preferred-height + 16px;
+        accessible-role: AccessibleRole.button;
+        accessible-label: earlier.text;
+        accessible-action-default => { ChatUi.show-earlier(); }
+        earlier := Text {
+            text: @tr("Show {0} earlier messages", root.item.text);
+            font-size: Theme.ui-sm;
+            color: earlier-touch.has-hover ? Theme.foreground : Theme.foreground-subtle;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        earlier-touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { ChatUi.show-earlier(); }
         }
     }
     // Failover / paused notices: warning surface with an icon.
@@ -1850,7 +1870,7 @@ component RoundButton inherits Rectangle {
         }
     }
     if root.pulse: Rectangle {
-        property <float> t: mod(animation-tick() / 1400ms, 1);
+        property <float> t: mod(ArtClock.busy-tick, 16) / 16;
         width: parent.width * (1 + 0.55 * self.t);
         height: self.width;
         x: (parent.width - self.width) / 2;

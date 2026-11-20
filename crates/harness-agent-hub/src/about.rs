@@ -61,9 +61,26 @@ and your own tool list; do not inspect the application's files to find out.\n</h
     text
 }
 
+pub const STYLE: &str = "<harness-style>\n\
+Replies: put the answer or result first. No greeting, preamble, restating the request, narration of your \
+steps or closing offer. Status and concept questions get one or two sentences. After editing files, name \
+them with file:line and say what changed; do not paste the code back. Never shorten code with `// ...` and \
+never drop error handling or validation to save space. Keep one-line warnings about security, data loss \
+and unverified assumptions.\n\
+Input: search before reading and give every search a path or glob, never the drive root or home folder; \
+list matching files first when you only need where something is. Read line ranges, not whole large files. \
+Use compact commands (`git status -s`, `git log --oneline -n 10`). From a failing build or test read only \
+the error lines. Do not open lockfiles, build output or vendored dependencies.\n</harness-style>";
+
 #[cfg(test)]
 mod tests {
-    use super::{block, Attached};
+    use super::{block, Attached, STYLE};
+
+    #[test]
+    fn style_block_stays_small() {
+        assert!(STYLE.starts_with("<harness-style>") && STYLE.ends_with("</harness-style>"));
+        assert!(STYLE.len() < 1400, "{}", STYLE.len());
+    }
 
     #[test]
     fn names_only_the_servers_the_session_has() {

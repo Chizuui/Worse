@@ -80,6 +80,14 @@ pub(crate) fn migrate(c: &Connection) -> Result<(), HubError> {
 pub(crate) fn mark_orphans(c: &Connection) -> Result<(), HubError> {
     c.execute(
         "UPDATE runs SET state='finished', finished_at=COALESCE(finished_at, started_at)
+         WHERE state IN ('running','resumable','resumed') AND EXISTS(
+           SELECT 1 FROM runs n WHERE n.session_id=runs.session_id
+             AND (n.started_at>runs.started_at
+               OR (n.started_at=runs.started_at AND n.turn_id>runs.turn_id)))",
+        [],
+    )?;
+    c.execute(
+        "UPDATE runs SET state='finished', finished_at=COALESCE(finished_at, started_at)
          WHERE state='running' AND NOT EXISTS(
            SELECT 1 FROM run_steps s WHERE s.turn_id=runs.turn_id AND s.state='tool_result')",
         [],
@@ -117,6 +125,11 @@ pub(crate) fn begin(
             user_text,
             at
         ],
+    )?;
+    c.execute(
+        "UPDATE runs SET state='finished', finished_at=COALESCE(finished_at, ?3)
+         WHERE session_id=?1 AND turn_id<>?2 AND state IN ('running','resumable','resumed')",
+        params![session.as_str(), turn.as_str(), at],
     )?;
     Ok(())
 }
@@ -432,6 +445,56 @@ mod tests {
         )
         .unwrap();
         finish(&c, &turn, 5).unwrap();
+        mark_orphans(&c).unwrap();
+        assert!(offer(&c, &session()).unwrap().is_none());
+    }
+
+    fn result(c: &Connection, turn: &TurnId, at: i64) {
+        step(
+            c,
+            turn,
+            "tool_result",
+            Some("t1"),
+            Some("shell"),
+            None,
+            Some("out"),
+            at,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn only_the_newest_run_of_a_session_is_offered() {
+        let c = open();
+        let old = TurnId::new("turn-old");
+        begin(&c, &session(), &old, &AgentId::new("codex"), "old", 1).unwrap();
+        result(&c, &old, 2);
+        c.execute(
+            "INSERT INTO runs(turn_id,session_id,agent,user_text,state,started_at)
+             VALUES('turn-new','sess-1','codex','new','running',10)",
+            [],
+        )
+        .unwrap();
+        result(&c, &TurnId::new("turn-new"), 11);
+        mark_orphans(&c).unwrap();
+        let run = offer(&c, &session()).unwrap().unwrap();
+        assert_eq!(run.user_text, "new");
+        discard(&c, &session()).unwrap();
+        mark_orphans(&c).unwrap();
+        assert!(offer(&c, &session()).unwrap().is_none());
+    }
+
+    #[test]
+    fn a_new_turn_closes_the_pending_offer() {
+        let c = open();
+        let old = TurnId::new("turn-a");
+        begin(&c, &session(), &old, &AgentId::new("codex"), "a", 1).unwrap();
+        result(&c, &old, 2);
+        mark_orphans(&c).unwrap();
+        assert!(offer(&c, &session()).unwrap().is_some());
+        let new = TurnId::new("turn-b");
+        begin(&c, &session(), &new, &AgentId::new("codex"), "b", 3).unwrap();
+        finish(&c, &new, 4).unwrap();
         mark_orphans(&c).unwrap();
         assert!(offer(&c, &session()).unwrap().is_none());
     }

@@ -282,7 +282,8 @@ fn config_defaults_on_and_round_trips() {
         Config {
             recall: true,
             capture: false,
-            graph: true
+            graph: true,
+            concise: true
         }
     );
     let _ = fs::remove_dir_all(home);

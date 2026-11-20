@@ -15,6 +15,7 @@ mod llm;
 mod mcp;
 mod papers;
 mod project_docs;
+mod search;
 mod session;
 mod tools;
 mod web;

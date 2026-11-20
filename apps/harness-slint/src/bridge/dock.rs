@@ -523,7 +523,7 @@ impl UiState {
 
     fn show_resumable(&mut self, run: Option<ResumableRun>) {
         let dock = self.dock();
-        if let Some(run) = run {
+        if let Some(run) = run.filter(|run| !run.resumed) {
             let plural = if run.finished_steps == 1 { "" } else { "s" };
             dock.set_resume_title(sv(&format!(
                 "{} finished step{plural} before the interruption, for: {}",

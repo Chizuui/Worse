@@ -59,6 +59,7 @@ pub fn install(window: &AppWindow, home: &Path, workspace: &Path) {
     let config = Store::new(home).config();
     ui.set_auto_recall(config.recall);
     ui.set_auto_capture(config.capture);
+    ui.set_concise(config.concise);
 
     let c = ctx.clone();
     ui.on_refresh(move || reload(&c, None));
@@ -112,8 +113,10 @@ pub fn install(window: &AppWindow, home: &Path, workspace: &Path) {
 
     let c = ctx.clone();
     ui.on_set_auto_recall(move |on| set_config(&c, move |config| config.recall = on));
-    let c = ctx;
+    let c = ctx.clone();
     ui.on_set_auto_capture(move |on| set_config(&c, move |config| config.capture = on));
+    let c = ctx;
+    ui.on_set_concise(move |on| set_config(&c, move |config| config.concise = on));
 }
 
 fn run(work: impl FnOnce() + Send + 'static) {
@@ -145,6 +148,7 @@ fn set_config(ctx: &Ctx, change: impl FnOnce(&mut recall::Config) + Send + 'stat
             let ui = window.global::<RecallUi>();
             ui.set_auto_recall(config.recall);
             ui.set_auto_capture(config.capture);
+            ui.set_concise(config.concise);
             if let Some(error) = failed {
                 ui.set_note(format!("Could not save the setting: {error}").into());
             }

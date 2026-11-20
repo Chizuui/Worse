@@ -173,6 +173,7 @@ export global ChatUi {
     callback turn-action(string, int);
     // Open a tool-card path (`path` or `path:line`, workspace-relative or absolute) in the editor.
     callback open-path(string);
+    callback show-earlier();
     // Item id of the last assistant row (Retry only there); -1 = none.
     in property <int> last-assistant: -1;
     // ---- status panel and context meter ----

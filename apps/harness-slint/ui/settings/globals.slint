@@ -481,6 +481,7 @@ export global RecallUi {
     in-out property <string> filter: "all";
     in property <bool> auto-recall: true;
     in property <bool> auto-capture: true;
+    in property <bool> concise: true;
     in-out property <string> draft;
     in-out property <string> draft-kind: "fact";
     in-out property <bool> draft-global;
@@ -490,6 +491,7 @@ export global RecallUi {
     callback pin(string, bool);
     callback set-auto-recall(bool);
     callback set-auto-capture(bool);
+    callback set-concise(bool);
 }
 
 // A name floating over the graph picture: a community's, at the middle of its stars or under its planet.

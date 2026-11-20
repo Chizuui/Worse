@@ -93,15 +93,23 @@ component CardItem inherits Rectangle {
         HorizontalLayout {
             spacing: 6px;
             height: 18px;
-            if root.card.state == "running": HorizontalLayout {
+            if root.card.state == "running": working := HorizontalLayout {
+                property <int> beat;
                 spacing: 6px;
+                Timer {
+                    interval: 100ms;
+                    running: !Theme.reduce-motion;
+                    triggered => {
+                        working.beat = mod(working.beat + 1, 20);
+                    }
+                }
                 Rectangle {
                     y: (parent.height - self.height) / 2;
                     width: 6px;
                     height: 6px;
                     border-radius: 3px;
                     background: root.agent-tint;
-                    opacity: Theme.reduce-motion ? 1 : 0.55 + 0.45 * abs(sin(animation-tick() / 1ms * 0.18deg));
+                    opacity: Theme.reduce-motion ? 1 : 0.55 + 0.45 * abs(sin(working.beat * 18deg));
                 }
                 Text {
                     text: "Agent working…";

@@ -173,6 +173,7 @@ impl Added {
 
 /// What the hub does on its own. Read from `config.json` each time, so a change in Settings applies to the
 /// next session without a restart.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
@@ -183,6 +184,7 @@ pub struct Config {
     /// Give agents the project's Graphify graph when there is one ([`crate::graphify`]): its MCP server and a
     /// note in the first prompt.
     pub graph: bool,
+    pub concise: bool,
 }
 
 impl Default for Config {
@@ -191,6 +193,7 @@ impl Default for Config {
             recall: true,
             capture: true,
             graph: true,
+            concise: true,
         }
     }
 }

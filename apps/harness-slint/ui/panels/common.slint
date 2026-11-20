@@ -50,8 +50,16 @@ export component ProgressTrack inherits Rectangle {
     border-radius: 2px;
     background: Theme.border-hover;
     clip: true;
+    property <int> step;
+    Timer {
+        interval: 50ms;
+        running: root.ratio < 0 && !root.on-busy-clock && !Theme.reduce-motion;
+        triggered => {
+            root.step = mod(root.step + 1, 32);
+        }
+    }
     Rectangle {
-        property <float> phase: Theme.reduce-motion ? 0.3 : root.on-busy-clock ? mod(ArtClock.busy-tick, 18) / 18 : mod(animation-tick() / 1ms, 1600) / 1600;
+        property <float> phase: Theme.reduce-motion ? 0.3 : root.on-busy-clock ? mod(ArtClock.busy-tick, 18) / 18 : root.step / 32;
         x: root.ratio < 0 ? (parent.width * 1.4 * self.phase - parent.width * 0.4) : 0;
         width: root.ratio < 0 ? parent.width * 0.4 : parent.width * clamp(root.ratio, 0, 1);
         height: parent.height;

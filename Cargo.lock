@@ -2737,6 +2737,7 @@ dependencies = [
  "harness-core-api",
  "harness-import",
  "harness-perf",
+ "ignore",
  "reqwest",
  "rusqlite",
  "rustls",
@@ -3027,7 +3028,7 @@ dependencies = [
 
 [[package]]
 name = "harness-slint"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "alacritty_terminal",
  "clipboard-win",

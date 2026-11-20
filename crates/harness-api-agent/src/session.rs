@@ -181,7 +181,11 @@ fn system_prompt(agent: &Agent, session: &Session, instructions: &str) -> String
          - Batch: when several tool calls do not depend on each other (searches, reads of different files), \
          request them all in the same response.\n\
          - Search once: put every name variant in one regex (e.g. maxConcurrent|max_concurrent|max-concurrent) \
-         instead of one search per spelling; search before listing directories or reading files.\n\
+         instead of one search per spelling; search before listing directories or reading files. Use the \
+         search tool, never grep, findstr or Select-String through run_command; narrow it with path or glob and \
+         use files_only when you only need where something is.\n\
+         - Lean output: use compact commands (git status -s, git log --oneline -n 10); from a failing build or \
+         test read only the error lines; do not open lockfiles, build output or vendored dependencies.\n\
          - Read once: read the range you need in one call (large enough to cover the surrounding code); do not \
          re-read files, re-run commands or repeat searches whose results you already have.\n\
          - Stop early: answer as soon as you have enough evidence; do not verify what the task did not ask for.\n\
@@ -190,7 +194,11 @@ fn system_prompt(agent: &Agent, session: &Session, instructions: &str) -> String
          appear as [Harness folded context fN] summaries, and context_search or context_decompress bring \
          details back.\n\
          When the task is done, stop and report.\n\
-         Keep answers concise and reply in the user's language.",
+         Replies: lead with the answer or result, reply in the user's language, and skip greetings, preamble, \
+         restating the request and closing offers. After editing files, cite file:line and say what changed \
+         instead of pasting the code back. Never shorten code with placeholders such as // ... and never drop \
+         error handling or validation. Keep one-line warnings about security, data loss and unverified \
+         assumptions.",
         label = agent.provider.label,
         cwd = session.cwd,
     );

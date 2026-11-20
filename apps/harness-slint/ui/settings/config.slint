@@ -1794,6 +1794,17 @@ component RecallBody inherits VerticalLayout {
                 }
             }
         }
+        SettingRow {
+            title: "Concise replies";
+            description: "A new session asks the agent to lead with the result, skip preamble and narration, and keep searches and file reads narrow. Saves tokens on every turn.";
+            Switch {
+                label: "Concise replies";
+                checked: RecallUi.concise;
+                toggled(on) => {
+                    RecallUi.set-concise(on);
+                }
+            }
+        }
     }
     // Add by hand.
     DCard {

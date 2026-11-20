@@ -3,13 +3,13 @@
 //! Lives in a `thread_local` on the UI thread; the core thread reaches it only through
 //! `slint::invoke_from_event_loop` (spec §3 "Threading").
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
 
-use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, FilterModel, Model, ModelRc, SharedString, VecModel};
 use tokio::sync::mpsc;
 
 use crate::core::{
@@ -72,6 +72,33 @@ struct UiState {
 
 thread_local! {
     static STATE: RefCell<Option<UiState>> = const { RefCell::new(None) };
+    static REVEALED: Cell<i32> = const { Cell::new(-1) };
+    static CHAT_VIEW: RefCell<Option<Rc<ChatView>>> = const { RefCell::new(None) };
+}
+
+type ChatView = FilterModel<Rc<VecModel<ChatItem>>, fn(&ChatItem) -> bool>;
+
+fn shown_row(row: &ChatItem) -> bool {
+    !row.folded || row.id == REVEALED.with(Cell::get)
+}
+
+pub fn reveal_row(id: i32) {
+    if REVEALED.with(|r| r.replace(id)) != id {
+        CHAT_VIEW.with(|v| {
+            if let Some(view) = v.borrow().as_ref() {
+                view.reset();
+            }
+        });
+    }
+}
+
+pub fn shown_index(id: i32) -> i32 {
+    CHAT_VIEW.with(|v| {
+        v.borrow()
+            .as_ref()
+            .and_then(|view| view.iter().position(|row| row.id == id))
+            .map_or(-1, |at| i32::try_from(at).unwrap_or(-1))
+    })
 }
 
 fn with_state(f: impl FnOnce(&mut UiState)) {
@@ -290,6 +317,12 @@ impl UiState {
             } => {
                 row.kind = 4;
                 row.reset = reset.clone().unwrap_or_default().into();
+            }
+            Item::Notice {
+                notice: Notice::Earlier { count },
+            } => {
+                row.kind = 7;
+                row.text = count.to_string().into();
             }
         }
         row
@@ -1099,7 +1132,12 @@ pub fn install(
     window.set_sessions(ModelRc::from(sessions.clone()));
     window.set_agents(ModelRc::from(agents.clone()));
     window.set_fallback(ModelRc::from(fallback.clone()));
-    window.set_chat(ModelRc::from(chat.clone()));
+    let view: Rc<ChatView> = Rc::new(FilterModel::new(
+        chat.clone(),
+        shown_row as fn(&ChatItem) -> bool,
+    ));
+    CHAT_VIEW.with(|v| *v.borrow_mut() = Some(view.clone()));
+    window.set_chat(ModelRc::from(view));
     window.set_files(ModelRc::from(files.clone()));
     window.set_queue(ModelRc::from(queue.clone()));
     // 修复：启动时不显示上次的工作区（名称/路径），直到打开会话或文件夹为止。
@@ -1349,6 +1387,14 @@ pub fn open_session(id: &str) {
         s.send(Command::OpenSession {
             session: id.to_string(),
         });
+    });
+}
+
+pub fn show_earlier() {
+    with_state(|s| {
+        if let Some(session) = s.active.clone() {
+            s.send(Command::OpenSessionAll { session });
+        }
     });
 }
 

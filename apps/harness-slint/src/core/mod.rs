@@ -109,6 +109,9 @@ pub enum Notice {
     Paused {
         reset: Option<String>,
     },
+    Earlier {
+        count: usize,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -189,6 +192,9 @@ pub enum Command {
         workspace: Option<PathBuf>,
     },
     OpenSession {
+        session: SessionId,
+    },
+    OpenSessionAll {
         session: SessionId,
     },
     /// The agent is a parameter of every send (one session, many agents).

@@ -269,6 +269,30 @@ fn part(kind: i32, text: &str) -> ToolPart {
     }
 }
 
+const PART_LINES: usize = 200;
+const PART_CHARS: usize = 12_000;
+
+fn clip(text: &str) -> std::borrow::Cow<'_, str> {
+    let mut end = text.len();
+    let mut cut = false;
+    if let Some((at, _)) = text.char_indices().nth(PART_CHARS) {
+        end = at;
+        cut = true;
+    }
+    if let Some((at, _)) = text[..end].match_indices('\n').nth(PART_LINES) {
+        end = at;
+        cut = true;
+    }
+    if !cut {
+        return std::borrow::Cow::Borrowed(text);
+    }
+    let rest = text[end..].lines().filter(|l| !l.is_empty()).count();
+    std::borrow::Cow::Owned(format!(
+        "{}\n… {rest} more lines not shown",
+        text[..end].trim_end()
+    ))
+}
+
 fn fenced_body(text: &str) -> Option<&str> {
     let trimmed = text.trim();
     let rest = trimmed.strip_prefix("```")?;
@@ -413,8 +437,8 @@ fn tool_parts(
     for item in content {
         match item {
             ToolContent::Text { text } => match fenced_body(text) {
-                Some(body) => out.push(part(6, body.trim_end())),
-                None => out.push(part(0, text.trim_end())),
+                Some(body) => out.push(part(6, &clip(body.trim_end()))),
+                None => out.push(part(0, &clip(text.trim_end()))),
             },
             ToolContent::Diff {
                 path,
@@ -430,7 +454,7 @@ fn tool_parts(
     for (label, raw) in [("input", raw_input), ("output", raw_output)] {
         if let Some(raw) = raw.filter(|r| !r.trim().is_empty()) {
             out.push(part(5, label));
-            out.push(part(6, raw.trim_end()));
+            out.push(part(6, &clip(raw.trim_end())));
         }
     }
     out

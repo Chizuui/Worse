@@ -732,7 +732,7 @@ impl Adapter {
     async fn resync(&mut self) {
         self.startup().await;
         if let Some(id) = self.active_id() {
-            self.open(&id).await;
+            self.open(&id, false).await;
         }
     }
 
@@ -808,7 +808,8 @@ impl Adapter {
             Command::CreateWorktreeSession { agent, workspace } => {
                 self.create(true, agent, workspace).await;
             }
-            Command::OpenSession { session } => self.open(&session).await,
+            Command::OpenSession { session } => self.open(&session, false).await,
+            Command::OpenSessionAll { session } => self.open(&session, true).await,
             Command::Send {
                 session,
                 agent,
@@ -1014,7 +1015,7 @@ impl Adapter {
         match result {
             Ok(created) => {
                 self.refresh_sessions().await;
-                self.open(created.id.as_str()).await;
+                self.open(created.id.as_str(), false).await;
             }
             Err(error) => self.report("new session", &error),
         }
@@ -1496,7 +1497,7 @@ impl Adapter {
     }
 
     #[allow(clippy::too_many_lines)]
-    async fn open(&mut self, session: &str) {
+    async fn open(&mut self, session: &str, all: bool) {
         let detail = match self.core.open_session(api::SessionId::new(session)).await {
             Ok(detail) => detail,
             Err(error) => {
@@ -1517,9 +1518,23 @@ impl Adapter {
         let mut items = Vec::new();
         let mut running = false;
         let mut paused = false;
-        for turn in &detail.turns {
+        let start = if all { 0 } else { tail_start(&detail.turns) };
+        if let Some(first) = detail.turns.first().filter(|_| start > 0) {
+            let id = view.alloc_in(&first.id);
+            items.push((
+                id,
+                Item::Notice {
+                    notice: Notice::Earlier { count: start },
+                },
+            ));
+        }
+        for (index, turn) in detail.turns.iter().enumerate() {
             running |= turn.status == api::TurnStatus::Running;
             paused |= turn.status == api::TurnStatus::Paused;
+            if index < start {
+                view.turns.insert(turn.id.clone(), TurnMap::default());
+                continue;
+            }
             if detail.queue.contains(&turn.id) {
                 // 排队中的消息只显示在输入框上方的队列里（可取消），开始运行时才进入对话。
                 view.turns.insert(turn.id.clone(), TurnMap::default());
@@ -1745,7 +1760,7 @@ impl Adapter {
         if is_open && matches!(event.kind, EventKind::TurnsRemoved { .. }) {
             // 回退/编辑重发/重试删除了回合：已显示的条目和 item→turn 映射都已失效，按快照重建视图。
             if let Some(id) = self.active_id() {
-                self.open(&id).await;
+                self.open(&id, false).await;
             }
             return;
         }
@@ -2765,4 +2780,21 @@ mod tests {
         assert!(request.worktree.is_none());
         assert_eq!(request.agent, Some(api::AgentId::new("codex")));
     }
+}
+
+const TAIL_TURNS: usize = 3;
+const TAIL_ITEMS: usize = 400;
+
+fn tail_start(turns: &[api::TurnView]) -> usize {
+    let mut budget = 0;
+    let mut start = turns.len();
+    while start > 0 {
+        let cost = 1 + turns[start - 1].tool_calls.len();
+        if turns.len() - start >= TAIL_TURNS && budget + cost > TAIL_ITEMS {
+            break;
+        }
+        budget += cost;
+        start -= 1;
+    }
+    start
 }

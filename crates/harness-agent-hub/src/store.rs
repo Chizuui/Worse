@@ -445,6 +445,8 @@ fn load_turns_inner(
         turn.segments = build_segments(&turn.assistant_text, last_attempt, &marks);
         if index < keep_from {
             slim_turn(turn);
+        } else if slim {
+            trim_turn(turn);
         }
     }
     Ok(turns)
@@ -452,10 +454,31 @@ fn load_turns_inner(
 
 const FULL_TURNS: usize = 8;
 const SLIM_TEXT: usize = 256;
+const FULL_TEXT: usize = 16 * 1024;
+
+fn trim_turn(turn: &mut TurnView) {
+    for tool in &mut turn.tool_calls {
+        for text in [tool.raw_input.as_mut(), tool.raw_output.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            clip_to(text, FULL_TEXT);
+        }
+        for content in &mut tool.content {
+            if let harness_core_api::ToolContent::Text { text } = content {
+                clip_to(text, FULL_TEXT);
+            }
+        }
+    }
+}
 
 fn clip(text: &mut String) {
-    if text.len() > SLIM_TEXT {
-        let mut end = SLIM_TEXT;
+    clip_to(text, SLIM_TEXT);
+}
+
+fn clip_to(text: &mut String, limit: usize) {
+    if text.len() > limit {
+        let mut end = limit;
         while !text.is_char_boundary(end) {
             end -= 1;
         }
@@ -494,6 +517,12 @@ fn slim_turn(turn: &mut TurnView) {
         }
     }
     turn.tool_calls.shrink_to_fit();
+    for thought in &mut turn.thoughts {
+        clip(&mut thought.text);
+    }
+    if let Some(last) = turn.attempts.last_mut() {
+        clip(&mut last.partial_text);
+    }
 }
 
 /// Folds one stored turn event into the view.

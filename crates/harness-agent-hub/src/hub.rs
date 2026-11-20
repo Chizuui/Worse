@@ -544,8 +544,12 @@ impl Hub {
     ) -> ApiResult<T> {
         let tx = self.actor(id).await?;
         let (reply, rx) = oneshot::channel();
-        tx.send(ActorMsg::Cmd(make(reply)))
-            .map_err(|_| ApiError::ShutDown)?;
+        if let Err(unsent) = tx.send(ActorMsg::Cmd(make(reply))) {
+            self.actor(id)
+                .await?
+                .send(unsent.0)
+                .map_err(|_| ApiError::ShutDown)?;
+        }
         rx.await.map_err(|_| ApiError::ShutDown)?
     }
 

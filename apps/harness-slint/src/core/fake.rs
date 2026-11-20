@@ -560,7 +560,7 @@ impl FakeCore {
                 self.sync_summary(&id);
                 self.emit_opened(&id);
             }
-            Command::OpenSession { session } => {
+            Command::OpenSession { session } | Command::OpenSessionAll { session } => {
                 if self.ensure_open(&session).await {
                     self.emit_opened(&session);
                     self.emit_session_options(&session, false);

@@ -45,6 +45,7 @@ mod options;
 mod orchestra;
 pub mod pool;
 mod process;
+mod project_map;
 mod providers;
 pub mod quota;
 pub mod recall;

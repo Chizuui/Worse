@@ -942,12 +942,14 @@ impl ChatState {
         let ui = self.ui();
         let count = i32::try_from(self.find_hits.len()).unwrap_or(i32::MAX);
         ui.set_find_count(count);
-        if let Some(&(id, row)) = self.find_hits.get(self.find_pos) {
+        if let Some(&(id, _)) = self.find_hits.get(self.find_pos) {
             ui.set_find_current(i32::try_from(self.find_pos + 1).unwrap_or(i32::MAX));
+            crate::bridge::reveal_row(id);
             ui.set_find_id(id);
-            ui.set_find_row(i32::try_from(row).unwrap_or(-1));
+            ui.set_find_row(crate::bridge::shown_index(id));
         } else {
             ui.set_find_current(0);
+            crate::bridge::reveal_row(-1);
             ui.set_find_id(-1);
             ui.set_find_row(-1);
         }
@@ -960,6 +962,7 @@ impl ChatState {
         self.find_pos = 0;
         let ui = self.ui();
         ui.set_find_open(false);
+        crate::bridge::reveal_row(-1);
         ui.set_find_id(-1);
         ui.set_find_row(-1);
         ui.set_find_count(0);
@@ -1528,6 +1531,7 @@ fn wire(window: &AppWindow) {
     ui.on_attach_files(pick_files);
     whiteboard::install(window);
     ui.on_open_path(|path| open_path(&path));
+    ui.on_show_earlier(crate::bridge::show_earlier);
     ui.on_paste_image(paste_image);
     install_drop(window);
 }

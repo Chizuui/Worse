@@ -21,7 +21,6 @@ const READ_LINES: usize = 2000;
 const LINE_MAX: usize = 2000;
 const READ_BYTES_MAX: u64 = 10 * 1024 * 1024;
 const LIST_MAX: usize = 1000;
-const SEARCH_MAX: usize = 200;
 const COMMAND_DEFAULT_SECS: u64 = 120;
 const COMMAND_MAX_SECS: u64 = 600;
 
@@ -52,13 +51,17 @@ pub fn definitions(mode: &str, background: bool) -> Vec<Value> {
         ),
         function(
             "search",
-            "Search file contents with a regular expression (respects .gitignore). Returns path:line: text. \
-             Combine alternatives in one pattern (a|b|c) rather than searching several times.",
+            "Search file contents with a regular expression. Fast and bounded: skips .gitignore'd, binary, \
+             dependency and build folders, stops after 20 s with partial results. Returns path:line: text. \
+             Use this instead of grep/Select-String/findstr in run_command. Combine alternatives in one pattern \
+             (a|b|c); set path or glob to narrow it; files_only first when you only need where something is.",
             &json!({"type": "object", "properties": {
                 "pattern": {"type": "string", "description": "Regular expression"},
                 "path": {"type": "string", "description": "File or directory to search, default the working directory"},
                 "glob": {"type": "string", "description": "Only files matching this glob, e.g. *.rs"},
-                "case_insensitive": {"type": "boolean"}
+                "case_insensitive": {"type": "boolean"},
+                "files_only": {"type": "boolean", "description": "List matching files with their match counts instead of lines"},
+                "context": {"type": "integer", "description": "Lines of context around each match, at most 3"}
             }, "required": ["pattern"]}),
         ),
     ];
@@ -321,7 +324,14 @@ impl Ctx<'_> {
         let mut update = tool.clone();
         update["sessionUpdate"] = json!("tool_call");
         self.update(&update);
-        let outcome = if self.mode == "readOnly" && writes(&call.name, &args) {
+        let outcome = if call.name == "run_command"
+            && str_arg(&args, "command").is_some_and(crate::search::shell_search)
+        {
+            Outcome::err(
+                "refused: recursive text search through the shell is slow and unbounded here. Use the search \
+                 tool (pattern, path, glob, files_only, context) instead; it is faster and stops after 20 s.",
+            )
+        } else if self.mode == "readOnly" && writes(&call.name, &args) {
             Outcome::err("refused: the session is in read-only mode")
         } else if self.needs_permission(&call.name, &args) && !self.ask(&call.name, &tool).await {
             Outcome::err("the user denied this action")
@@ -482,17 +492,30 @@ impl Ctx<'_> {
         let Some(pattern) = str_arg(args, "pattern").map(str::to_owned) else {
             return Outcome::err("pattern is required");
         };
-        let root = resolve(self.cwd, str_arg(args, "path").unwrap_or("."));
-        let glob = str_arg(args, "glob").map(str::to_owned);
-        let insensitive = args
-            .get("case_insensitive")
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        let cwd = self.cwd.to_path_buf();
-        let result = tokio::task::spawn_blocking(move || {
-            search_blocking(&root, &cwd, &pattern, glob.as_deref(), insensitive)
-        })
-        .await;
+        let flag = |key: &str| args.get(key).and_then(Value::as_bool).unwrap_or(false);
+        let request = crate::search::Request {
+            root: resolve(self.cwd, str_arg(args, "path").unwrap_or(".")),
+            cwd: self.cwd.to_path_buf(),
+            pattern,
+            glob: str_arg(args, "glob").map(str::to_owned),
+            insensitive: flag("case_insensitive"),
+            files_only: flag("files_only"),
+            context: args.get("context").and_then(Value::as_u64).map_or(0, |n| {
+                usize::try_from(n).unwrap_or(crate::search::CONTEXT_MAX)
+            }),
+        };
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = std::sync::Arc::clone(&cancel);
+        let task = tokio::task::spawn_blocking(move || {
+            crate::search::run(&request, &flag, crate::search::DEADLINE)
+        });
+        let result = tokio::select! {
+            () = self.token.cancelled() => {
+                cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+                return Outcome::err("cancelled");
+            }
+            result = task => result,
+        };
         match result {
             Ok(Ok(text)) => Outcome::ok(text),
             Ok(Err(e)) => Outcome::err(e),
@@ -637,62 +660,4 @@ impl Ctx<'_> {
             outcome
         }
     }
-}
-
-fn search_blocking(
-    root: &Path,
-    cwd: &Path,
-    pattern: &str,
-    glob: Option<&str>,
-    insensitive: bool,
-) -> Result<String, String> {
-    use grep_regex::RegexMatcherBuilder;
-    use grep_searcher::sinks::UTF8;
-    use grep_searcher::Searcher;
-
-    let matcher = RegexMatcherBuilder::new()
-        .case_insensitive(insensitive)
-        .build(pattern)
-        .map_err(|e| format!("invalid pattern: {e}"))?;
-    let mut walk = ignore::WalkBuilder::new(root);
-    if let Some(glob) = glob {
-        let mut overrides = ignore::overrides::OverrideBuilder::new(root);
-        overrides
-            .add(glob)
-            .map_err(|e| format!("invalid glob: {e}"))?;
-        walk.overrides(
-            overrides
-                .build()
-                .map_err(|e| format!("invalid glob: {e}"))?,
-        );
-    }
-    let mut hits: Vec<String> = Vec::new();
-    let mut searcher = Searcher::new();
-    for entry in walk.build().flatten() {
-        if hits.len() >= SEARCH_MAX {
-            break;
-        }
-        if !entry.file_type().is_some_and(|t| t.is_file()) {
-            continue;
-        }
-        let path = entry.path();
-        let shown = path.strip_prefix(cwd).unwrap_or(path).display().to_string();
-        let _ = searcher.search_path(
-            &matcher,
-            path,
-            UTF8(|line, text| {
-                let text: String = text.trim_end().chars().take(300).collect();
-                hits.push(format!("{shown}:{line}: {text}"));
-                Ok(hits.len() < SEARCH_MAX)
-            }),
-        );
-    }
-    if hits.is_empty() {
-        return Ok("no matches".into());
-    }
-    let mut out = hits.join("\n");
-    if hits.len() >= SEARCH_MAX {
-        let _ = write!(out, "\n… stopped at {SEARCH_MAX} matches");
-    }
-    Ok(out)
 }
