@@ -24,7 +24,13 @@ pub(crate) struct AgySlot {
     pub active: bool,
 }
 
-/// A bar before display: (label, used %, reset unix time).
+/// A bar before display: (label, remaining %, reset unix time).
+///
+/// Remaining, not used: Antigravity's own panel reports "Weekly Limit
+/// Remaining" / "Five Hour Limit Remaining", so Worse shows the same number
+/// users compare against. A bar almost full means quota left; 0% remaining
+/// means the limit is hit. (Claude Code rows elsewhere in the popover still
+/// show utilization, because Anthropic's API returns utilization.)
 type RawBar = (String, f32, Option<i64>);
 
 /// Last successful quota per account id: (plan, bars, fetched at). Only numbers, no tokens.
@@ -171,25 +177,26 @@ async fn fetch_one(client: &reqwest::Client, target: &str, id: &str, label: &str
     }
 }
 
-/// Display row; `s_of` marks numbers remembered from an earlier check. A passed reset reads as unused.
+/// Display row; `as_of` marks numbers remembered from an earlier check. A passed reset reads as full again.
 fn shown(id: &str, label: &str, plan: String, bars: &[RawBar], as_of: Option<i64>) -> Fetched {
     let now = now_secs();
     let mut out = row(id, label, "");
     out.plan = plan;
     out.bars = bars
         .iter()
-        .map(|(name, used, reset)| match reset {
-            Some(at) if *at <= now => (name.clone(), 0.0, String::new()),
-            Some(at) => (name.clone(), *used, resets_in(*at)),
-            None => (name.clone(), *used, String::new()),
+        .map(|(name, remaining, reset)| match reset {
+            Some(at) if *at <= now => (name.clone(), 100.0, String::new()),
+            Some(at) => (name.clone(), *remaining, resets_in(*at)),
+            None => (name.clone(), *remaining, String::new()),
         })
         .collect();
+    // Lowest remaining first: the most constrained bucket is the summary.
     let mut top: Vec<&(String, f32, String)> = out.bars.iter().collect();
-    top.sort_by(|a, b| b.1.total_cmp(&a.1));
+    top.sort_by(|a, b| a.1.total_cmp(&b.1));
     out.summary = top
         .iter()
         .take(2)
-        .map(|(name, used, _)| format!("{name} {used:.0}%"))
+        .map(|(name, remaining, _)| format!("{name} {remaining:.0}% left"))
         .collect::<Vec<_>>()
         .join(" · ");
     if let Some(at) = as_of {
@@ -234,8 +241,21 @@ async fn quota(client: &reqwest::Client, target: &str) -> Result<(String, Vec<Ra
     )
     .await
     .ok();
-    let mut bars = summary.as_ref().map(summary_bars).unwrap_or_default();
-    if !bars.iter().any(|(label, _, _)| label.starts_with("Gemini")) {
+    let (mut bars, skipped) = summary.as_ref().map(summary_bars).unwrap_or_default();
+    // Fallback: `fetchAvailableModels` only carries one remaining fraction per
+    // model, with no window attached, so it can never invent a weekly or a
+    // 5-hour bar. Fill in only the families the summary did not report, one
+    // honestly labelled "quota" bar each (worst model of the family).
+    let families = ["Gemini", "Claude", "GPT"];
+    // "Gemini · " (with separator) so a "Gemini 4 Argon" bar does not count
+    // as the Gemini Models family being present.
+    let prefixes = ["Gemini · ", "Claude", "GPT"];
+    let missing = prefixes
+        .iter()
+        .filter(|f| !bars.iter().any(|(label, _, _)| label.starts_with(**f)))
+        .count();
+    let mut fallback_used = false;
+    if missing > 0 {
         if let Ok(models) = post(
             client,
             &token,
@@ -244,12 +264,115 @@ async fn quota(client: &reqwest::Client, target: &str) -> Result<(String, Vec<Ra
         )
         .await
         {
-            if let Some((used, reset)) = group(&models["models"])[0] {
-                bars.push(("Gemini · 5-hour".into(), used, reset));
+            fallback_used = true;
+            for (slot, value) in group(&models["models"]).into_iter().enumerate() {
+                let Some((remaining, reset)) = value else {
+                    continue;
+                };
+                if bars
+                    .iter()
+                    .any(|(label, _, _)| label.starts_with(prefixes[slot]))
+                {
+                    continue;
+                }
+                bars.push((
+                    format!("{} · quota remaining", families[slot]),
+                    remaining,
+                    reset,
+                ));
             }
         }
     }
+    write_diagnostic(&plan, summary.as_ref(), &skipped, fallback_used, &bars);
     Ok((plan, bars))
+}
+
+/// Where the redacted quota diagnostic goes: `<harness home>/logs/agy-quota-debug.json`.
+/// No token, no project id, no account name: only group/bucket shapes and numbers.
+fn write_diagnostic(
+    plan: &str,
+    summary: Option<&Value>,
+    skipped: &[String],
+    fallback_used: bool,
+    bars: &[RawBar],
+) {
+    let home = std::env::var_os("HARNESS_HOME")
+        .filter(|v| !v.is_empty())
+        .map_or_else(
+            || {
+                std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+                    .map_or_else(|| std::path::PathBuf::from("."), std::path::PathBuf::from)
+                    .join(".harness")
+            },
+            std::path::PathBuf::from,
+        );
+    let groups: Vec<Value> = summary
+        .and_then(|s| groups_of(s))
+        .map(|groups| {
+            groups
+                .iter()
+                .map(|group| {
+                    let buckets: Vec<Value> = group["buckets"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(|bucket| {
+                            json!({
+                                "bucketId": bucket["bucketId"].as_str().unwrap_or_default(),
+                                "displayName": bucket["displayName"].as_str().unwrap_or_default(),
+                                "window": bucket["window"].as_str().unwrap_or_default(),
+                                "disabled": bucket["disabled"].as_bool().unwrap_or(false),
+                                "hasRemaining": bucket["remainingFraction"].is_number()
+                                    || bucket["remainingFraction"].is_string(),
+                                "remaining": fraction(&bucket["remainingFraction"]),
+                                "resetTime": bucket["resetTime"].as_str().unwrap_or_default(),
+                            })
+                        })
+                        .collect();
+                    json!({
+                        "displayName": group["displayName"].as_str().unwrap_or_default(),
+                        "buckets": buckets,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let doc = json!({
+        "atUnix": now_secs(),
+        "plan": plan,
+        "summaryGroups": groups,
+        "skippedBuckets": skipped,
+        "fallbackUsed": fallback_used,
+        "barsShown": bars.iter().map(|(label, remaining, reset)| json!({
+            "label": label, "remaining": remaining, "resetUnix": reset,
+        })).collect::<Vec<_>>(),
+    });
+    let dir = home.join("logs");
+    if std::fs::create_dir_all(&dir).is_ok() {
+        let text = serde_json::to_string_pretty(&doc).unwrap_or_default();
+        let _ = std::fs::write(dir.join("agy-quota-debug.json"), text);
+    }
+    eprintln!(
+        "agy usage: plan={plan} groups={} bars={} skipped={:?} fallback={fallback_used}",
+        groups.len(),
+        bars.len(),
+        skipped,
+    );
+}
+
+/// The `groups` array of a quota summary, tolerating the Connect-RPC envelope
+/// `{"response": {"groups": [...]}}` as well as a bare `{"groups": [...]}`.
+fn groups_of(summary: &Value) -> Option<&Vec<Value>> {
+    summary["groups"]
+        .as_array()
+        .or_else(|| summary["response"]["groups"].as_array())
+}
+
+/// A fraction that may arrive as a JSON number or as a numeric string.
+fn fraction(value: &Value) -> Option<f64> {
+    value
+        .as_f64()
+        .or_else(|| value.as_str().and_then(|s| s.parse::<f64>().ok()))
 }
 fn short_group(name: &str) -> String {
     let name = name
@@ -259,40 +382,70 @@ fn short_group(name: &str) -> String {
     name.replace(" and ", " & ")
 }
 
-/// Every bucket of every quota group, as (label, used %, reset time), in server order.
-fn summary_bars(summary: &Value) -> Vec<RawBar> {
+/// Every bucket of every quota group, as (label, remaining %, reset time), in
+/// server order, plus the buckets that had to be skipped and why (never silent:
+/// a skipped Gemini weekly / Argon bucket is exactly the bug this file had).
+fn summary_bars(summary: &Value) -> (Vec<RawBar>, Vec<String>) {
     let mut out = Vec::new();
-    for group in summary["groups"].as_array().into_iter().flatten() {
+    let mut skipped = Vec::new();
+    for group in groups_of(summary).into_iter().flatten() {
         let name = short_group(group["displayName"].as_str().unwrap_or("Models"));
         for bucket in group["buckets"].as_array().into_iter().flatten() {
+            let bucket_name = bucket["displayName"]
+                .as_str()
+                .or_else(|| bucket["bucketId"].as_str())
+                .unwrap_or("limit");
             if bucket["disabled"].as_bool() == Some(true) {
+                skipped.push(format!("{name} · {bucket_name}: disabled by server"));
                 continue;
             }
-            let Some(remaining) = bucket["remainingFraction"].as_f64() else {
+            let Some(remaining) = fraction(&bucket["remainingFraction"]) else {
+                skipped.push(format!("{name} · {bucket_name}: no remainingFraction"));
                 continue;
             };
-            let window = match bucket["window"].as_str().unwrap_or_default() {
+            let window = match bucket["window"]
+                .as_str()
+                .unwrap_or_default()
+                .to_ascii_lowercase()
+                .as_str()
+            {
                 "weekly" => "weekly".to_owned(),
-                "5h" => "5-hour".to_owned(),
-                "" => bucket["displayName"].as_str().unwrap_or("limit").to_owned(),
+                "5h" | "5-hour" | "five_hour" | "five-hour" => "5-hour".to_owned(),
+                "" => bucket_name.to_owned(),
                 other => other.to_owned(),
             };
             #[allow(clippy::cast_possible_truncation)]
-            let used = ((1.0 - remaining.clamp(0.0, 1.0)) * 100.0) as f32;
+            let remaining = (remaining.clamp(0.0, 1.0) * 100.0) as f32;
             let reset = bucket["resetTime"].as_str().and_then(parse_rfc3339);
-            out.push((format!("{name} · {window}"), used, reset));
+            out.push((format!("{name} · {window} remaining"), remaining, reset));
         }
     }
-    out
+    (out, skipped)
 }
 
-/// Worst (lowest remaining) quota per family: [Gemini, Claude, GPT-OSS], as (used %, reset time).
+/// Worst (lowest remaining) quota per family: [Gemini, Claude, GPT-OSS], as
+/// (remaining %, reset time). Accepts the models as an object map or an array.
 fn group(models: &Value) -> [Option<(f32, Option<i64>)>; 3] {
     let mut worst: [Option<(f64, Option<i64>)>; 3] = [None, None, None];
-    let Some(map) = models.as_object() else {
-        return [None, None, None];
+    let entries: Vec<(String, &Value)> = match models {
+        Value::Object(map) => map.iter().map(|(k, v)| (k.clone(), v)).collect(),
+        Value::Array(items) => items
+            .iter()
+            .map(|v| {
+                (
+                    v["id"]
+                        .as_str()
+                        .or_else(|| v["modelId"].as_str())
+                        .or_else(|| v["name"].as_str())
+                        .unwrap_or_default()
+                        .to_owned(),
+                    v,
+                )
+            })
+            .collect(),
+        _ => return [None, None, None],
     };
-    for (id, model) in map {
+    for (id, model) in entries {
         if model["displayName"].as_str().is_none() || id.contains("image") {
             continue;
         }
@@ -306,7 +459,7 @@ fn group(models: &Value) -> [Option<(f32, Option<i64>)>; 3] {
             continue;
         };
         let quota = &model["quotaInfo"];
-        let Some(remaining) = quota["remainingFraction"].as_f64() else {
+        let Some(remaining) = fraction(&quota["remainingFraction"]) else {
             continue;
         };
         let reset = quota["resetTime"].as_str().and_then(parse_rfc3339);
@@ -317,8 +470,8 @@ fn group(models: &Value) -> [Option<(f32, Option<i64>)>; 3] {
     worst.map(|w| {
         w.map(|(remaining, reset)| {
             #[allow(clippy::cast_possible_truncation)]
-            let used = ((1.0 - remaining.clamp(0.0, 1.0)) * 100.0) as f32;
-            (used, reset)
+            let remaining = (remaining.clamp(0.0, 1.0) * 100.0) as f32;
+            (remaining, reset)
         })
     })
 }
@@ -337,9 +490,21 @@ mod tests {
             "chat_1": {"quotaInfo": {"remainingFraction": 0.0}}
         });
         let g = group(&models);
-        assert_eq!(g[0].as_ref().map(|x| x.0.round()), Some(75.0));
-        assert_eq!(g[1].as_ref().map(|x| x.0), Some(0.0));
+        assert_eq!(g[0].as_ref().map(|x| x.0.round()), Some(25.0));
+        assert_eq!(g[1].as_ref().map(|x| x.0), Some(100.0));
         assert!(g[2].is_none());
+    }
+
+    #[test]
+    fn group_accepts_models_as_an_array() {
+        let models = json!([
+            {"id": "gemini-3-flash", "displayName": "G3", "quotaInfo": {"remainingFraction": 0.9}},
+            {"id": "gpt-oss-120b", "displayName": "GPT", "quotaInfo": {"remainingFraction": "0.5"}}
+        ]);
+        let g = group(&models);
+        assert_eq!(g[0].as_ref().map(|x| x.0.round()), Some(90.0));
+        assert!(g[1].is_none());
+        assert_eq!(g[2].as_ref().map(|x| x.0.round()), Some(50.0));
     }
 
     #[test]
@@ -351,19 +516,69 @@ mod tests {
         ]}, {"displayName": "Gemini 4 Argon", "buckets": [
             {"displayName": "Weekly Limit", "remainingFraction": 0.8227}
         ]}]});
-        let bars = summary_bars(&v);
+        let (bars, skipped) = summary_bars(&v);
         assert_eq!(bars.len(), 3);
-        assert_eq!(bars[0].0, "Claude & GPT · weekly");
-        assert_eq!(bars[0].1.round(), 47.0);
-        assert_eq!(bars[2].0, "Gemini 4 Argon · Weekly Limit");
+        assert_eq!(bars[0].0, "Claude & GPT · weekly remaining");
+        assert_eq!(bars[0].1.round(), 53.0);
+        assert_eq!(bars[2].0, "Gemini 4 Argon · Weekly Limit remaining");
+        assert_eq!(skipped.len(), 1);
+        assert!(skipped[0].contains("disabled"));
     }
 
     #[test]
-    fn remembered_numbers_show_as_of_and_passed_resets_read_unused() {
+    fn summary_reads_the_response_envelope_and_reports_missing_fractions() {
+        let v = json!({"response": {"groups": [
+            {"displayName": "Gemini Models", "buckets": [
+                {"window": "weekly"},
+                {"window": "5h", "remainingFraction": 0.9378}
+            ]}
+        ]}});
+        let (bars, skipped) = summary_bars(&v);
+        assert_eq!(bars.len(), 1);
+        assert_eq!(bars[0].0, "Gemini · 5-hour remaining");
+        assert_eq!(bars[0].1.round(), 94.0);
+        assert_eq!(skipped.len(), 1);
+        assert!(skipped[0].contains("no remainingFraction"));
+    }
+
+    #[test]
+    fn user_screenshot_numbers_show_as_remaining() {
+        // Antigravity's own panel: Gemini weekly 98.20% left, 5-hour 93.78%
+        // left, Claude & GPT 100% left, Argon weekly 100% left. Worse used to
+        // show those as 0% used and drop the weekly/Argon bars entirely.
+        let v = json!({"groups": [
+            {"displayName": "Gemini Models", "buckets": [
+                {"window": "weekly", "remainingFraction": 0.982},
+                {"window": "5h", "remainingFraction": 0.9378}
+            ]},
+            {"displayName": "Claude and GPT models", "buckets": [
+                {"window": "weekly", "remainingFraction": 1},
+                {"window": "5h", "remainingFraction": 1}
+            ]},
+            {"displayName": "Gemini 4 Argon", "buckets": [
+                {"displayName": "Weekly Limit", "remainingFraction": 1}
+            ]}
+        ]});
+        let (bars, skipped) = summary_bars(&v);
+        assert!(skipped.is_empty());
+        assert_eq!(bars.len(), 5);
+        assert_eq!(bars[0].0, "Gemini · weekly remaining");
+        assert_eq!(bars[0].1.round(), 98.0);
+        assert_eq!(bars[1].1.round(), 94.0);
+        assert_eq!(bars[4].0, "Gemini 4 Argon · Weekly Limit remaining");
+        assert_eq!(bars[4].1.round(), 100.0);
+    }
+
+    #[test]
+    fn remembered_numbers_show_as_of_and_passed_resets_read_full() {
         let now = now_secs();
         let bars = vec![
-            ("Gemini · weekly".to_owned(), 40.0, Some(now + 3600)),
-            ("Claude · 5-hour".to_owned(), 90.0, Some(now - 60)),
+            (
+                "Gemini · weekly remaining".to_owned(),
+                60.0,
+                Some(now + 3600),
+            ),
+            ("Claude · 5-hour remaining".to_owned(), 10.0, Some(now - 60)),
         ];
         let row = shown(
             "agy:sek2",
@@ -373,8 +588,9 @@ mod tests {
             Some(now - 1500),
         );
         assert_eq!(row.error, "");
-        assert_eq!(row.bars[1].1, 0.0);
+        assert_eq!(row.bars[1].1, 100.0);
         assert!(row.bars[0].2.starts_with("Resets in"));
         assert!(row.summary.ends_with("(as of 25m ago)"));
+        assert!(row.summary.contains("60% left"));
     }
 }
