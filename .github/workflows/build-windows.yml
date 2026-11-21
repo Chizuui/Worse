@@ -8,10 +8,10 @@ name: build-windows
 on:
   workflow_dispatch:
   push:
-    branches: ["liquid-glass-ui"]
+    branches: ["liquid-glass-ui", "agy-usage-fix"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows:
@@ -36,9 +36,18 @@ jobs:
           foreach ($file in "LICENSE", "NOTICE") {
             if (Test-Path $file) { Copy-Item $file $dir }
           }
+          Compress-Archive -Path $dir -DestinationPath dist/Worse-Harness-windows-x64.zip
 
       - uses: actions/upload-artifact@v4
         with:
           name: Worse-Harness-windows-x64
           path: dist/Worse-Harness-windows-x64
           if-no-files-found: error
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: agy-usage-fix-build
+          name: Worse Harness (agy usage fix)
+          files: dist/Worse-Harness-windows-x64.zip
+          fail_on_unmatched_files: true
