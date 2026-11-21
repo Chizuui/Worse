@@ -12,7 +12,12 @@ use serde_json::{json, Value};
 use crate::plan_usage::{parse_rfc3339, resets_in, Fetched};
 
 const BASE: &str = "https://cloudcode-pa.googleapis.com/v1internal";
-const CLIENT_VERSION: &str = "1.11.3";
+/// The `agy` CLI's version, as captured from its own traffic: the quota
+/// server gates the grouped summary on this client identity. With any other
+/// User-Agent the summary comes back with only the Claude & GPT (`3p`)
+/// group and no Gemini/Argon groups at all, which is exactly what the
+/// first build showed (live-verified by a mitmproxy capture of `agy`).
+const CLI_VERSION: &str = "1.0.9";
 
 pub(crate) const AGY_ID: &str = "agy";
 
@@ -48,7 +53,10 @@ fn user_agent() -> String {
         "aarch64" => "arm64",
         other => other,
     };
-    format!("antigravity/{CLIENT_VERSION} {os}/{arch}")
+    // The Antigravity CLI's own User-Agent: `antigravity/cli/<version>
+    // <os>/<arch>`. The quota server only returns the full grouped summary
+    // (Gemini, Claude & GPT, Argon) to this client identity.
+    format!("antigravity/cli/{CLI_VERSION} {os}/{arch}")
 }
 
 fn row(id: &str, label: &str, error: &str) -> Fetched {
@@ -433,6 +441,7 @@ fn write_diagnostic(
     let doc = json!({
         "atUnix": now_secs(),
         "plan": plan,
+        "userAgent": user_agent(),
         "summaryGroups": groups,
         "summaryTopLevel": summary_shape(summary),
         "modelsQuota": models_quota(models),
@@ -687,6 +696,20 @@ mod tests {
         assert!(row.bars[0].2.starts_with("Resets in"));
         assert!(row.summary.ends_with("(as of 25m ago)"));
         assert!(row.summary.contains("60% left"));
+    }
+
+    #[test]
+    fn user_agent_matches_the_agy_cli() {
+        // The quota server gates the grouped summary on the CLI's identity:
+        // any other UA returns only the Claude & GPT group (seen live).
+        let ua = user_agent();
+        assert!(ua.starts_with("antigravity/cli/"), "{ua}");
+        let arch = match std::env::consts::ARCH {
+            "x86_64" => "amd64",
+            "aarch64" => "arm64",
+            other => other,
+        };
+        assert!(ua.ends_with(arch), "{ua}");
     }
 
     #[test]
