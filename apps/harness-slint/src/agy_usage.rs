@@ -250,11 +250,19 @@ async fn quota(client: &reqwest::Client, target: &str) -> Result<(String, Vec<Ra
     // "Gemini · " (with separator) so a "Gemini 4 Argon" bar does not count
     // as the Gemini Models family being present.
     let prefixes = ["Gemini · ", "Claude", "GPT"];
-    let missing = prefixes
-        .iter()
-        .filter(|f| !bars.iter().any(|(label, _, _)| label.starts_with(**f)))
-        .count();
+    // The summary's "Claude & GPT" group already covers the GPT-OSS models,
+    // so a GPT fallback bar next to it would double-count the same quota.
+    let covered = |bars: &[(String, f32, Option<i64>)], slot: usize| match slot {
+        2 => bars
+            .iter()
+            .any(|(label, _, _)| label.starts_with("GPT") || label.starts_with("Claude & GPT")),
+        _ => bars
+            .iter()
+            .any(|(label, _, _)| label.starts_with(prefixes[slot])),
+    };
+    let missing = (0..3).filter(|slot| !covered(&bars, *slot)).count();
     let mut fallback_used = false;
+    let mut models_seen: Option<Value> = None;
     if missing > 0 {
         if let Ok(models) = post(
             client,
@@ -269,10 +277,7 @@ async fn quota(client: &reqwest::Client, target: &str) -> Result<(String, Vec<Ra
                 let Some((remaining, reset)) = value else {
                     continue;
                 };
-                if bars
-                    .iter()
-                    .any(|(label, _, _)| label.starts_with(prefixes[slot]))
-                {
+                if covered(&bars, slot) {
                     continue;
                 }
                 bars.push((
@@ -281,10 +286,97 @@ async fn quota(client: &reqwest::Client, target: &str) -> Result<(String, Vec<Ra
                     reset,
                 ));
             }
+            models_seen = Some(models);
         }
     }
-    write_diagnostic(&plan, summary.as_ref(), &skipped, fallback_used, &bars);
+    write_diagnostic(
+        &plan,
+        summary.as_ref(),
+        &skipped,
+        fallback_used,
+        &bars,
+        models_seen.as_ref(),
+    );
     Ok((plan, bars))
+}
+
+/// Top-level shape of a quota-summary response: key -> value kind, so a
+/// second group array hiding under another key (e.g. `geminiGroups`) shows
+/// up instead of silently never being parsed. No values, only shapes.
+fn summary_shape(summary: Option<&Value>) -> Value {
+    match summary {
+        Some(Value::Object(map)) => {
+            let mut shape = serde_json::Map::new();
+            for (k, v) in map {
+                let desc = match v {
+                    Value::Array(a) => format!("array[{}]", a.len()),
+                    Value::Object(o) => format!("object[{} keys]", o.len()),
+                    Value::String(_) => "string".to_owned(),
+                    Value::Number(_) => "number".to_owned(),
+                    Value::Bool(_) => "bool".to_owned(),
+                    Value::Null => "null".to_owned(),
+                };
+                shape.insert(k.clone(), Value::String(desc));
+            }
+            Value::Object(shape)
+        }
+        Some(_) => Value::String("non-object".to_owned()),
+        None => Value::Null,
+    }
+}
+
+/// Per-model quota from `fetchAvailableModels`, redacted to id + fraction +
+/// reset only: shows whether the Gemini models really report 100%, or the
+/// metered ones are skipped (e.g. ids that do not start with `gemini`).
+fn models_quota(models: Option<&Value>) -> Vec<Value> {
+    let Some(models) = models else {
+        return Vec::new();
+    };
+    let entries: Vec<(String, &Value)> = match &models["models"] {
+        Value::Object(map) => map.iter().map(|(k, v)| (k.clone(), v)).collect(),
+        Value::Array(items) => items
+            .iter()
+            .map(|v| {
+                (
+                    v["id"]
+                        .as_str()
+                        .or_else(|| v["modelId"].as_str())
+                        .or_else(|| v["name"].as_str())
+                        .unwrap_or_default()
+                        .to_owned(),
+                    v,
+                )
+            })
+            .collect(),
+        _ => match &models["response"]["models"] {
+            Value::Array(items) => items
+                .iter()
+                .map(|v| {
+                    (
+                        v["id"]
+                            .as_str()
+                            .or_else(|| v["modelId"].as_str())
+                            .or_else(|| v["name"].as_str())
+                            .unwrap_or_default()
+                            .to_owned(),
+                        v,
+                    )
+                })
+                .collect(),
+            _ => Vec::new(),
+        },
+    };
+    entries
+        .into_iter()
+        .take(300)
+        .map(|(id, model)| {
+            json!({
+                "id": id,
+                "remaining": fraction(&model["quotaInfo"]["remainingFraction"]),
+                "reset": model["quotaInfo"]["resetTime"].as_str().unwrap_or_default(),
+            })
+        })
+        .collect()
 }
 
 /// Where the redacted quota diagnostic goes: `<harness home>/logs/agy-quota-debug.json`.
@@ -295,6 +387,7 @@ fn write_diagnostic(
     skipped: &[String],
     fallback_used: bool,
     bars: &[RawBar],
+    models: Option<&Value>,
 ) {
     let home = std::env::var_os("HARNESS_HOME")
         .filter(|v| !v.is_empty())
@@ -341,6 +434,8 @@ fn write_diagnostic(
         "atUnix": now_secs(),
         "plan": plan,
         "summaryGroups": groups,
+        "summaryTopLevel": summary_shape(summary),
+        "modelsQuota": models_quota(models),
         "skippedBuckets": skipped,
         "fallbackUsed": fallback_used,
         "barsShown": bars.iter().map(|(label, remaining, reset)| json!({
@@ -592,5 +687,35 @@ mod tests {
         assert!(row.bars[0].2.starts_with("Resets in"));
         assert!(row.summary.ends_with("(as of 25m ago)"));
         assert!(row.summary.contains("60% left"));
+    }
+
+    #[test]
+    fn models_quota_records_ids_and_fractions() {
+        // The user's live run showed a Gemini fallback bar of 100% while
+        // Antigravity itself reported 98.20% / 93.78%: the diagnostic must
+        // show each model's id as seen by the grouping code, so a skipped
+        // metered model (e.g. an id not starting with `gemini`) is visible.
+        let models = json!({"models": {
+            "gemini-2.5-flash": {"displayName": "Flash", "quotaInfo": {"remainingFraction": 0.982, "resetTime": "2026-11-21T06:59:40Z"}},
+            "models/gemini-4-neon": {"displayName": "Neon", "quotaInfo": {"remainingFraction": 1.0}},
+            "claude-opus-5-5": {"displayName": "Opus"}
+        }});
+        let q = models_quota(Some(&models));
+        assert_eq!(q.len(), 3);
+        let by_id = |id: &str| q.iter().find(|e| e["id"] == id).unwrap().clone();
+        assert_eq!(by_id("gemini-2.5-flash")["remaining"], 0.982);
+        assert_eq!(by_id("models/gemini-4-neon")["remaining"], 1.0);
+        assert!(by_id("claude-opus-5-5")["remaining"].is_null());
+    }
+
+    #[test]
+    fn summary_shape_lists_top_level_keys() {
+        let v = json!({"groups": [{"displayName": "Claude and GPT models", "buckets": []}],
+            "geminiGroups": [{"displayName": "Gemini Models"}],
+            "project": "p"});
+        let shape = summary_shape(Some(&v));
+        assert_eq!(shape["groups"], "array[1]");
+        assert_eq!(shape["geminiGroups"], "array[1]");
+        assert_eq!(shape["project"], "string");
     }
 }
