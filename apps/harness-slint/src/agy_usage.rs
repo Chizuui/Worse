@@ -11,7 +11,16 @@ use serde_json::{json, Value};
 
 use crate::plan_usage::{parse_rfc3339, resets_in, Fetched};
 
+/// `agy` itself talks to the `daily-` host, not the prod host: the grouped
+/// summary (Gemini + Claude & GPT + Argon) comes from there. The prod host
+/// is kept as a fallback so a `daily-` outage still shows the `3p` bars
+/// instead of nothing.
+const BASE_DAILY: &str = "https://daily-cloudcode-pa.googleapis.com/v1internal";
 const BASE: &str = "https://cloudcode-pa.googleapis.com/v1internal";
+
+fn base_hosts() -> [&'static str; 2] {
+    [BASE_DAILY, BASE]
+}
 /// The `agy` CLI's version, as captured from its own traffic: the quota
 /// server gates the grouped summary on this client identity. With any other
 /// User-Agent the summary comes back with only the Claude & GPT (`3p`)
@@ -110,28 +119,37 @@ async fn post(
     token: &str,
     method: &str,
     body: Value,
-) -> Result<Value, String> {
-    let response = client
-        .post(format!("{BASE}:{method}"))
-        .bearer_auth(token)
-        .header("user-agent", user_agent())
-        .json(&body)
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await
-        .map_err(|_| "Network error".to_owned())?;
-    let status = response.status();
-    if !status.is_success() {
-        return Err(if status.as_u16() == 401 {
-            "Login expired; run agy once to refresh it".into()
-        } else {
-            format!("Usage unavailable (HTTP {})", status.as_u16())
-        });
+) -> Result<(Value, &'static str), String> {
+    let mut last_error = "Network error".to_owned();
+    for base in base_hosts() {
+        let response = client
+            .post(format!("{base}:{method}"))
+            .bearer_auth(token)
+            .header("user-agent", user_agent())
+            .json(&body)
+            .timeout(Duration::from_secs(30))
+            .send()
+            .await;
+        let response = match response {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+        let status = response.status();
+        if !status.is_success() {
+            last_error = if status.as_u16() == 401 {
+                "Login expired; run agy once to refresh it".to_owned()
+            } else {
+                format!("Usage unavailable (HTTP {})", status.as_u16())
+            };
+            continue;
+        }
+        let value = response
+            .json::<Value>()
+            .await
+            .map_err(|_| "Usage unavailable".to_owned())?;
+        return Ok((value, base));
     }
-    response
-        .json::<Value>()
-        .await
-        .map_err(|_| "Usage unavailable".to_owned())
+    Err(last_error)
 }
 
 /// One row per saved agy account (the active one from agy's live login, the others from their Harness copies);
@@ -225,7 +243,7 @@ fn shown(id: &str, label: &str, plan: String, bars: &[RawBar], as_of: Option<i64
 /// Plan name and bars of the login in `target`.
 async fn quota(client: &reqwest::Client, target: &str) -> Result<(String, Vec<RawBar>), String> {
     let token = read_token(target)?.ok_or_else(|| "Not signed in".to_owned())?;
-    let load = post(
+    let (load, _) = post(
         client,
         &token,
         "loadCodeAssist",
@@ -241,14 +259,15 @@ async fn quota(client: &reqwest::Client, target: &str) -> Result<(String, Vec<Ra
         Value::String(s) => s.clone(),
         v => v["id"].as_str().unwrap_or_default().to_owned(),
     };
-    let summary = post(
+    let (summary, summary_host) = post(
         client,
         &token,
         "retrieveUserQuotaSummary",
         json!({"project": project}),
     )
     .await
-    .ok();
+    .map(|(v, h)| (Some(v), h))
+    .unwrap_or((None, BASE));
     let (mut bars, skipped) = summary.as_ref().map(summary_bars).unwrap_or_default();
     // Fallback: `fetchAvailableModels` only carries one remaining fraction per
     // model, with no window attached, so it can never invent a weekly or a
@@ -272,7 +291,7 @@ async fn quota(client: &reqwest::Client, target: &str) -> Result<(String, Vec<Ra
     let mut fallback_used = false;
     let mut models_seen: Option<Value> = None;
     if missing > 0 {
-        if let Ok(models) = post(
+        if let Ok((models, _)) = post(
             client,
             &token,
             "fetchAvailableModels",
@@ -304,6 +323,7 @@ async fn quota(client: &reqwest::Client, target: &str) -> Result<(String, Vec<Ra
         fallback_used,
         &bars,
         models_seen.as_ref(),
+        summary_host,
     );
     Ok((plan, bars))
 }
@@ -396,6 +416,7 @@ fn write_diagnostic(
     fallback_used: bool,
     bars: &[RawBar],
     models: Option<&Value>,
+    host: &str,
 ) {
     let home = std::env::var_os("HARNESS_HOME")
         .filter(|v| !v.is_empty())
@@ -442,6 +463,7 @@ fn write_diagnostic(
         "atUnix": now_secs(),
         "plan": plan,
         "userAgent": user_agent(),
+        "host": host,
         "summaryGroups": groups,
         "summaryTopLevel": summary_shape(summary),
         "modelsQuota": models_quota(models),
@@ -710,6 +732,16 @@ mod tests {
             other => other,
         };
         assert!(ua.ends_with(arch), "{ua}");
+    }
+
+    #[test]
+    fn daily_host_is_tried_before_prod() {
+        // `agy` itself hits daily-cloudcode-pa; the prod host answered the
+        // summary with only the Claude & GPT group even with the CLI UA.
+        let hosts = base_hosts();
+        assert_eq!(hosts[0], BASE_DAILY);
+        assert!(hosts[0].starts_with("https://daily-"));
+        assert_eq!(hosts[1], BASE);
     }
 
     #[test]
